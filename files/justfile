@@ -1,0 +1,102 @@
+# System Control Center
+
+# Path to the configuration flake
+FLAKE_PATH := "~/Develop/github.com/kleinbem/nix/nix-config"
+
+default:
+    @just --list --justfile ~/.justfile
+
+# --- AI Services ---
+
+# Start AI stack (Ollama, WebUI, n8n)
+ai-up:
+    sudo systemctl start ai-services.target
+
+# Stop AI stack
+ai-down:
+    sudo systemctl stop ai-services.target
+
+# Check AI status
+ai-status:
+    systemctl status ai-services.target ollama open-webui n8n
+
+# Follow AI logs
+ai-logs:
+    journalctl -u ollama -u open-webui -u n8n -f
+
+# --- System ---
+
+# --- Generic Service Control ---
+
+# Start a system service
+start service:
+    sudo systemctl start {{service}}
+
+# Stop a system service
+stop service:
+    sudo systemctl stop {{service}}
+
+# Restart a system service
+restart service:
+    sudo systemctl restart {{service}}
+
+# Check service status
+status service:
+    systemctl status {{service}}
+
+# --- System Management ---
+
+# Rebuild system (Apply changes)
+rebuild:
+    nh os switch --ask --diff always {{FLAKE_PATH}}
+
+# Smart Rebuild (Checks build count first)
+rebuild-smart:
+    {{FLAKE_PATH}}/scripts/smart-switch.sh {{FLAKE_PATH}}
+
+# Rollback to previous generation
+rollback:
+    nh os switch --rollback {{FLAKE_PATH}}
+
+# Show generation history
+history:
+    nix profile history --profile /nix/var/nix/profiles/system
+
+# Show what changed between generations
+changelogs:
+    nix store diff-closures /run/booted-system /run/current-system
+
+# Reboot into BIOS/UEFI
+bios:
+    systemctl reboot --firmware-setup
+
+# Verify store integrity
+verify-store:
+    nix-store --verify --check-contents
+
+
+
+# Garbage Collect (Free space)
+clean:
+    nh clean all
+    # Also clean old generations (keep last 3 days)
+    sudo nix-collect-garbage --delete-older-than 3d
+
+# System Logs
+logs:
+    journalctl -f
+
+# --- Fixes ---
+
+# Fix YubiKey/Smartcard issues (Restart PCSCD & Agents)
+fix-yubikey:
+    pkill lxqt-openssh-askpass || true
+    gpgconf --kill gpg-agent || true
+    sudo systemctl restart pcscd
+
+# Fix Chrome (Restart Panel & YubiKey & Chrome)
+fix-chrome:
+    pkill cosmic-panel || true
+    pkill -f google-chrome || true
+    just fix-yubikey
+    google-chrome-stable > /dev/null 2>&1 &
