@@ -44,7 +44,7 @@
           # example = import ./modules/example.nix;
         };
         homeManagerModules = {
-           # Add modules here
+           opencode = import ./opencode.nix;
         };
       };
     };
