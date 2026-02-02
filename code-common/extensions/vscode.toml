@@ -1,0 +1,7 @@
+# --- VS Code Specific Overrides ---
+
+# Pin Copilot Chat to 0.36.0 for VS Code 1.104 compatibility
+[[extensions]]
+publisher = "github"
+name = "copilot-chat"
+version = "0.36.0"

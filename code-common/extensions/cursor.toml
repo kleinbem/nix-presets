@@ -1,0 +1,6 @@
+# --- Cursor Specific Overrides ---
+
+# Cursor usually bundles its own chat, but if we need the extension, use latest.
+[[extensions]]
+publisher = "github"
+name = "copilot-chat"

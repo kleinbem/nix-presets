@@ -45,6 +45,8 @@
         };
         homeManagerModules = {
            opencode = import ./opencode.nix;
+           terminal = import ./terminal.nix;
+           desktop = import ./desktop.nix;
         };
       };
     };

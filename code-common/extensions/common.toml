@@ -1,0 +1,54 @@
+# --- NixOS Essentials ---
+[[extensions]]
+publisher = "mkhl"
+name = "direnv"
+
+[[extensions]]
+publisher = "jnoortheen"
+name = "nix-ide"
+
+[[extensions]]
+publisher = "tamasfe"
+name = "even-better-toml"
+
+# --- Coding & Git ---
+[[extensions]]
+publisher = "eamodio"
+name = "gitlens"
+
+[[extensions]]
+publisher = "waderyan"
+name = "gitblame"
+
+[[extensions]]
+publisher = "ms-python"
+name = "python"
+
+# --- AI & Agents ---
+[[extensions]]
+publisher = "github"
+name = "copilot"
+
+
+# RECOMMENDATION: Autonomous Agent for VS Code (DeepSeek/Claude support)
+# Turns VS Code into a "Windsurf-like" agentic editor.
+[[extensions]]
+publisher = "rooveterinaryinc"
+name = "roo-cline"
+
+# RECOMMENDATION: High-Speed Autocomplete (1M Context)
+[[extensions]]
+publisher = "supermaven"
+name = "supermaven"
+
+# --- MISSING TOOLS (Restored) ---
+
+# 1. ErrorLens (Essential for inline errors)
+[[extensions]]
+publisher = "usernamehw"
+name = "errorlens"
+
+# 2. Terraform (Infrastructure)
+[[extensions]]
+publisher = "hashicorp"
+name = "terraform"
