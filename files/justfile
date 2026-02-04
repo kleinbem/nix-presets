@@ -52,7 +52,7 @@ rebuild:
 
 # Smart Rebuild (Checks build count first)
 rebuild-smart:
-    {{FLAKE_PATH}}/scripts/smart-switch.sh {{FLAKE_PATH}}
+    smart-switch {{FLAKE_PATH}}
 
 # Rollback to previous generation
 rollback:

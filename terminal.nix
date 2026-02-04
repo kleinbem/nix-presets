@@ -1,7 +1,7 @@
 {
   pkgs,
-  lib,
-  config,
+  _lib,
+  _config,
   ...
 }:
 
@@ -33,6 +33,22 @@
 
     starship = {
       enable = true;
+      settings = {
+        add_newline = true;
+        scan_timeout = 10;
+        character = {
+          success_symbol = "[➜](bold green)";
+          error_symbol = "[✗](bold red)";
+        };
+        directory = {
+          truncation_length = 0;
+          truncate_to_repo = false;
+        };
+        git_status = {
+          disabled = false;
+          ignore_submodules = true;
+        };
+      };
     };
 
     keychain = {
@@ -144,8 +160,6 @@
     };
   };
 
-  xdg.configFile."starship.toml".source = ./files/starship.toml;
-
   home = {
     file = {
       ".justfile".source = ./files/justfile;
@@ -165,19 +179,6 @@
       pciutils # lspci
     ];
 
-    activation = {
-      fixSshConfigPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        if [ -L "$HOME/.ssh/config" ]; then
-          $DRY_RUN_CMD rm -f $HOME/.ssh/config
-          $DRY_RUN_CMD cp -L ${config.home.file.".ssh/config".source} $HOME/.ssh/config
-          $DRY_RUN_CMD chmod 600 $HOME/.ssh/config
-        fi
-        # Ensure correct ownership/permissions if it's already a file (idempotency)
-        if [ -f "$HOME/.ssh/config" ]; then
-            $DRY_RUN_CMD chmod 600 $HOME/.ssh/config
-        fi
-      '';
-    };
   };
 
   # Rclone setup (Unchanged)
