@@ -57,6 +57,9 @@ in
               OLLAMA_BASE_URL = cfg.ollamaUrl;
             };
           };
+          
+          # Fix for bind-mount permission issues (Systemd tries to chown bind mount with DynamicUser)
+          systemd.services.open-webui.serviceConfig.DynamicUser = lib.mkForce false;
           networking.firewall.allowedTCPPorts = [ 8080 ];
           system.stateVersion = "25.11";
         };
