@@ -40,18 +40,13 @@ in
         };
       };
 
-      config =
-        { pkgs, ... }:
-        {
-          system.stateVersion = "24.05";
-          nixpkgs.config.allowUnfree = true;
-
+      config = { pkgs, ... }: {
           services.ollama = {
             enable = true;
-            host = "0.0.0.0"; # Listen on all interfaces so host/other containers can reach it
+            host = "0.0.0.0"; # Listen on all interfaces
             port = 11434;
-            # acceleration = "cuda"; # Deprecated
-            package = pkgs.ollama-cuda; # Explicitly use CUDA enabled package
+            # acceleration = "cuda"; # Default (rocm/cuda) is often better if auto-detected
+            # package = pkgs.ollama-cuda; # Too specific for Intel host
           };
           
           # Allow firewall access
