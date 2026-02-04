@@ -49,7 +49,8 @@ in
             enable = true;
             host = "0.0.0.0"; # Listen on all interfaces so host/other containers can reach it
             port = 11434;
-            acceleration = "cuda"; # Enable CUDA if available, falls back gracefully usually
+            # acceleration = "cuda"; # Deprecated
+            package = pkgs.ollama-cuda; # Explicitly use CUDA enabled package
           };
           
           # Allow firewall access
