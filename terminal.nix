@@ -181,7 +181,7 @@
 
   };
 
-  # Rclone setup (Unchanged)
+  # Rclone setup
   systemd.user.services.setup-rclone-config = {
     Unit = {
       Description = "Setup Rclone Config from Secrets";
@@ -190,6 +190,23 @@
     Service = {
       Type = "oneshot";
       ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.coreutils}/bin/mkdir -p %h/.config/rclone && ${pkgs.coreutils}/bin/rm -f %h/.config/rclone/rclone.conf && ${pkgs.coreutils}/bin/cp -f /run/secrets/rclone_config %h/.config/rclone/rclone.conf && ${pkgs.coreutils}/bin/chmod 600 %h/.config/rclone/rclone.conf'";
+    };
+    Install = {
+      WantedBy = [ "default.target" ];
+    };
+  };
+
+  # SSH Config Permission Fix (The NixOS Best Practice)
+  # OpenSSH is strict about permissions. Home Manager symlinks to the store are "too open".
+  # This service materializes the config as a real file with 600 permissions.
+  systemd.user.services.fix-ssh-permissions = {
+    Unit = {
+      Description = "Fix SSH Config Permissions";
+      After = [ "home-manager-generation.service" ];
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.bash}/bin/bash -c 'if [ -L %h/.ssh/config ]; then ${pkgs.coreutils}/bin/cp --remove-destination %h/.ssh/config %h/.ssh/config.real; ${pkgs.coreutils}/bin/mv %h/.ssh/config.real %h/.ssh/config; ${pkgs.coreutils}/bin/chmod 600 %h/.ssh/config; fi'";
     };
     Install = {
       WantedBy = [ "default.target" ];
