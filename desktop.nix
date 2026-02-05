@@ -103,7 +103,6 @@ in
       pavucontrol
       nwg-look
       mission-center # System Monitor (Task Manager)
-      firewalld-gui # GUI for Firewalld
       zathura # PDF Viewer
       imv # Image Viewer
       p7zip # Archives
