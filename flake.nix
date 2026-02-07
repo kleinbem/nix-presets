@@ -10,6 +10,8 @@
     pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
     nixpak.url = "github:nixpak/nixpak";
     nixpak.inputs.nixpkgs.follows = "nixpkgs";
+    nix-waydroid-setup.url = "github:kleinbem/nix-waydroid-setup";
+    nix-waydroid-setup.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =

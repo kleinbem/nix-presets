@@ -1,8 +1,10 @@
-{ config, pkgs, ... }:
+{ inputs, ... }:
 
 {
-  virtualisation.waydroid.enable = true;
+  imports = [
+    inputs.nix-waydroid-setup.nixosModules.default
+  ];
 
-  # networking.firewall.allowedTCPPorts = [ 53317 ]; # Example port if needed, usually container handles NAT
-  # networking.firewall.allowedUDPPorts = [ 53317 ];
+  # This one line now enables the core service, kernel params, bridge, and setup tools.
+  programs.waydroid-setup.enable = true;
 }
