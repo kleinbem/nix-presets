@@ -1,4 +1,6 @@
-{ inputs, ... }:
+{ inputs, ... }: # Pass flake inputs as a function argument
+
+{ ... }:
 
 {
   imports = [

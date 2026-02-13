@@ -10,7 +10,7 @@
     pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
     nixpak.url = "github:nixpak/nixpak";
     nixpak.inputs.nixpkgs.follows = "nixpkgs";
-    nix-waydroid-setup.url = "github:kleinbem/nix-waydroid-setup";
+    nix-waydroid-setup.url = "path:/home/martin/Develop/github.com/kleinbem/nix/nix-waydroid-setup";
     nix-waydroid-setup.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -79,7 +79,7 @@
           open-webui = import ./containers/open-webui.nix;
           dashboard = import ./containers/dashboard.nix;
           ollama = import ./containers/ollama.nix;
-          waydroid = import ./waydroid.nix;
+          waydroid = import ./waydroid.nix { inherit inputs; };
         };
         homeManagerModules = {
           opencode = import ./opencode.nix;
