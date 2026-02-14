@@ -76,12 +76,12 @@ in
             ProtectHome = true;
             # PrivateTmp = true; # Conflict with upstream n8n module
             # PrivateDevices = true; # Conflict with upstream n8n module
-            ProtectKernelTunables = true;
-            ProtectControlGroups = true;
-            RestrictSUIDSGID = true;
-            RemoveIPC = true;
+            # ProtectKernelTunables = true; # Conflict with upstream n8n module
+            # ProtectControlGroups = true; # Conflict with upstream n8n module
+            # RestrictSUIDSGID = true; # Conflict with upstream n8n module
+            # RemoveIPC = true; # Conflict with upstream n8n module
             # NoNewPrivileges = true; # Conflict with upstream n8n module
-            RestrictRealtime = true;
+            # RestrictRealtime = true; # Conflict with upstream n8n module
             # MemoryDenyWriteExecute = true; # Conflict with upstream n8n module
             # Allow writing to state dir (bind mounted)
             ReadWritePaths = [ "/var/lib/n8n" ];
