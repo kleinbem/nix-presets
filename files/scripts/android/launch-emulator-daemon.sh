@@ -52,6 +52,7 @@ if [ "$HEADLESS" = "true" ]; then
 fi
 
 echo "Starting Emulator process..."
+# shellcheck disable=SC2086
 steam-run emulator "${ARGS[@]}" $EXTRA_FLAGS &
 
 EMULATOR_PID=$!
@@ -71,7 +72,7 @@ adb wait-for-device -s "$ADB_SERIAL"
 # 4. Wait for Android Boot Completion
 echo "⏳ Android is booting (Waiting for sys.boot_completed)..."
 ITER=0
-while [ "$(adb -s $ADB_SERIAL shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
+while [ "$(adb -s "$ADB_SERIAL" shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
     sleep 2
     ITER=$((ITER + 2))
     if [ "$ITER" -gt "$TIMEOUT" ]; then
