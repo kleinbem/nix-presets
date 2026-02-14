@@ -69,7 +69,23 @@ in
             };
           };
 
-          systemd.services.n8n.serviceConfig.DynamicUser = pkgs.lib.mkForce false;
+          systemd.services.n8n.serviceConfig = {
+            DynamicUser = pkgs.lib.mkForce false;
+            # Zero Trust Hardening
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            # PrivateTmp = true; # Conflict with upstream n8n module
+            # PrivateDevices = true; # Conflict with upstream n8n module
+            ProtectKernelTunables = true;
+            ProtectControlGroups = true;
+            RestrictSUIDSGID = true;
+            RemoveIPC = true;
+            # NoNewPrivileges = true; # Conflict with upstream n8n module
+            RestrictRealtime = true;
+            # MemoryDenyWriteExecute = true; # Conflict with upstream n8n module
+            # Allow writing to state dir (bind mounted)
+            ReadWritePaths = [ "/var/lib/n8n" ];
+          };
           system.stateVersion = "25.11";
         };
 

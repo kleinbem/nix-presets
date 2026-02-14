@@ -56,7 +56,21 @@ in
             allowedHosts = "*";
           };
 
-          systemd.services.homepage-dashboard.serviceConfig.SupplementaryGroups = [ "docker" ];
+          systemd.services.homepage-dashboard.serviceConfig = {
+            # Zero Trust Hardening
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateTmp = true;
+            PrivateDevices = true;
+            ProtectKernelTunables = true;
+            ProtectControlGroups = true;
+            RestrictSUIDSGID = true;
+            RemoveIPC = true;
+            NoNewPrivileges = true;
+            RestrictRealtime = true;
+            MemoryDenyWriteExecute = true;
+            SupplementaryGroups = [ "docker" ];
+          };
           users.groups.docker.gid = 131;
 
           services.homepage-dashboard = {
