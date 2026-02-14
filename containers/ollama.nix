@@ -40,7 +40,9 @@ in
         };
       };
 
-      config = { pkgs, ... }: {
+      config =
+        { pkgs, ... }:
+        {
           services.ollama = {
             enable = true;
             host = "0.0.0.0"; # Listen on all interfaces
@@ -48,12 +50,12 @@ in
             # acceleration = "cuda"; # Default (rocm/cuda) is often better if auto-detected
             # package = pkgs.ollama-cuda; # Too specific for Intel host
           };
-          
+
           system.stateVersion = "25.11";
 
           # Fix for bind-mount permission issues (Systemd tries to chown bind mount with DynamicUser)
           systemd.services.ollama.serviceConfig.DynamicUser = lib.mkForce false;
-          
+
           # Allow firewall access
           networking.firewall.allowedTCPPorts = [ 11434 ];
         };

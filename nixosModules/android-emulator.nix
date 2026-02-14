@@ -1,8 +1,14 @@
-{ config, lib, pkgs, inputs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}:
 
 let
   cfg = config.services.android-desktop-emulator;
-  
+
   # Dynamic SDK based on configuration
   androidSdk = pkgs.androidenv.composeAndroidPackages {
     cmdLineToolsVersion = "13.0";
@@ -24,7 +30,13 @@ let
   # Launcher script wrappers
   launchScript = pkgs.writeShellApplication {
     name = "launch-android-daily-driver";
-    runtimeInputs = [ androidSdk.androidsdk pkgs.jdk pkgs.steam-run pkgs.android-tools pkgs.scrcpy ];
+    runtimeInputs = [
+      androidSdk.androidsdk
+      pkgs.jdk
+      pkgs.steam-run
+      pkgs.android-tools
+      pkgs.scrcpy
+    ];
     text = ''
       export ANDROID_SDK_ROOT="${androidSdk.androidsdk}/libexec/android-sdk"
       export ANDROID_HOME="$ANDROID_SDK_ROOT"
@@ -40,7 +52,12 @@ let
 
   launchVaultScript = pkgs.writeShellApplication {
     name = "launch-android-vault";
-    runtimeInputs = [ androidSdk.androidsdk pkgs.jdk pkgs.steam-run pkgs.android-tools ];
+    runtimeInputs = [
+      androidSdk.androidsdk
+      pkgs.jdk
+      pkgs.steam-run
+      pkgs.android-tools
+    ];
     text = ''
       export ANDROID_SDK_ROOT="${androidSdk.androidsdk}/libexec/android-sdk"
       export ANDROID_HOME="$ANDROID_SDK_ROOT"
@@ -53,13 +70,13 @@ let
       ${builtins.readFile (scriptPath + "/launch-vault.sh")}
     '';
   };
-  
+
   emulatorDaemonScript = pkgs.writeShellApplication {
     name = "launch-emulator-daemon";
-    runtimeInputs = [ 
-      androidSdk.androidsdk 
+    runtimeInputs = [
+      androidSdk.androidsdk
       pkgs.jdk
-      pkgs.procps 
+      pkgs.procps
       pkgs.steam-run
       pkgs.qemu_kvm
     ];
@@ -67,7 +84,7 @@ let
       export ANDROID_SDK_ROOT="${androidSdk.androidsdk}/libexec/android-sdk"
       export ANDROID_HOME="$ANDROID_SDK_ROOT"
       export JAVA_HOME="${pkgs.jdk}/lib/openjdk"
-      
+
       # Runtime Config
       export ANDROID_EMULATOR_GPU_MODE="${cfg.gpuMode}"
       export ANDROID_EMULATOR_MEMORY="${toString cfg.memorySize}"
@@ -78,22 +95,23 @@ let
       ${builtins.readFile (scriptPath + "/launch-emulator-daemon.sh")} "$@"
     '';
   };
-  
+
   scrcpyClient = pkgs.writeShellApplication {
     name = "launch-scrcpy-client";
-    runtimeInputs = [ 
-        pkgs.android-tools
-        pkgs.scrcpy 
+    runtimeInputs = [
+      pkgs.android-tools
+      pkgs.scrcpy
     ];
     text = ''
-        ${builtins.readFile (scriptPath + "/launch-scrcpy-client.sh")} "$@"
+      ${builtins.readFile (scriptPath + "/launch-scrcpy-client.sh")} "$@"
     '';
   };
 
-in {
+in
+{
   options.services.android-desktop-emulator = {
     enable = lib.mkEnableOption "Android Desktop Emulator Support";
-    
+
     user = lib.mkOption {
       type = lib.types.str;
       description = "The user to add to adbusers and kvm groups.";
@@ -157,8 +175,13 @@ in {
   config = lib.mkIf cfg.enable {
     # System Requirements
     # programs.adb.enable = true; # Deprecated in systemd 258
-    users.users.${cfg.user}.extraGroups = [ "adbusers" "kvm" "video" "audio" ];
-    
+    users.users.${cfg.user}.extraGroups = [
+      "adbusers"
+      "kvm"
+      "video"
+      "audio"
+    ];
+
     # Udev rules for Android devices
 
     # Enable Unfree for Google APIs image
@@ -185,11 +208,11 @@ in {
         TimeoutStopSec = "30s";
       };
     };
-    
+
     # Install launcher scripts and client
-    environment.systemPackages = [ 
+    environment.systemPackages = [
       pkgs.android-tools # Provides adb
-      pkgs.steam-run 
+      pkgs.steam-run
       launchScript
       launchVaultScript
       scrcpyClient
@@ -197,7 +220,9 @@ in {
       pkgs.alsa-utils
       pkgs.v4l-utils
       # Biometric Simulation
-      (pkgs.writeShellScriptBin "simulate-fingerprint" (builtins.readFile (scriptPath + "/simulate-fingerprint.sh")))
+      (pkgs.writeShellScriptBin "simulate-fingerprint" (
+        builtins.readFile (scriptPath + "/simulate-fingerprint.sh")
+      ))
     ];
   };
 }

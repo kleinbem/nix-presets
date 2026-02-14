@@ -10,12 +10,10 @@
     pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
     nixpak.url = "github:nixpak/nixpak";
     nixpak.inputs.nixpkgs.follows = "nixpkgs";
-    nix-waydroid-setup.url = "path:/home/martin/Develop/github.com/kleinbem/nix/nix-waydroid-setup";
-    nix-waydroid-setup.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
-    inputs@{ flake-parts, ... }:
+    inputs@{ flake-parts, self, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" ];
       imports = [
@@ -64,10 +62,14 @@
             ];
           };
 
-          packages = import ./pkgs/nixpak/default.nix {
-            pkgs = appsPkgs;
-            nixpak = inputs.nixpak;
-          };
+          packages =
+            (import ./pkgs/nixpak/default.nix {
+              pkgs = appsPkgs;
+              nixpak = inputs.nixpak;
+            })
+            // (import ./pkgs/waydroid/default.nix {
+              inherit pkgs;
+            });
         };
 
       flake = {
@@ -79,7 +81,7 @@
           open-webui = import ./containers/open-webui.nix;
           dashboard = import ./containers/dashboard.nix;
           ollama = import ./containers/ollama.nix;
-          waydroid = import ./waydroid.nix { inherit inputs; };
+          waydroid = import ./nixosModules/waydroid.nix { inherit self; };
           android-emulator = import ./nixosModules/android-emulator.nix;
         };
         homeManagerModules = {
