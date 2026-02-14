@@ -39,6 +39,7 @@ fi
 # Add extra flags if specified
 if [ -n "${ANDROID_EMULATOR_FLAGS:-}" ]; then
      # Split by space is risky but simple for now
+    # shellcheck disable=SC2206
     FLAGS+=(${ANDROID_EMULATOR_FLAGS})
 fi
 
