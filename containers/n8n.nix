@@ -72,8 +72,8 @@ in
           systemd.services.n8n.serviceConfig = {
             DynamicUser = pkgs.lib.mkForce false;
             # Zero Trust Hardening
-            ProtectSystem = "strict";
-            ProtectHome = true;
+            # ProtectSystem = "strict"; # Conflict with upstream n8n module
+            # ProtectHome = true; # Conflict with upstream n8n module
             # PrivateTmp = true; # Conflict with upstream n8n module
             # PrivateDevices = true; # Conflict with upstream n8n module
             # ProtectKernelTunables = true; # Conflict with upstream n8n module
