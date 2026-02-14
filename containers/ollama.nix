@@ -49,6 +49,8 @@ in
             # package = pkgs.ollama-cuda; # Too specific for Intel host
           };
           
+          system.stateVersion = "25.11";
+
           # Fix for bind-mount permission issues (Systemd tries to chown bind mount with DynamicUser)
           systemd.services.ollama.serviceConfig.DynamicUser = lib.mkForce false;
           

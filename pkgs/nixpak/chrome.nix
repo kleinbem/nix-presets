@@ -41,12 +41,14 @@ let
       exportDesktopFiles ? true,
       extraBinNames ? [ ],
       policy ? chromePolicyBlocked,
+      resourceLimits ? null,
       # _displayName,
       ...
     }:
     utils.mkSandboxed {
       inherit exportDesktopFiles;
       inherit extraBinNames;
+      inherit resourceLimits;
       package = pkgs.runCommand "google-chrome-renamed-${name}" { } ''
         mkdir -p $out/bin
         ln -s ${pkgs.google-chrome}/bin/google-chrome-stable $out/bin/${name}
@@ -153,5 +155,9 @@ in
     extraBinNames = [ "google-chrome" ];
     displayName = "Google Chrome (Secure)";
     policy = chromePolicyAllowed;
+    resourceLimits = {
+      cpu = "400%";
+      mem = "12G";
+    };
   };
 }

@@ -80,6 +80,7 @@
           dashboard = import ./containers/dashboard.nix;
           ollama = import ./containers/ollama.nix;
           waydroid = import ./waydroid.nix { inherit inputs; };
+          android-emulator = import ./nixosModules/android-emulator.nix;
         };
         homeManagerModules = {
           opencode = import ./opencode.nix;

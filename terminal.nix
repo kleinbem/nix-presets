@@ -143,7 +143,7 @@
 
     ssh = {
       enable = true;
-      # enableDefaultConfig = false;
+      enableDefaultConfig = false;
       matchBlocks = {
         "*" = {
           addKeysToAgent = "yes";

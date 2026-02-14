@@ -18,6 +18,7 @@ rec {
       presets ? [ ],
       exportDesktopFiles ? true,
       extraBinNames ? [ ],
+      resourceLimits ? null,
       displayName ? null,
     }:
     let
@@ -124,10 +125,27 @@ rec {
     in
     pkgs.runCommand "${name}-sandboxed" { } ''
       mkdir -p $out/bin
-      ln -s ${script}/bin/${executableName} $out/bin/${name}
+      ${
+        if resourceLimits != null then
+          ''
+            cat > $out/bin/${name} <<EOF
+            #!/bin/sh
+            exec /run/current-system/sw/bin/systemd-run --user --scope \\
+              -p CPUQuota=${resourceLimits.cpu} \\
+              -p MemoryMax=${resourceLimits.mem} \\
+              --description="${name} (Restricted)" \\
+              ${script}/bin/${executableName} "\$@"
+            EOF
+            chmod +x $out/bin/${name}
+          ''
+        else
+          ''
+            ln -s ${script}/bin/${executableName} $out/bin/${name}
+          ''
+      }
 
       for extraBin in ${toString extraBinNames}; do
-        ln -s ${script}/bin/${executableName} $out/bin/$extraBin
+        ln -s $out/bin/${name} $out/bin/$extraBin
       done
 
       if ${pkgs.lib.boolToString exportDesktopFiles} && [ -d "${package}/share" ]; then
