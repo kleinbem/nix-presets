@@ -10,6 +10,15 @@
     pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
     nixpak.url = "github:nixpak/nixpak";
     nixpak.inputs.nixpkgs.follows = "nixpkgs";
+    # Redroid GApps
+    gapps-arm64 = {
+      url = "https://github.com/MindTheGapps/16.0.0-arm64/releases/download/MindTheGapps-16.0.0-arm64-20250812_214353/MindTheGapps-16.0.0-arm64-20250812_214353.zip";
+      flake = false;
+    };
+    gapps-amd64 = {
+      url = "path:./pkgs/redroid/placeholder.zip";
+      flake = false;
+    };
   };
 
   outputs =
@@ -69,6 +78,9 @@
             })
             // (import ./pkgs/waydroid/default.nix {
               inherit pkgs;
+            })
+            // (import ./pkgs/redroid/default.nix {
+              inherit pkgs inputs;
             });
         };
 
