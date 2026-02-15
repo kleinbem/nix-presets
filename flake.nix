@@ -93,6 +93,7 @@
           open-webui = import ./containers/open-webui.nix;
           dashboard = import ./containers/dashboard.nix;
           ollama = import ./containers/ollama.nix;
+          qdrant = import ./containers/qdrant.nix;
           waydroid = import ./nixosModules/waydroid.nix { inherit self; };
           android-emulator = import ./nixosModules/android-emulator.nix;
         };

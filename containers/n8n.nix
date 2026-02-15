@@ -32,6 +32,12 @@ in
       default = "n8n";
       description = "Hostname for the container (will be reachable via .local)";
     };
+
+    noteDirs = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      description = "Attribute set of host paths to mount under /mnt/ingest/ in the container (e.g. { obsidian = '/home/martin/Obsidian'; })";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -71,18 +77,12 @@ in
 
           systemd.services.n8n.serviceConfig = {
             DynamicUser = pkgs.lib.mkForce false;
-            # Zero Trust Hardening
-            # ProtectSystem = "strict"; # Conflict with upstream n8n module
-            # ProtectHome = true; # Conflict with upstream n8n module
-            # PrivateTmp = true; # Conflict with upstream n8n module
-            # PrivateDevices = true; # Conflict with upstream n8n module
-            # ProtectKernelTunables = true; # Conflict with upstream n8n module
-            # ProtectControlGroups = true; # Conflict with upstream n8n module
-            # RestrictSUIDSGID = true; # Conflict with upstream n8n module
-            # RemoveIPC = true; # Conflict with upstream n8n module
-            # NoNewPrivileges = true; # Conflict with upstream n8n module
-            # RestrictRealtime = true; # Conflict with upstream n8n module
-            # MemoryDenyWriteExecute = true; # Conflict with upstream n8n module
+
+            # Upstream n8n module already provides strict systemd hardening:
+            # - ProtectSystem = "strict", ProtectHome = "read-only"
+            # - PrivateTmp, PrivateDevices, NoNewPrivileges = true
+            # - ProtectKernelTunables, ProtectControlGroups, RestrictSUIDSGID = true
+
             # Allow writing to state dir (bind mounted)
             ReadWritePaths = [ "/var/lib/n8n" ];
           };
@@ -94,7 +94,10 @@ in
           hostPath = cfg.hostDataDir;
           isReadOnly = false;
         };
-      };
+      } // (lib.mapAttrs' (name: path: lib.nameValuePair "/mnt/ingest/${name}" {
+        hostPath = path;
+        isReadOnly = true; # Keep notes RO for security
+      }) cfg.noteDirs);
     };
   };
 }

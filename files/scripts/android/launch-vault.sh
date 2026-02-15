@@ -38,9 +38,9 @@ fi
 
 # Add extra flags if specified
 if [ -n "${ANDROID_EMULATOR_FLAGS:-}" ]; then
-     # Split by space is risky but simple for now
-    # shellcheck disable=SC2206
-    FLAGS+=(${ANDROID_EMULATOR_FLAGS})
+    # Split by space robustly
+    read -ra EXTRA_FLAGS_ARRAY <<< "${ANDROID_EMULATOR_FLAGS}"
+    FLAGS+=("${EXTRA_FLAGS_ARRAY[@]}")
 fi
 
 echo "Starting Vault ($AVD_NAME)..."
