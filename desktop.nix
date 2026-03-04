@@ -1,14 +1,14 @@
 {
   pkgs,
   lib,
-
+  config,
   nixpak,
   ...
 }:
 
 let
   # Import modular apps catalog
-  sandboxedApps = import ./nixpak/apps.nix { inherit pkgs nixpak; };
+  sandboxedApps = import ./nixpak/apps.nix { inherit pkgs nixpak; inherit (config.home) homeDirectory; };
 
   commonData = import ./code-common/settings.nix;
   extensionsCommon = import ./code-common/extensions/common.nix { inherit pkgs; };
@@ -66,7 +66,7 @@ let
           else if app.name == "Cursor" then
             "code-cursor-fhs"
           else
-            "antigravity-fhs"
+            "google-antigravity"
         }"
       }/bin/${
         if app.name == "Windsurf" then
@@ -89,17 +89,12 @@ in
 
   home = {
     packages = with pkgs; [
-      # Unified Code Platform Editors
-      # (Replaced by Isolated Wrappers below)
-
-      # -- GUI Apps --
       # Unified Code Platform Editors (Isolated Wrappers)
       (mkIsolatedEditor (builtins.elemAt codeFamily 0)) # Antigravity
       (mkIsolatedEditor (builtins.elemAt codeFamily 1)) # Cursor
       (mkIsolatedEditor (builtins.elemAt codeFamily 2)) # Windsurf
 
-      # vscode-fhs (Moved to declarative module)
-      warp-terminal # Rust-based AI Terminal
+      warp-terminal
       pavucontrol
       nwg-look
       mission-center # System Monitor (Task Manager)
@@ -123,9 +118,8 @@ in
       sandboxedApps.google-chrome-stable-vault
       sandboxedApps.google-chrome-stable-hazard
       sandboxedApps.lmstudio # Nixpak (Safe)
-      sandboxedApps.bitwarden # Nixpak (Safe) - Password Manager
-      # sandboxedApps.github-desktop # Nixpak (Safe) - Code
-      github-desktop # Standard (Unsafe) - Temporarily disabled sandbox for auth debugging
+      sandboxedApps.bitwarden
+      github-desktop
       chromium # Fallback (Unsafe) - Local Dev
       pkgs.brotab # Browser Automation (asked by user)
       pkgs.brave # Secure Browser (asked by user)
@@ -195,9 +189,7 @@ in
   };
 
   # Create a custom "Fortress" launcher for BOI
-  xdg.desktopEntries = {
-    # Manual entries removed - now handled by nixpak apps.nix
-  };
+  xdg.desktopEntries = { };
 
   programs.waybar.enable = true;
 

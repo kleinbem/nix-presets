@@ -1,6 +1,6 @@
 { pkgs, inputs }:
 let
-  system = pkgs.system;
+  system = pkgs.stdenv.hostPlatform.system;
 
   # Define Docker Image Sources (Managed by update.sh)
   redroidHashes = {

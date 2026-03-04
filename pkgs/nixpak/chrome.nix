@@ -1,35 +1,25 @@
-{ pkgs, nixpak, ... }:
+{ pkgs, lib, nixpak, homeDirectory, ... }:
 
 let
   utils = import ../../nixpak/utils.nix { inherit pkgs nixpak; };
   sandboxedXdgUtils = pkgs.callPackage ../../nixpak/xdg-utils.nix { };
 
   # Define the policy file directly via Nix
-  chromePolicyBlocked = pkgs.runCommand "chrome-policy-blocked" { } ''
-    mkdir -p $out/policies/managed
-    cat > $out/policies/managed/blocklist.json <<EOF
-    ${builtins.toJSON {
-      ExtensionInstallBlocklist = [
-        "ghbmnnjooekpmoecnnnilnnbdlolhkhi" # Google Drive Offline
-        "aohghmighlieiainnegkcijnfilokake" # Google Docs
-        "felcaaldnbdncclmgdcncolpebgiejap" # Google Sheets
-        "aapocclcgogkmnckokdopfmhonfmgoek" # Google Slides
-        "pjkljhegncpnkpknbcohdijeoejaedia" # Gmail
-        "blpcfgokakmgnkcojhhkbfbldkacnbeo" # YouTube
-      ];
-    }}
-    EOF
-  '';
+  chromePolicyBlocked = pkgs.writeTextDir "policies/managed/blocklist.json" (builtins.toJSON {
+    ExtensionInstallBlocklist = [
+      "ghbmnnjooekpmoecnnnilnnbdlolhkhi" # Google Drive Offline
+      "aohghmighlieiainnegkcijnfilokake" # Google Docs
+      "felcaaldnbdncclmgdcncolpebgiejap" # Google Sheets
+      "aapocclcgogkmnckokdopfmhonfmgoek" # Google Slides
+      "pjkljhegncpnkpknbcohdijeoejaedia" # Gmail
+      "blpcfgokakmgnkcojhhkbfbldkacnbeo" # YouTube
+    ];
+  });
 
   # Define a permissive policy (empty blocklist)
-  chromePolicyAllowed = pkgs.runCommand "chrome-policy-allowed" { } ''
-    mkdir -p $out/policies/managed
-    cat > $out/policies/managed/blocklist.json <<EOF
-    ${builtins.toJSON {
-      ExtensionInstallBlocklist = [ ];
-    }}
-    EOF
-  '';
+  chromePolicyAllowed = pkgs.writeTextDir "policies/managed/blocklist.json" (builtins.toJSON {
+    ExtensionInstallBlocklist = [ ];
+  });
 
   # Define a dummy machine-id file
   dummyMachineId = pkgs.writeText "machine-id" "00000000000000000000000000000000\n";
@@ -49,9 +39,14 @@ let
       inherit exportDesktopFiles;
       inherit extraBinNames;
       inherit resourceLimits;
-      package = pkgs.runCommand "google-chrome-renamed-${name}" { } ''
+      package = pkgs.runCommand "google-chrome-renamed-${name}" { nativeBuildInputs = [ pkgs.makeWrapper ]; } ''
         mkdir -p $out/bin
-        ln -s ${pkgs.google-chrome}/bin/google-chrome-stable $out/bin/${name}
+        makeWrapper ${pkgs.google-chrome}/bin/google-chrome-stable $out/bin/${name} \
+          --add-flags "--enable-features=UseOzonePlatform,WaylandWindowDecorations,VaapiVideoDecoder,VaapiVideoEncoder,VaapiIgnoreDriverChecks" \
+          --add-flags "--ozone-platform-hint=auto" \
+          --add-flags "--ignore-gpu-blocklist" \
+          --add-flags "--enable-gpu-rasterization" \
+          --add-flags "--enable-zero-copy"
         ln -s ${pkgs.google-chrome}/share $out/share
       '';
       inherit name;
@@ -79,7 +74,7 @@ let
                 "/dev/video0"
                 "/dev/video1"
               ]
-              ++ (map (i: "/dev/hidraw" + toString i) (pkgs.lib.lists.range 0 49));
+              ++ (map (i: "/dev/hidraw" + toString i) (lib.lists.range 0 49));
 
               # 2. File & Socket Access
               rw = [
@@ -95,7 +90,7 @@ let
                 (sloth.concat' sloth.homeDir "/.config/mimeapps.list")
               ]
               # Conditional Binding
-              ++ pkgs.lib.optionals (sourceUserDataDir != null) [
+              ++ lib.optionals (sourceUserDataDir != null) [
                 [
                   sourceUserDataDir
                   (sloth.concat' sloth.homeDir "/.config/google-chrome")
@@ -119,6 +114,9 @@ let
                 "/sys/devices"
                 "/run/udev/data"
                 "/run/udev"
+                "/etc/ssl/certs"
+                "/etc/static/ssl/certs"
+                "/etc/pki" # Just in case
               ];
             };
             env = {
@@ -133,7 +131,7 @@ in
   # 1. Standard Banking (Vault) - Isolated Storage
   vault = mkChrome {
     name = "google-chrome-stable-vault";
-    sourceUserDataDir = "/home/martin/.config/google-chrome-vault";
+    sourceUserDataDir = "${homeDirectory}/.config/google-chrome-vault";
     exportDesktopFiles = true;
     displayName = "Google Chrome Vault (Secure)";
     policy = chromePolicyBlocked;
@@ -142,7 +140,7 @@ in
   # 2. Social Media (Hazard) - Isolated Storage
   hazard = mkChrome {
     name = "google-chrome-stable-hazard";
-    sourceUserDataDir = "/home/martin/.config/google-chrome-hazard";
+    sourceUserDataDir = "${homeDirectory}/.config/google-chrome-hazard";
     exportDesktopFiles = true;
     displayName = "Google Chrome Hazard (Secure)";
     policy = chromePolicyBlocked;
@@ -151,7 +149,7 @@ in
   # 3. Standard Chrome (matches upstream name)
   stable = mkChrome {
     name = "google-chrome-stable";
-    sourceUserDataDir = "/home/martin/.config/google-chrome";
+    sourceUserDataDir = "${homeDirectory}/.config/google-chrome";
     extraBinNames = [ "google-chrome" ];
     displayName = "Google Chrome (Secure)";
     policy = chromePolicyAllowed;

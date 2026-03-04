@@ -25,8 +25,8 @@ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
   {
     name = "gitlens";
     publisher = "eamodio";
-    version = "2026.1.2704";
-    sha256 = "0xb7a4l950g3g7zjf4yngrpbfw0inr9x2xvyp0s2jg1lf3cc3h42";
+    version = "2026.2.2504";
+    sha256 = "11dri2yxq2lp5lfscw08nq0vv6a6m7qpy1xa8mp8rp0kq627sj28";
   }
   {
     name = "gitblame";
@@ -37,8 +37,8 @@ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
   {
     name = "python";
     publisher = "ms-python";
-    version = "2026.1.2026012301";
-    sha256 = "0sf1caqzzms9is968m2ijd4dm9yg3w6hnki2yh6fs8dnpf4a5d5j";
+    version = "2026.2.2026021801";
+    sha256 = "1d6k088123gbwwiri7hwl49jhf7ll3npwizyrai3x4871i254cwz";
   }
   {
     name = "copilot";
@@ -49,8 +49,8 @@ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
   {
     name = "roo-cline";
     publisher = "rooveterinaryinc";
-    version = "3.44.2";
-    sha256 = "0hwrz9gv672g681hf6n3n2m1dwf1aic5is17bc8mn9ra7h2pl33c";
+    version = "3.50.5";
+    sha256 = "1fkhl0mxvwd9s8kiwiqzg19l4674qi54dh1rsl6gai4wvcwvsw91";
   }
   {
     name = "supermaven";
@@ -61,13 +61,13 @@ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
   {
     name = "errorlens";
     publisher = "usernamehw";
-    version = "3.27.0";
-    sha256 = "113i434f7nspbz09ajy50pnvc1f0zc7cqcrddqh8l1w0ks1cvqb2";
+    version = "3.28.0";
+    sha256 = "0bz0japmw72hsqgxr6fwcs4pfnvqw98ac24x2m9frmhisb5vpszd";
   }
   {
     name = "terraform";
     publisher = "hashicorp";
-    version = "2.37.2025092217";
-    sha256 = "01qpl161xi15xfpjvdmslq6v233nv43lac00644wn5gjn55vl39f";
+    version = "2.38.2026022319";
+    sha256 = "sha256-e7QUm/OQ9ko4RCAWHEJ3pY8saZypl8OrHORsmfR/pqk=";
   }
 ]

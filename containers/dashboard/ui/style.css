@@ -1,0 +1,132 @@
+:root {
+    --bg: #09090b;
+    --card-bg: rgba(24, 24, 27, 0.6);
+    --accent: #6366f1;
+    --accent-glow: rgba(99, 102, 241, 0.15);
+    --success: #10b981;
+    --error: #ef4444;
+    --text: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --border: rgba(255, 255, 255, 0.05);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    background-image: 
+        radial-gradient(circle at 15% 50%, var(--accent-glow) 0%, transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.05) 0%, transparent 25%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 20px;
+}
+
+.container { max-width: 1200px; margin: 0 auto; }
+
+/* Header & Clock */
+header { 
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 60px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.brand h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -1px; }
+.brand p { color: var(--text-muted); font-weight: 300; margin-top: 5px; }
+
+.clock-widget { text-align: right; }
+#clock-time { font-size: 2.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+#clock-date { color: var(--text-muted); font-size: 0.9rem; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* Categories */
+.category-section { margin-bottom: 50px; }
+.category-section h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 25px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    display: inline-block;
+}
+
+/* Grid */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 25px;
+}
+
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 30px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent);
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5);
+}
+
+.card:active { transform: scale(0.98); }
+
+.icon-box {
+    font-size: 48px;
+    margin-bottom: 20px;
+    transition: 0.3s;
+}
+
+.card:hover .icon-box { transform: scale(1.1); }
+
+.card-content h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 8px; }
+.card-content p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 20px; flex-grow: 1; }
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3f3f46;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-text { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+.online .status-dot { background: var(--success); box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
+.online .status-text { color: var(--success); }
+.offline .status-dot { background: var(--error); }
+
+/* Telemetry Footer */
+.telemetry-bar {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 60px;
+    padding-top: 30px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.t-item span { color: var(--accent); font-weight: 700; }
+
+@media (max-width: 768px) {
+    header { flex-direction: column; text-align: center; gap: 20px; }
+    .clock-widget { text-align: center; }
+}

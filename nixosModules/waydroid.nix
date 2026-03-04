@@ -15,7 +15,7 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = self.packages.${pkgs.system}.default;
+      default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
       description = "The waydroid-setup package providing the bootstrap tool.";
     };
   };
@@ -78,12 +78,12 @@ in
 
     environment.systemPackages = [
       cfg.package
-      self.packages.${pkgs.system}.get-id
-      self.packages.${pkgs.system}.status
-      self.packages.${pkgs.system}.uninstall
-      self.packages.${pkgs.system}.update-pif
-      self.packages.${pkgs.system}.restart
-      self.packages.${pkgs.system}.activate
+      self.packages.${pkgs.stdenv.hostPlatform.system}.get-id
+      self.packages.${pkgs.stdenv.hostPlatform.system}.status
+      self.packages.${pkgs.stdenv.hostPlatform.system}.uninstall
+      self.packages.${pkgs.stdenv.hostPlatform.system}.update-pif
+      self.packages.${pkgs.stdenv.hostPlatform.system}.restart
+      self.packages.${pkgs.stdenv.hostPlatform.system}.activate
     ];
   };
 }

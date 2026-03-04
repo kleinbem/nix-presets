@@ -1,7 +1,7 @@
 {
   pkgs,
-  _lib,
-  _config,
+  config,
+  my,
   ...
 }:
 
@@ -24,7 +24,7 @@
         tree = "eza --tree --icons";
         update = "nh os switch";
         cleanup = "nh clean all";
-        hm-logs = "journalctl -xeu home-manager-martin.service";
+        hm-logs = "journalctl -xeu home-manager-${config.home.username}.service";
 
         # System Control
         os = "just --justfile ~/.justfile";
@@ -35,7 +35,7 @@
       enable = true;
       settings = {
         add_newline = true;
-        scan_timeout = 10;
+        scan_timeout = 100;
         character = {
           success_symbol = "[➜](bold green)";
           error_symbol = "[✗](bold red)";
@@ -69,9 +69,9 @@
 
       settings = {
         user = {
-          name = "kleinbem";
-          email = "martin.kleinberger@gmail.com";
-          signingKey = "/home/martin/.ssh/id_ed25519_sk.pub";
+          name = my.git.name;
+          email = my.git.email;
+          signingKey = "${config.home.homeDirectory}/.ssh/id_ed25519_sk.pub";
         };
 
         commit.gpgsign = true;
@@ -80,7 +80,7 @@
         gpg.format = "ssh";
         # This file tells Git which public keys belong to which email addresses.
         # Without this, your local 'git log' will show "Unknown Signature" for your own commits.
-        "gpg.ssh".allowedSignersFile = "/home/martin/.ssh/allowed_signers";
+        "gpg.ssh".allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
 
         alias = {
           st = "status";
@@ -154,7 +154,7 @@
         };
         "github.com" = {
           user = "git";
-          identityFile = "/home/martin/.ssh/id_ecdsa_sk_auth";
+          identityFile = "${config.home.homeDirectory}/.ssh/id_ecdsa_sk_auth";
         };
       };
     };
@@ -189,7 +189,13 @@
     };
     Service = {
       Type = "oneshot";
-      ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.coreutils}/bin/mkdir -p %h/.config/rclone && ${pkgs.coreutils}/bin/rm -f %h/.config/rclone/rclone.conf && ${pkgs.coreutils}/bin/cp -f /run/secrets/rclone_config %h/.config/rclone/rclone.conf && ${pkgs.coreutils}/bin/chmod 600 %h/.config/rclone/rclone.conf'";
+      ExecStart = toString (pkgs.writeShellScript "setup-rclone-config" ''
+        config_dir="$HOME/.config/rclone"
+        ${pkgs.coreutils}/bin/mkdir -p "$config_dir"
+        ${pkgs.coreutils}/bin/rm -f "$config_dir/rclone.conf"
+        ${pkgs.coreutils}/bin/cp -f /run/secrets/rclone_config "$config_dir/rclone.conf"
+        ${pkgs.coreutils}/bin/chmod 600 "$config_dir/rclone.conf"
+      '');
     };
     Install = {
       WantedBy = [ "default.target" ];
@@ -206,7 +212,14 @@
     };
     Service = {
       Type = "oneshot";
-      ExecStart = "${pkgs.bash}/bin/bash -c 'if [ -L %h/.ssh/config ]; then ${pkgs.coreutils}/bin/cp --remove-destination %h/.ssh/config %h/.ssh/config.real; ${pkgs.coreutils}/bin/mv %h/.ssh/config.real %h/.ssh/config; ${pkgs.coreutils}/bin/chmod 600 %h/.ssh/config; fi'";
+      ExecStart = toString (pkgs.writeShellScript "fix-ssh-permissions" ''
+        ssh_config="$HOME/.ssh/config"
+        if [ -L "$ssh_config" ]; then
+          ${pkgs.coreutils}/bin/cp --remove-destination "$ssh_config" "$ssh_config.real"
+          ${pkgs.coreutils}/bin/mv "$ssh_config.real" "$ssh_config"
+          ${pkgs.coreutils}/bin/chmod 600 "$ssh_config"
+        fi
+      '');
     };
     Install = {
       WantedBy = [ "default.target" ];

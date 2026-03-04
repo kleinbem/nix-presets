@@ -1,0 +1,80 @@
+/* Glassmorphism Theme for Homepage */
+
+:root {
+    --glass-bg: rgba(20, 20, 30, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-blur: 10px;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0b0;
+    --accent-color: #3b82f6;
+    /* Blue accent */
+    --card-radius: 12px;
+}
+
+body {
+    /* Background is handled by settings.yaml, we just style content */
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Service Cards */
+.service-card {
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(var(--glass-blur)) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur)) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: var(--card-radius) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.service-card:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;
+    border-color: var(--accent-color) !important;
+}
+
+/* Widgets (Glances, etc.) */
+.widget-card {
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(var(--glass-blur)) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: var(--card-radius) !important;
+}
+
+/* Headers */
+h1,
+h2,
+h3 {
+    color: var(--text-primary) !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Search Bar */
+.search-container input {
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--text-primary) !important;
+    border-radius: 20px !important;
+}
+
+.search-container input:focus {
+    border-color: var(--accent-color) !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

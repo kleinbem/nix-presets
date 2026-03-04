@@ -1,72 +1,48 @@
+{ self }:
 {
   config,
-  pkgs,
   lib,
   ...
 }:
 let
   cfg = config.my.containers.silverbullet;
+  mkContainer = self.lib.mkContainer; # Added mkContainer definition
+  tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
   options.my.containers.silverbullet = {
     enable = lib.mkEnableOption "SilverBullet Container";
     ip = lib.mkOption { type = lib.types.str; };
-    hostBridge = lib.mkOption {
-      type = lib.types.str;
-      default = "incusbr0";
-    };
     hostDataDir = lib.mkOption { type = lib.types.str; };
-    hostName = lib.mkOption {
-      type = lib.types.str;
-      default = "silverbullet";
+    memoryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "512M";
     };
-  };
+  } // tlsOpts;
 
-  config = lib.mkIf cfg.enable {
-    containers.silverbullet = {
-      autoStart = true;
-      privateNetwork = true;
-      hostBridge = cfg.hostBridge;
-      localAddress = cfg.ip;
-
-      config =
-        { config, pkgs, ... }:
-        {
-          networking.firewall.enable = false;
-          networking.hostName = cfg.hostName;
-          services.avahi = {
-            enable = true;
-            nssmdns4 = true;
-            publish = {
-              enable = true;
-              addresses = true;
-              workstation = true;
-            };
-            openFirewall = true;
-          };
-
-          systemd.services.silverbullet = {
-            description = "SilverBullet Notes Server";
-            after = [ "network.target" ];
-            wantedBy = [ "multi-user.target" ];
-            serviceConfig = {
-              DynamicUser = true;
-              StateDirectory = "silverbullet";
-              WorkingDirectory = "/var/lib/silverbullet";
-              ExecStart = "${pkgs.silverbullet}/bin/silverbullet --hostname 0.0.0.0 --port 3333 /var/lib/silverbullet";
-              Restart = "always";
-            };
-          };
-          networking.firewall.allowedTCPPorts = [ 3333 ];
-          system.stateVersion = "25.11";
-        };
-
-      bindMounts = {
-        "/var/lib/silverbullet" = {
-          hostPath = cfg.hostDataDir;
-          isReadOnly = false;
-        };
+  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+    # Changed to mkContainer
+    name = "silverbullet";
+    cfg = cfg;
+    innerConfig = {
+      # Removed networking.firewall.allowedTCPPorts
+      services.silverbullet = {
+        # Changed to services.silverbullet
+        enable = true; # Added enable
+        listenAddress = "0.0.0.0"; # Added listenAddress
+        listenPort = 3030;
+      };
+      systemd.services.silverbullet.serviceConfig = {
+        User = lib.mkForce "root";
+        Group = lib.mkForce "root";
+      };
+      networking.firewall.allowedTCPPorts = [ 3030 ];
+    };
+    bindMounts = {
+      "/var/lib/silverbullet" = {
+        hostPath = cfg.hostDataDir;
+        isReadOnly = false;
       };
     };
-  };
+  });
 }

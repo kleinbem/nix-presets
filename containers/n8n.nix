@@ -1,103 +1,76 @@
+{ self }:
 {
   config,
-  pkgs,
   lib,
   ...
 }:
 let
   cfg = config.my.containers.n8n;
+  mkContainer = self.lib.mkContainer;
+  tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
   options.my.containers.n8n = {
     enable = lib.mkEnableOption "n8n Container";
-
-    ip = lib.mkOption {
-      type = lib.types.str;
-      description = "Static IP Address (CIDR notation preferred, e.g. 10.85.46.99/24)";
+    ip = lib.mkOption { type = lib.types.str; };
+    hostDataDir = lib.mkOption { type = lib.types.str; };
+    memoryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "4G";
     };
-
-    hostBridge = lib.mkOption {
-      type = lib.types.str;
-      default = "incusbr0";
-      description = "Bridge interface on the host";
+    secretsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Path on the host to a .env file containing N8N_ENCRYPTION_KEY and other secrets";
     };
-
-    hostDataDir = lib.mkOption {
-      type = lib.types.str;
-      description = "Absolute path on host for persistence";
-    };
-
-    hostName = lib.mkOption {
-      type = lib.types.str;
-      default = "n8n";
-      description = "Hostname for the container (will be reachable via .local)";
-    };
-
     noteDirs = lib.mkOption {
-      type = lib.types.attrsOf lib.types.str;
+      type = lib.types.attrsOf lib.types.path;
       default = { };
-      description = "Attribute set of host paths to mount under /mnt/ingest/ in the container (e.g. { obsidian = '/home/martin/Obsidian'; })";
     };
-  };
+  } // tlsOpts;
 
-  config = lib.mkIf cfg.enable {
-    containers.n8n = {
-      autoStart = true;
-      privateNetwork = true;
-      hostBridge = cfg.hostBridge;
-      localAddress = cfg.ip;
-
-      config =
-        { config, pkgs, ... }:
-        {
-          nixpkgs.config.allowUnfree = true;
-
-          networking.hostName = cfg.hostName;
-          services.avahi = {
-            enable = true;
-            nssmdns4 = true;
-            publish = {
-              enable = true;
-              addresses = true;
-              workstation = true;
-            };
-            openFirewall = true;
-          };
-
-          services.n8n = {
-            enable = true;
-            openFirewall = true;
-            environment = {
-              N8N_LISTEN_ADDRESS = "0.0.0.0";
-              N8N_PORT = "5678";
-              N8N_PROTOCOL = "http";
-              N8N_SECURE_COOKIE = "false";
-            };
-          };
-
-          systemd.services.n8n.serviceConfig = {
-            DynamicUser = pkgs.lib.mkForce false;
-
-            # Upstream n8n module already provides strict systemd hardening:
-            # - ProtectSystem = "strict", ProtectHome = "read-only"
-            # - PrivateTmp, PrivateDevices, NoNewPrivileges = true
-            # - ProtectKernelTunables, ProtectControlGroups, RestrictSUIDSGID = true
-
-            # Allow writing to state dir (bind mounted)
-            ReadWritePaths = [ "/var/lib/n8n" ];
-          };
-          system.stateVersion = "25.11";
+  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+    name = "n8n";
+    cfg = cfg;
+    innerConfig = {
+      nixpkgs.config.allowUnfree = true;
+      services.n8n = {
+        enable = true;
+        openFirewall = true;
+        environment = {
+          N8N_LISTEN_ADDRESS = "0.0.0.0";
+          N8N_PORT = "5678";
+          N8N_PROTOCOL = "http";
+          N8N_SECURE_COOKIE = "false";
+          N8N_CORS_ALLOWED_ORIGINS = "*";
+          N8N_RUNNERS_AUTH_TOKEN_FILE = "/dev/null";
         };
-
-      bindMounts = {
-        "/var/lib/n8n" = {
-          hostPath = cfg.hostDataDir;
-          isReadOnly = false;
-        };
-      } // (lib.mapAttrs' (name: path: lib.nameValuePair "/mnt/ingest/${name}" {
+      };
+      systemd.services.n8n.serviceConfig = {
+        DynamicUser = lib.mkForce false;
+        User = lib.mkForce "root";
+        ReadWritePaths = [ "/var/lib/n8n" ];
+        EnvironmentFile = "/run/secrets/n8n.env";
+      };
+    };
+    bindMounts = {
+      "/var/lib/n8n" = {
+        hostPath = cfg.hostDataDir;
+        isReadOnly = false;
+      };
+    }
+    // lib.optionalAttrs (cfg.secretsFile != null) {
+      "/run/secrets/n8n.env" = {
+        hostPath = cfg.secretsFile;
+        isReadOnly = true;
+      };
+    }
+    // (lib.mapAttrs' (
+      name: path:
+      lib.nameValuePair "/mnt/ingest/${name}" {
         hostPath = path;
-        isReadOnly = true; # Keep notes RO for security
-      }) cfg.noteDirs);
-    };
-  };
+        isReadOnly = true;
+      }
+    ) cfg.noteDirs);
+  });
 }

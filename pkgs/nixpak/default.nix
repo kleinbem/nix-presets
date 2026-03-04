@@ -1,8 +1,8 @@
-{ pkgs, nixpak }:
+{ pkgs, nixpak, homeDirectory ? "/home/martin" }:
 
 let
-  call = file: import file { inherit pkgs nixpak; };
-  chrome = call ./chrome.nix;
+  call = file: import file { inherit pkgs nixpak; lib = pkgs.lib; };
+  chrome = import ./chrome.nix { inherit pkgs nixpak homeDirectory; lib = pkgs.lib; };
 in
 {
   bitwarden = call ./bitwarden.nix;

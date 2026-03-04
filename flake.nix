@@ -19,6 +19,10 @@
       url = "path:./pkgs/redroid/placeholder.zip";
       flake = false;
     };
+    openclaw = {
+      url = "github:openclaw/nix-openclaw";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -42,7 +46,7 @@
             inherit system;
             config.allowUnfree = true;
             overlays = [
-              (final: prev: {
+              (_final: prev: {
                 stable = prev;
               })
             ];
@@ -85,15 +89,31 @@
         };
 
       flake = {
+        lib = {
+          mkContainer = import ./lib/factory.nix { inherit (inputs.nixpkgs) lib; };
+        };
+
         nixosModules = {
           # Generic Modules
-          n8n = import ./containers/n8n.nix;
-          silverbullet = import ./containers/silverbullet.nix;
-          code-server = import ./containers/code-server.nix;
-          open-webui = import ./containers/open-webui.nix;
-          dashboard = import ./containers/dashboard.nix;
-          ollama = import ./containers/ollama.nix;
-          qdrant = import ./containers/qdrant.nix;
+          container-common = import ./containers/common.nix;
+          n8n = import ./containers/n8n.nix { inherit self; };
+          silverbullet = import ./containers/silverbullet.nix { inherit self; };
+          code-server = import ./containers/code-server.nix { inherit self; };
+          open-webui = import ./containers/open-webui.nix { inherit self; };
+          dashboard = import ./containers/dashboard { inherit self; };
+          dashboard-custom = import ./containers/dashboard { inherit self; };
+          dashboard-homer = import ./containers/dashboard/homer { inherit self; };
+          dashboard-homepage = import ./containers/dashboard/homepage { inherit self; };
+          ollama = import ./containers/ollama.nix { inherit self; };
+          qdrant = import ./containers/qdrant.nix { inherit self; };
+          playground = import ./containers/playground.nix { inherit self; };
+          caddy = import ./containers/caddy { inherit self; };
+          comfyui = import ./containers/comfyui.nix { inherit self; };
+          langfuse = import ./containers/langfuse.nix { inherit self; };
+          langflow = import ./containers/langflow.nix { inherit self; };
+          vllm = import ./containers/vllm.nix { inherit self; };
+          openclaw = import ./containers/openclaw.nix { inherit self inputs; };
+          agent-zero = import ./containers/agent-zero.nix { inherit self; };
           waydroid = import ./nixosModules/waydroid.nix { inherit self; };
           android-emulator = import ./nixosModules/android-emulator.nix;
         };

@@ -1,0 +1,17 @@
+# Nix / Direnv
+result
+result-*
+.direnv/
+.cache/
+.devenv/
+
+# Development Tools
+.pre-commit-config.yaml
+.agent/
+_
+*.swp
+*~
+.DS_Store
+
+# Preserve VSCode settings
+!.vscode/

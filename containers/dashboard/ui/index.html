@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NixOS Homelab</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="brand">
+                <h1>Homelab</h1>
+                <p>NixOS • Stateless • Secure</p>
+            </div>
+            <div class="clock-widget">
+                <div id="clock-time">00:00</div>
+                <div id="clock-date">Mon, Jan 1</div>
+            </div>
+        </header>
+
+        <div id="content-wrapper" class="content-wrapper">
+            <!-- Dynamically loaded -->
+            <div style="text-align: center; padding: 40px; color: var(--text-muted);">Loading system nodes...</div>
+        </div>
+
+        <div class="telemetry-bar">
+            <div class="t-item">CPU: <span id="load-val">--%</span></div>
+            <div class="t-item">RAM: <span id="mem-val">--%</span></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
