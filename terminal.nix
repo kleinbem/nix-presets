@@ -52,7 +52,7 @@
     };
 
     keychain = {
-      enable = true;
+      enable = false; # Disabled to prevent conflict with system-wide ssh-agent
       enableBashIntegration = true;
       keys = [
         "id_ed25519_sk"
@@ -167,6 +167,7 @@
 
     sessionVariables = {
       TERMINAL = "cosmic-terminal";
+      SSH_ASKPASS = "${pkgs.lxqt.lxqt-openssh-askpass}/bin/lxqt-openssh-askpass";
     };
 
     packages = with pkgs; [
