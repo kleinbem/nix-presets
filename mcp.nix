@@ -13,9 +13,9 @@
     path = "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json";
     content = builtins.toJSON {
       mcpServers = {
-        # 1. Filesystem (Critical for Coding)
+        # 1. Filesystem (Nixified)
         filesystem = {
-          command = "npx";
+          command = "${pkgs.nodejs_22}/bin/npx";
           args = [
             "-y"
             "@modelcontextprotocol/server-filesystem"
@@ -23,9 +23,17 @@
           ];
         };
 
-        # 2. GitHub (Repo Management)
+        # 2. Workspace Atlas (Custom Nix-Native)
+        workspace-atlas = {
+          command = "${pkgs.python3}/bin/python3";
+          args = [
+            "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
+          ];
+        };
+
+        # 3. GitHub (Nixified)
         github = {
-          command = "npx";
+          command = "${pkgs.nodejs_22}/bin/npx";
           args = [
             "-y"
             "@modelcontextprotocol/server-github"
@@ -35,9 +43,9 @@
           };
         };
 
-        # 3. Brave Search (Web Knowledge)
+        # 4. Brave Search (Nixified)
         brave-search = {
-          command = "npx";
+          command = "${pkgs.nodejs_22}/bin/npx";
           args = [
             "-y"
             "@modelcontextprotocol/server-brave-search"
@@ -47,18 +55,18 @@
           };
         };
 
-        # 4. Puppeteer (Browser Automation)
+        # 5. Puppeteer (Nixified)
         puppeteer = {
-          command = "npx";
+          command = "${pkgs.nodejs_22}/bin/npx";
           args = [
             "-y"
             "@modelcontextprotocol/server-puppeteer"
           ];
         };
 
-        # 5. Database (Postgres) — connection string should be updated when DB is provisioned
+        # 6. Database (Postgres) — connection string should be updated when DB is provisioned
         postgres = {
-          command = "npx";
+          command = "${pkgs.nodejs_22}/bin/npx";
           args = [
             "-y"
             "@modelcontextprotocol/server-postgres"
@@ -66,9 +74,9 @@
           ];
         };
 
-        # 6. Local Git
+        # 7. Local Git (Nixified)
         git = {
-          command = "npx";
+          command = "${pkgs.nodejs_22}/bin/npx";
           args = [
             "-y"
             "mcp-server-git"

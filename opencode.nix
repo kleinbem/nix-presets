@@ -55,17 +55,10 @@ in
       # 2. Install OpenCode (Imperative is safest for self-updating CLI tools)
       # We add a shell alias to help install/update it easily
       shellAliases = {
-        update-opencode = "mkdir -p $HOME/.npm-global && npm install -g opencode-ai --prefix $HOME/.npm-global";
+        opencode = "nix run github:opencode-ai/opencode-ai --";
+        update-opencode = "echo 'OpenCode is now managed via Nix flakes. Run opencode to use it.'";
       };
     };
-
-    # Ensure Home Manager session variables are loaded in interactive shells
-    # This fixes the PATH issue without requiring a full logout/login
-    # Ensure npm binaries are in PATH for interactive shells
-    programs.bash.initExtra = ''
-      export NPM_CONFIG_PREFIX="${config.home.homeDirectory}/.npm-global"
-      export PATH="${config.home.homeDirectory}/.npm-global/bin:$PATH"
-    '';
 
     # 3. Configure OpenCode (The "Safe" Paid Gemini Setup)
     xdg.configFile."opencode/opencode.json".text = builtins.toJSON {
@@ -79,11 +72,17 @@ in
 
       "mcp" = {
         "local_tools" = {
-          "command" = "npx";
+          "command" = "${pkgs.nodejs_22}/bin/npx";
           "args" = [
             "-y"
             "@modelcontextprotocol/server-filesystem"
             "${config.home.homeDirectory}"
+          ];
+        };
+        "workspace-atlas" = {
+          "command" = "${pkgs.python3}/bin/python3";
+          "args" = [
+            "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
           ];
         };
       };

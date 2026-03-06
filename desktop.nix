@@ -201,8 +201,11 @@ in
     Service = {
       Type = "simple";
       Environment = "PATH=/run/wrappers/bin:$PATH";
-      # Ensure the mount point exists: mkdir -p ~/GoogleDrive
-      ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p %h/GoogleDrive";
+      # Wait for network to be fully ready before mounting
+      ExecStartPre = [
+        "${pkgs.coreutils}/bin/sleep 5"
+        "${pkgs.coreutils}/bin/mkdir -p %h/GoogleDrive"
+      ];
       ExecStart = ''
         ${pkgs.rclone}/bin/rclone mount gdrive: %h/GoogleDrive \
           --vfs-cache-mode full \
@@ -228,8 +231,11 @@ in
     Service = {
       Type = "simple";
       Environment = "PATH=/run/wrappers/bin:$PATH";
-      # Ensure the mount point exists: mkdir -p ~/OneDrive
-      ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p %h/OneDrive";
+      # Wait for network to be fully ready before mounting
+      ExecStartPre = [
+        "${pkgs.coreutils}/bin/sleep 5"
+        "${pkgs.coreutils}/bin/mkdir -p %h/OneDrive"
+      ];
       ExecStart = ''
         ${pkgs.rclone}/bin/rclone mount onedrive: %h/OneDrive \
           --vfs-cache-mode full \
