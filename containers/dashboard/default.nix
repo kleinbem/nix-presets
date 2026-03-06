@@ -27,9 +27,10 @@ in
   imports = [ (import ./options.nix { inherit lib; }) ];
 
   config = lib.mkIf cfg.enable (
-    self.lib.mkContainer { inherit config;
+    self.lib.mkContainer {
+      inherit config;
       name = "dashboard";
-      cfg = cfg;
+      inherit cfg;
       innerConfig = {
         services.nginx = {
           enable = true;

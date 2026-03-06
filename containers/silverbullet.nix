@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.my.containers.silverbullet;
-  mkContainer = self.lib.mkContainer; # Added mkContainer definition
+  inherit (self.lib) mkContainer; # Added mkContainer definition
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -18,12 +18,14 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "512M";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     # Changed to mkContainer
     name = "silverbullet";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       # Removed networking.firewall.allowedTCPPorts
       services.silverbullet = {

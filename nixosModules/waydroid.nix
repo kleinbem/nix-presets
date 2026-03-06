@@ -15,7 +15,7 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) default;
       description = "The waydroid-setup package providing the bootstrap tool.";
     };
   };
@@ -26,15 +26,17 @@ in
     virtualisation.lxc.enable = lib.mkDefault true;
 
     # Waydroid needs these kernel environment settings
-    boot.kernelParams = [ "psi=1" ];
-    boot.kernelModules = [
-      "uhid"
-      "binder_linux"
-    ];
+    boot = {
+      kernelParams = [ "psi=1" ];
+      kernelModules = [
+        "uhid"
+        "binder_linux"
+      ];
 
-    # Fix for Magisk/LXC: Allow nested mounts and unprivileged user namespaces
-    boot.kernel.sysctl = {
-      "kernel.unprivileged_userns_clone" = lib.mkDefault 1;
+      # Fix for Magisk/LXC: Allow nested mounts and unprivileged user namespaces
+      kernel.sysctl = {
+        "kernel.unprivileged_userns_clone" = lib.mkDefault 1;
+      };
     };
 
     # Override the Waydroid service to allow the required mounts and capabilities

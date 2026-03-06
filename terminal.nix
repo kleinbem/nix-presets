@@ -69,8 +69,8 @@
 
       settings = {
         user = {
-          name = my.git.name;
-          email = my.git.email;
+          inherit (my.git) name;
+          inherit (my.git) email;
           signingKey = "${config.home.homeDirectory}/.ssh/id_ed25519_sk.pub";
         };
 
@@ -189,13 +189,15 @@
     };
     Service = {
       Type = "oneshot";
-      ExecStart = toString (pkgs.writeShellScript "setup-rclone-config" ''
-        config_dir="$HOME/.config/rclone"
-        ${pkgs.coreutils}/bin/mkdir -p "$config_dir"
-        ${pkgs.coreutils}/bin/rm -f "$config_dir/rclone.conf"
-        ${pkgs.coreutils}/bin/cp -f /run/secrets/rclone_config "$config_dir/rclone.conf"
-        ${pkgs.coreutils}/bin/chmod 600 "$config_dir/rclone.conf"
-      '');
+      ExecStart = toString (
+        pkgs.writeShellScript "setup-rclone-config" ''
+          config_dir="$HOME/.config/rclone"
+          ${pkgs.coreutils}/bin/mkdir -p "$config_dir"
+          ${pkgs.coreutils}/bin/rm -f "$config_dir/rclone.conf"
+          ${pkgs.coreutils}/bin/cp -f /run/secrets/rclone_config "$config_dir/rclone.conf"
+          ${pkgs.coreutils}/bin/chmod 600 "$config_dir/rclone.conf"
+        ''
+      );
     };
     Install = {
       WantedBy = [ "default.target" ];
@@ -212,14 +214,16 @@
     };
     Service = {
       Type = "oneshot";
-      ExecStart = toString (pkgs.writeShellScript "fix-ssh-permissions" ''
-        ssh_config="$HOME/.ssh/config"
-        if [ -L "$ssh_config" ]; then
-          ${pkgs.coreutils}/bin/cp --remove-destination "$ssh_config" "$ssh_config.real"
-          ${pkgs.coreutils}/bin/mv "$ssh_config.real" "$ssh_config"
-          ${pkgs.coreutils}/bin/chmod 600 "$ssh_config"
-        fi
-      '');
+      ExecStart = toString (
+        pkgs.writeShellScript "fix-ssh-permissions" ''
+          ssh_config="$HOME/.ssh/config"
+          if [ -L "$ssh_config" ]; then
+            ${pkgs.coreutils}/bin/cp --remove-destination "$ssh_config" "$ssh_config.real"
+            ${pkgs.coreutils}/bin/mv "$ssh_config.real" "$ssh_config"
+            ${pkgs.coreutils}/bin/chmod 600 "$ssh_config"
+          fi
+        ''
+      );
     };
     Install = {
       WantedBy = [ "default.target" ];

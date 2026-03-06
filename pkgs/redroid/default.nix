@@ -1,6 +1,6 @@
 { pkgs, inputs }:
 let
-  system = pkgs.stdenv.hostPlatform.system;
+  inherit (pkgs.stdenv.hostPlatform) system;
 
   # Define Docker Image Sources (Managed by update.sh)
   redroidHashes = {
@@ -43,8 +43,8 @@ in
     tag = "16.0.0";
     fromImage = pkgs.dockerTools.pullImage {
       imageName = "redroid/redroid";
-      imageDigest = redroidSource.imageDigest;
-      sha256 = redroidSource.sha256;
+      inherit (redroidSource) imageDigest;
+      inherit (redroidSource) sha256;
       finalImageName = "redroid/redroid";
       finalImageTag = "16.0.0_64only-latest";
     };

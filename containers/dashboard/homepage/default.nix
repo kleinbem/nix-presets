@@ -25,9 +25,10 @@ in
   imports = [ (import ../options.nix { inherit lib; }) ];
 
   config = lib.mkIf cfg.enable (
-    self.lib.mkContainer { inherit config;
+    self.lib.mkContainer {
+      inherit config;
       name = "dashboard-homepage";
-      cfg = cfg;
+      inherit cfg;
       innerConfig = {
         # Use the native NixOS module for Homepage
         services.homepage-dashboard = {

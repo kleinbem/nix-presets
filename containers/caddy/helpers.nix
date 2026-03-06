@@ -21,13 +21,18 @@ in
     let
       isMtls = node.mtls or false;
     in
-    if isMtls then ''
-      transport http {
-        tls
-        tls_client_auth /etc/pki/internal/client.crt /etc/pki/internal/client.key
-        tls_trusted_ca_certs /etc/pki/internal/ca.crt
-      }
-    '' else if (node.secure or false) then "transport http { tls_insecure_skip_verify }" else "";
+    if isMtls then
+      ''
+        transport http {
+          tls
+          tls_client_auth /etc/pki/internal/client.crt /etc/pki/internal/client.key
+          tls_trusted_ca_certs /etc/pki/internal/ca.crt
+        }
+      ''
+    else if (node.secure or false) then
+      "transport http { tls_insecure_skip_verify }"
+    else
+      "";
 
   # Generates the maintenance page HTML
   mkMaintPage = name: ''
@@ -49,10 +54,11 @@ in
       let
         vhostName =
           let
-            ipHost = if node.externalPort == 443 then
-              "https://${hostIP}"
-            else
-              "https://${hostIP}:${toString node.externalPort}";
+            ipHost =
+              if node.externalPort == 443 then
+                "https://${hostIP}"
+              else
+                "https://${hostIP}:${toString node.externalPort}";
           in
           "${ipHost}, https://${name}.local";
 

@@ -1,25 +1,35 @@
-{ pkgs, lib, nixpak, homeDirectory, ... }:
+{
+  pkgs,
+  lib,
+  nixpak,
+  homeDirectory,
+  ...
+}:
 
 let
   utils = import ../../nixpak/utils.nix { inherit pkgs nixpak; };
   sandboxedXdgUtils = pkgs.callPackage ../../nixpak/xdg-utils.nix { };
 
   # Define the policy file directly via Nix
-  chromePolicyBlocked = pkgs.writeTextDir "policies/managed/blocklist.json" (builtins.toJSON {
-    ExtensionInstallBlocklist = [
-      "ghbmnnjooekpmoecnnnilnnbdlolhkhi" # Google Drive Offline
-      "aohghmighlieiainnegkcijnfilokake" # Google Docs
-      "felcaaldnbdncclmgdcncolpebgiejap" # Google Sheets
-      "aapocclcgogkmnckokdopfmhonfmgoek" # Google Slides
-      "pjkljhegncpnkpknbcohdijeoejaedia" # Gmail
-      "blpcfgokakmgnkcojhhkbfbldkacnbeo" # YouTube
-    ];
-  });
+  chromePolicyBlocked = pkgs.writeTextDir "policies/managed/blocklist.json" (
+    builtins.toJSON {
+      ExtensionInstallBlocklist = [
+        "ghbmnnjooekpmoecnnnilnnbdlolhkhi" # Google Drive Offline
+        "aohghmighlieiainnegkcijnfilokake" # Google Docs
+        "felcaaldnbdncclmgdcncolpebgiejap" # Google Sheets
+        "aapocclcgogkmnckokdopfmhonfmgoek" # Google Slides
+        "pjkljhegncpnkpknbcohdijeoejaedia" # Gmail
+        "blpcfgokakmgnkcojhhkbfbldkacnbeo" # YouTube
+      ];
+    }
+  );
 
   # Define a permissive policy (empty blocklist)
-  chromePolicyAllowed = pkgs.writeTextDir "policies/managed/blocklist.json" (builtins.toJSON {
-    ExtensionInstallBlocklist = [ ];
-  });
+  chromePolicyAllowed = pkgs.writeTextDir "policies/managed/blocklist.json" (
+    builtins.toJSON {
+      ExtensionInstallBlocklist = [ ];
+    }
+  );
 
   # Define a dummy machine-id file
   dummyMachineId = pkgs.writeText "machine-id" "00000000000000000000000000000000\n";
@@ -39,16 +49,18 @@ let
       inherit exportDesktopFiles;
       inherit extraBinNames;
       inherit resourceLimits;
-      package = pkgs.runCommand "google-chrome-renamed-${name}" { nativeBuildInputs = [ pkgs.makeWrapper ]; } ''
-        mkdir -p $out/bin
-        makeWrapper ${pkgs.google-chrome}/bin/google-chrome-stable $out/bin/${name} \
-          --add-flags "--enable-features=UseOzonePlatform,WaylandWindowDecorations,VaapiVideoDecoder,VaapiVideoEncoder,VaapiIgnoreDriverChecks" \
-          --add-flags "--ozone-platform-hint=auto" \
-          --add-flags "--ignore-gpu-blocklist" \
-          --add-flags "--enable-gpu-rasterization" \
-          --add-flags "--enable-zero-copy"
-        ln -s ${pkgs.google-chrome}/share $out/share
-      '';
+      package =
+        pkgs.runCommand "google-chrome-renamed-${name}" { nativeBuildInputs = [ pkgs.makeWrapper ]; }
+          ''
+            mkdir -p $out/bin
+            makeWrapper ${pkgs.google-chrome}/bin/google-chrome-stable $out/bin/${name} \
+              --add-flags "--enable-features=UseOzonePlatform,WaylandWindowDecorations,VaapiVideoDecoder,VaapiVideoEncoder,VaapiIgnoreDriverChecks" \
+              --add-flags "--ozone-platform-hint=auto" \
+              --add-flags "--ignore-gpu-blocklist" \
+              --add-flags "--enable-gpu-rasterization" \
+              --add-flags "--enable-zero-copy"
+            ln -s ${pkgs.google-chrome}/share $out/share
+          '';
       inherit name;
       binPath = "bin/${name}";
       extraPackages = [

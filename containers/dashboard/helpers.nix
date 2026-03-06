@@ -8,7 +8,7 @@
       mkServiceData =
         id: node:
         let
-          meta = node.meta;
+          inherit (node) meta;
           hasProxy = node ? externalPort;
           link =
             if hasProxy then

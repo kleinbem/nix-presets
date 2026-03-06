@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.my.containers.vllm;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -33,29 +33,34 @@ in
       default = null;
       description = "Path on the host to a .env file containing HUGGING_FACE_HUB_TOKEN";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "vllm";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
-      virtualisation.oci-containers.backend = "podman";
-      virtualisation.podman.enable = true;
-
-      virtualisation.oci-containers.containers.vllm = {
-        image = "vllm/vllm-openai:latest";
-        ports = [ "8000:8000" ];
-        environmentFiles = [ "/run/secrets/vllm.env" ];
-        volumes = [
-          "/var/lib/vllm:/root/.cache/huggingface"
-        ];
-        extraOptions = [
-          "--ipc=host"
-        ] ++ (lib.optionals cfg.enableGPU [
-          "--device=/dev/dri"
-        ]) ++ (lib.optionals cfg.enableAudio [
-          "--device=/dev/snd"
-        ]);
+      virtualisation = {
+        oci-containers.backend = "podman";
+        podman.enable = true;
+        oci-containers.containers.vllm = {
+          image = "vllm/vllm-openai:latest";
+          ports = [ "8000:8000" ];
+          environmentFiles = [ "/run/secrets/vllm.env" ];
+          volumes = [
+            "/var/lib/vllm:/root/.cache/huggingface"
+          ];
+          extraOptions = [
+            "--ipc=host"
+          ]
+          ++ (lib.optionals cfg.enableGPU [
+            "--device=/dev/dri"
+          ])
+          ++ (lib.optionals cfg.enableAudio [
+            "--device=/dev/snd"
+          ]);
+        };
       };
 
       networking.firewall.allowedTCPPorts = [ 8000 ];
@@ -65,17 +70,20 @@ in
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
       };
-    } // lib.optionalAttrs (cfg.secretsFile != null) {
+    }
+    // lib.optionalAttrs (cfg.secretsFile != null) {
       "/run/secrets/vllm.env" = {
         hostPath = cfg.secretsFile;
         isReadOnly = true;
       };
-    } // lib.optionalAttrs cfg.enableGPU {
+    }
+    // lib.optionalAttrs cfg.enableGPU {
       "/dev/dri" = {
         hostPath = "/dev/dri";
         isReadOnly = false;
       };
-    } // lib.optionalAttrs cfg.enableAudio {
+    }
+    // lib.optionalAttrs cfg.enableAudio {
       "/dev/snd" = {
         hostPath = "/dev/snd";
         isReadOnly = false;

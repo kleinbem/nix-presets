@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.my.containers.n8n;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -27,11 +27,13 @@ in
       type = lib.types.attrsOf lib.types.path;
       default = { };
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "n8n";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       nixpkgs.config.allowUnfree = true;
       services.n8n = {

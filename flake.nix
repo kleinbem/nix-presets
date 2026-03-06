@@ -79,7 +79,7 @@
           packages =
             (import ./pkgs/nixpak/default.nix {
               pkgs = appsPkgs;
-              nixpak = inputs.nixpak;
+              inherit (inputs) nixpak;
             })
             // (import ./pkgs/waydroid/default.nix {
               inherit pkgs;

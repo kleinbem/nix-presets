@@ -16,5 +16,6 @@ in
       default = null;
       description = "Path on the host to a .env file containing dashboard API keys";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 }

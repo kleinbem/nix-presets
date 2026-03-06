@@ -50,7 +50,7 @@
       # --- Helper: Widget Configuration ---
       # Automatically configure widgets for known services
       getWidget =
-        id: node:
+        _: node:
         let
           lowerName = lib.toLower node.meta.name;
         in
@@ -95,19 +95,17 @@
           href = mkHref node;
         in
         {
-          "${node.meta.name}" = (
-            {
-              icon = getIcon node;
-              inherit href;
-              description = node.meta.description;
-            }
-            // lib.optionalAttrs (widgetConfig != null) { widget = widgetConfig; }
-            // lib.optionalAttrs (href != "#") { ping = href; }
-          );
+          "${node.meta.name}" = {
+            icon = getIcon node;
+            inherit href;
+            inherit (node.meta) description;
+          }
+          // lib.optionalAttrs (widgetConfig != null) { widget = widgetConfig; }
+          // lib.optionalAttrs (href != "#") { ping = href; };
         };
 
       # Group items by category
-      grouped = lib.groupBy (node: node.meta.category or "Other") (lib.attrValues dashboardNodes);
+      grouped = builtins.groupBy (node: node.meta.category or "Other") (lib.attrValues dashboardNodes);
 
       catOrder = [
         "Infrastructure"

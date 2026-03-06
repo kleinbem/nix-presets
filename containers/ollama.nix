@@ -7,7 +7,7 @@
 
 let
   cfg = config.my.containers.ollama;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -24,11 +24,13 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "12G";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "ollama";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       nixpkgs.config.allowUnfree = true;
       services.ollama = {
@@ -48,7 +50,8 @@ in
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
       };
-    } // lib.optionalAttrs cfg.enableGPU {
+    }
+    // lib.optionalAttrs cfg.enableGPU {
       "/dev/dri/renderD128" = {
         hostPath = "/dev/dri/renderD128";
         isReadOnly = false;

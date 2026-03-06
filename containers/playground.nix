@@ -7,7 +7,7 @@
 }:
 let
   cfg = config.my.containers.playground;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -24,11 +24,13 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "8G";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "playground";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       users.users.${cfg.user} = {
         isNormalUser = true;

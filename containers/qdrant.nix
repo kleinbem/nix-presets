@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.my.containers.qdrant;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -18,11 +18,13 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "2G";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "qdrant";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       services.qdrant = {
         enable = true;

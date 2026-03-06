@@ -7,7 +7,7 @@
 }:
 let
   cfg = config.my.containers.langfuse;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -24,27 +24,30 @@ in
       default = null;
       description = "Path on the host to a .env file containing NEXTAUTH_SECRET and SALT";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "langfuse";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       # Since there is no native NixOS service for Langfuse, we use OCI containers.
-      virtualisation.oci-containers.backend = "podman";
-      virtualisation.podman.enable = true;
-
-      virtualisation.oci-containers.containers.langfuse = {
-        image = "ghcr.io/langfuse/langfuse:latest";
-        ports = [ "3000:3000" ];
-        environmentFiles = [ "/run/secrets/langfuse.env" ];
-        environment = {
-          DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/langfuse";
-          NEXTAUTH_URL = "http://localhost:3000";
-          TELEMETRY_ENABLED = "false";
+      virtualisation = {
+        oci-containers.backend = "podman";
+        podman.enable = true;
+        oci-containers.containers.langfuse = {
+          image = "ghcr.io/langfuse/langfuse:latest";
+          ports = [ "3000:3000" ];
+          environmentFiles = [ "/run/secrets/langfuse.env" ];
+          environment = {
+            DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/langfuse";
+            NEXTAUTH_URL = "http://localhost:3000";
+            TELEMETRY_ENABLED = "false";
+          };
+          # Wait for Postgres to be ready
+          dependsOn = [ ];
         };
-        # Wait for Postgres to be ready
-        dependsOn = [ ];
       };
 
       # Provide the required Postgres database locally within the container
@@ -77,7 +80,8 @@ in
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
       };
-    } // lib.optionalAttrs (cfg.secretsFile != null) {
+    }
+    // lib.optionalAttrs (cfg.secretsFile != null) {
       "/run/secrets/langfuse.env" = {
         hostPath = cfg.secretsFile;
         isReadOnly = true;

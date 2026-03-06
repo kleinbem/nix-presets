@@ -7,7 +7,7 @@
 }:
 let
   cfg = config.my.containers.open-webui;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -16,8 +16,8 @@ in
     ip = lib.mkOption { type = lib.types.str; };
     hostDataDir = lib.mkOption { type = lib.types.str; };
     ollamaUrl = lib.mkOption { type = lib.types.str; };
-    vllmUrl = lib.mkOption { 
-      type = lib.types.nullOr lib.types.str; 
+    vllmUrl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
       default = null;
     };
     secretsFile = lib.mkOption {
@@ -39,11 +39,13 @@ in
       default = false;
       description = "Enable /dev/video* hardware pass-through for direct webcam integration.";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "open-webui";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       nixpkgs.config.allowUnfree = true;
       services.open-webui = {
@@ -86,17 +88,20 @@ in
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
       };
-    } // lib.optionalAttrs (cfg.secretsFile != null) {
+    }
+    // lib.optionalAttrs (cfg.secretsFile != null) {
       "/run/secrets/openwebui.env" = {
         hostPath = cfg.secretsFile;
         isReadOnly = true;
       };
-    } // lib.optionalAttrs cfg.enableAudio {
+    }
+    // lib.optionalAttrs cfg.enableAudio {
       "/dev/snd" = {
         hostPath = "/dev/snd";
         isReadOnly = false;
       };
-    } // lib.optionalAttrs cfg.enableVideo {
+    }
+    // lib.optionalAttrs cfg.enableVideo {
       "/dev/video0" = {
         hostPath = "/dev/video0";
         isReadOnly = false;

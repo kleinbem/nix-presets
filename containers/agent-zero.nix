@@ -7,7 +7,7 @@
 }:
 let
   cfg = config.my.containers.agent-zero;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
   # System packages needed inside the container for building Python native extensions
@@ -28,9 +28,9 @@ let
     curl
     wget
     poppler_utils # pdf2image
-    tesseract     # pytesseract OCR
-    ffmpeg        # whisper audio
-    sox           # audio processing
+    tesseract # pytesseract OCR
+    ffmpeg # whisper audio
+    sox # audio processing
     cacert
   ];
 in
@@ -53,11 +53,13 @@ in
       default = null;
       description = "Path on the host to environment file containing API keys (e.g. OPENAI_API_KEY).";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "agent-zero";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       environment.systemPackages = buildDeps;
 
@@ -83,7 +85,8 @@ in
           A0_SET_UTILITY_MODEL_NAME = "llama3.1";
           A0_SET_EMBEDDING_MODEL_PROVIDER = "ollama";
           A0_SET_EMBEDDING_MODEL_NAME = "nomic-embed-text";
-        } // lib.optionalAttrs (cfg.ollamaUrl != "") {
+        }
+        // lib.optionalAttrs (cfg.ollamaUrl != "") {
           A0_SET_CHAT_MODEL_URL = cfg.ollamaUrl;
           A0_SET_UTILITY_MODEL_URL = cfg.ollamaUrl;
           A0_SET_EMBEDDING_MODEL_URL = cfg.ollamaUrl;
@@ -134,7 +137,8 @@ in
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
       };
-    } // lib.optionalAttrs (cfg.secretsFile != null) {
+    }
+    // lib.optionalAttrs (cfg.secretsFile != null) {
       "/run/secrets/agent-zero.env" = {
         hostPath = cfg.secretsFile;
         isReadOnly = true;

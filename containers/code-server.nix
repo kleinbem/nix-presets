@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.my.containers.code-server;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -23,11 +23,13 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "4G";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "code-server";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
       users.users.${cfg.user} = {
         isNormalUser = true;
@@ -37,7 +39,7 @@ in
 
       services.code-server = {
         enable = true;
-        user = cfg.user;
+        inherit (cfg) user;
         group = "users";
         host = "0.0.0.0";
         auth = "none";

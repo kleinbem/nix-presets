@@ -37,11 +37,13 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "512M";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
-      (self.lib.mkContainer { inherit config;
+      (self.lib.mkContainer {
+        inherit config;
         name = "caddy";
         cfg = cfg // {
           hostDataDir = null;

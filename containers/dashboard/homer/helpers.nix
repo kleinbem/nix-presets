@@ -21,15 +21,15 @@
           "#";
 
       # Map a node to a Homer item
-      mkItem = id: node: {
-        name = node.meta.name;
+      mkItem = _: node: {
+        inherit (node.meta) name;
         subtitle = node.meta.description;
-        icon = node.meta.icon; # Homer supports some icons, might need mapping but let's try raw
+        inherit (node.meta) icon; # Homer supports some icons, might need mapping but let's try raw
         url = mkLink node;
       };
 
       # Group items by category
-      grouped = lib.groupBy (node: node.meta.category or "Other") (lib.attrValues dashboardNodes);
+      grouped = builtins.groupBy (node: node.meta.category or "Other") (lib.attrValues dashboardNodes);
 
       # Priority for categories
       catOrder = [

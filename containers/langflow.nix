@@ -6,7 +6,7 @@
 }:
 let
   cfg = config.my.containers.langflow;
-  mkContainer = self.lib.mkContainer;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -18,25 +18,28 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "4G";
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer { inherit config;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
     name = "langflow";
-    cfg = cfg;
+    inherit cfg;
     innerConfig = {
-      virtualisation.oci-containers.backend = "podman";
-      virtualisation.podman.enable = true;
-
-      virtualisation.oci-containers.containers.langflow = {
-        image = "langflowai/langflow:latest";
-        ports = [ "7860:7860" ];
-        environment = {
-          LANGFLOW_DATABASE_URL = "sqlite:////var/lib/langflow/langflow.db";
-          LANGFLOW_HOST = "0.0.0.0";
+      virtualisation = {
+        oci-containers.backend = "podman";
+        podman.enable = true;
+        oci-containers.containers.langflow = {
+          image = "langflowai/langflow:latest";
+          ports = [ "7860:7860" ];
+          environment = {
+            LANGFLOW_DATABASE_URL = "sqlite:////var/lib/langflow/langflow.db";
+            LANGFLOW_HOST = "0.0.0.0";
+          };
+          volumes = [
+            "/var/lib/langflow:/var/lib/langflow"
+          ];
         };
-        volumes = [
-          "/var/lib/langflow:/var/lib/langflow"
-        ];
       };
 
       networking.firewall.allowedTCPPorts = [ 7860 ];

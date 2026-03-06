@@ -8,7 +8,10 @@
 
 let
   # Import modular apps catalog
-  sandboxedApps = import ./nixpak/apps.nix { inherit pkgs nixpak; inherit (config.home) homeDirectory; };
+  sandboxedApps = import ./nixpak/apps.nix {
+    inherit pkgs nixpak;
+    inherit (config.home) homeDirectory;
+  };
 
   commonData = import ./code-common/settings.nix;
   extensionsCommon = import ./code-common/extensions/common.nix { inherit pkgs; };

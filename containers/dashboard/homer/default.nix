@@ -24,7 +24,7 @@ let
     pkgs.runCommand "homer-dist"
       {
         nativeBuildInputs = [ pkgs.remarshal ];
-        homer = pkgs.homer;
+        inherit (pkgs) homer;
         configYml = builtins.toJSON homerConfig;
       }
       ''
@@ -40,9 +40,10 @@ in
 
   # Note: Uses the same options as the standard dashboard
   config = lib.mkIf cfg.enable (
-    self.lib.mkContainer { inherit config;
+    self.lib.mkContainer {
+      inherit config;
       name = "dashboard-homer";
-      cfg = cfg;
+      inherit cfg;
       innerConfig = {
         services.nginx = {
           enable = true;
