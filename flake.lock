@@ -462,8 +462,8 @@
         "treefmt-nix": "treefmt-nix_2"
       },
       "locked": {
-        "lastModified": 1772851595,
-        "narHash": "sha256-JtcFX3r5vG1KoiIirR0e80WUPtm6XIkijLvUjG9xWQE=",
+        "lastModified": 1772851794,
+        "narHash": "sha256-up0rWp+Db0iY9uVhdX7CsYMXAm6dZwlmhqwPsT+lbkE=",
         "path": "/home/martin/Develop/github.com/kleinbem/nix/nix-devshells",
         "type": "path"
       },
@@ -786,11 +786,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1772775058,
-        "narHash": "sha256-i+I9RYN8kYb9/9kibkxd0avkkislD1tyWojSVgIy160=",
+        "lastModified": 1772851046,
+        "narHash": "sha256-yyjgng6D7AALhsxN+J6u274Xnf0atAZpix7bZOHgkOY=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "629bbb7f9d02787a54e28398b411da849246253b",
+        "rev": "0dccc5c1af95500b30ecf25177d5e2f56b5072a5",
         "type": "github"
       },
       "original": {
