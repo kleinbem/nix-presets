@@ -23,7 +23,7 @@
       url = "github:openclaw/nix-openclaw";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nix-devshells.url = "path:../nix-devshells";
+    nix-devshells.url = "path:/home/martin/Develop/github.com/kleinbem/nix/nix-devshells";
     nix-devshells.inputs.nixpkgs.follows = "nixpkgs";
   };
 
