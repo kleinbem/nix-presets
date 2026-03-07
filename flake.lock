@@ -462,13 +462,13 @@
         "treefmt-nix": "treefmt-nix_2"
       },
       "locked": {
-        "lastModified": 1772851794,
+        "lastModified": 1772851864,
         "narHash": "sha256-up0rWp+Db0iY9uVhdX7CsYMXAm6dZwlmhqwPsT+lbkE=",
         "path": "/home/martin/Develop/github.com/kleinbem/nix/nix-devshells",
         "type": "path"
       },
       "original": {
-        "path": "../nix-devshells",
+        "path": "/home/martin/Develop/github.com/kleinbem/nix/nix-devshells",
         "type": "path"
       }
     },
