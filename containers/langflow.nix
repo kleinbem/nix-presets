@@ -1,4 +1,4 @@
-{ self }:
+_:
 {
   config,
   lib,
@@ -6,7 +6,6 @@
 }:
 let
   cfg = config.my.containers.langflow;
-  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -18,37 +17,40 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "4G";
     };
+    autoStart = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Start the container automatically on boot.";
+    };
   }
   // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer {
-    inherit config;
-    name = "langflow";
-    inherit cfg;
-    innerConfig = {
-      virtualisation = {
-        oci-containers.backend = "podman";
-        podman.enable = true;
-        oci-containers.containers.langflow = {
-          image = "langflowai/langflow:latest";
-          ports = [ "7860:7860" ];
-          environment = {
-            LANGFLOW_DATABASE_URL = "sqlite:////var/lib/langflow/langflow.db";
-            LANGFLOW_HOST = "0.0.0.0";
-          };
-          volumes = [
-            "/var/lib/langflow:/var/lib/langflow"
-          ];
-        };
+  config = lib.mkIf cfg.enable {
+    virtualisation.oci-containers.containers.langflow = {
+      image = "docker.io/langflowai/langflow:latest";
+      inherit (cfg) autoStart;
+      ports = [ "7860:7860" ];
+      environment = {
+        LANGFLOW_DATABASE_URL = "sqlite:////var/lib/langflow/langflow.db";
+        LANGFLOW_HOST = "0.0.0.0";
       };
+      volumes = [
+        "${cfg.hostDataDir}:/var/lib/langflow"
+      ];
+      extraOptions = [
+        "--network=cbr0"
+        "--ip=${lib.head (lib.splitString "/" cfg.ip)}"
+        "--security-opt=no-new-privileges"
+      ];
+    };
 
-      networking.firewall.allowedTCPPorts = [ 7860 ];
-    };
-    bindMounts = {
-      "/var/lib/langflow" = {
-        hostPath = cfg.hostDataDir;
-        isReadOnly = false;
+    systemd.services.podman-langflow = {
+      after = [ "podman-network-cbr0.service" ];
+      requires = [ "podman-network-cbr0.service" ];
+      serviceConfig = {
+        MemoryMax = lib.mkIf (cfg.memoryLimit != null) cfg.memoryLimit;
+        Environment = [ "TMPDIR=/var/lib/images/podman/tmp" ];
       };
     };
-  });
+  };
 }

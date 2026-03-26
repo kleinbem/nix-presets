@@ -14,9 +14,14 @@ in
     enable = lib.mkEnableOption "OpenClaw Personal AI Agent Container";
     ip = lib.mkOption { type = lib.types.str; };
     hostDataDir = lib.mkOption { type = lib.types.str; };
+    vllmUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      description = "Internal URL to the local vLLM/OpenAI instance";
+    };
     ollamaUrl = lib.mkOption {
       type = lib.types.str;
-      default = "http://10.85.46.20:11434"; # Example internal bridge IP
+      default = "";
       description = "Internal URL to the local Ollama instance";
     };
     memoryLimit = lib.mkOption {

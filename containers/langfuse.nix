@@ -1,13 +1,11 @@
-{ self }:
+_:
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
   cfg = config.my.containers.langfuse;
-  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -19,6 +17,11 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "4G";
     };
+    autoStart = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Start the container automatically on boot.";
+    };
     secretsFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -27,65 +30,56 @@ in
   }
   // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer {
-    inherit config;
-    name = "langfuse";
-    inherit cfg;
-    innerConfig = {
-      # Since there is no native NixOS service for Langfuse, we use OCI containers.
-      virtualisation = {
-        oci-containers.backend = "podman";
-        podman.enable = true;
-        oci-containers.containers.langfuse = {
-          image = "ghcr.io/langfuse/langfuse:latest";
-          ports = [ "3000:3000" ];
-          environmentFiles = [ "/run/secrets/langfuse.env" ];
-          environment = {
-            DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/langfuse";
-            NEXTAUTH_URL = "http://localhost:3000";
-            TELEMETRY_ENABLED = "false";
-          };
-          # Wait for Postgres to be ready
-          dependsOn = [ ];
+  config = lib.mkIf cfg.enable {
+    virtualisation.oci-containers.containers = {
+      langfuse-db = {
+        image = "postgres:16-alpine";
+        inherit (cfg) autoStart;
+        environment = {
+          POSTGRES_USER = "postgres";
+          POSTGRES_PASSWORD = "postgres";
+          POSTGRES_DB = "langfuse";
         };
+        volumes = [
+          "${cfg.hostDataDir}/db:/var/lib/postgresql/data"
+        ];
+        extraOptions = [
+          "--net=cbr0"
+          "--security-opt=no-new-privileges"
+        ];
       };
 
-      # Provide the required Postgres database locally within the container
-      services.postgresql = {
-        enable = true;
-        package = pkgs.postgresql_16;
-        enableTCPIP = true;
-        authentication = lib.mkForce ''
-          local all all trust
-          host all all 127.0.0.1/32 trust
-          host all all ::1/128 trust
-        '';
-        initialScript = pkgs.writeText "init-langfuse-db.sql" ''
-          CREATE DATABASE langfuse;
-          CREATE USER postgres WITH PASSWORD 'postgres';
-          GRANT ALL PRIVILEGES ON DATABASE langfuse TO postgres;
-          ALTER DATABASE langfuse OWNER TO postgres;
-        '';
-      };
-
-      networking.firewall.allowedTCPPorts = [
-        3000
-        5432
-      ];
-
-      systemd.services.podman-langfuse.after = [ "postgresql.service" ];
-    };
-    bindMounts = {
-      "/var/lib/postgresql" = {
-        hostPath = cfg.hostDataDir;
-        isReadOnly = false;
-      };
-    }
-    // lib.optionalAttrs (cfg.secretsFile != null) {
-      "/run/secrets/langfuse.env" = {
-        hostPath = cfg.secretsFile;
-        isReadOnly = true;
+      langfuse = {
+        image = "ghcr.io/langfuse/langfuse:latest";
+        inherit (cfg) autoStart;
+        ports = [ "3000:3000" ];
+        environmentFiles = lib.optional (cfg.secretsFile != null) cfg.secretsFile;
+        environment = {
+          DATABASE_URL = "postgresql://postgres:postgres@langfuse-db:5432/langfuse";
+          NEXTAUTH_URL = "http://localhost:3000";
+          TELEMETRY_ENABLED = "false";
+        };
+        dependsOn = [ "langfuse-db" ];
+        extraOptions = [
+          "--net=cbr0"
+          "--ip=${lib.head (lib.splitString "/" cfg.ip)}"
+          "--security-opt=no-new-privileges"
+        ];
       };
     };
-  });
+
+    systemd.services.podman-langfuse = {
+      after = [ "podman-network-cbr0.service" ];
+      requires = [ "podman-network-cbr0.service" ];
+      serviceConfig = {
+        MemoryMax = lib.mkIf (cfg.memoryLimit != null) cfg.memoryLimit;
+        Environment = [ "TMPDIR=/var/lib/images/podman/tmp" ];
+      };
+    };
+    systemd.services.podman-langfuse-db = {
+      after = [ "podman-network-cbr0.service" ];
+      requires = [ "podman-network-cbr0.service" ];
+      serviceConfig.Environment = [ "TMPDIR=/var/lib/images/podman/tmp" ];
+    };
+  };
 }

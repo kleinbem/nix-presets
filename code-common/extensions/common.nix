@@ -38,7 +38,7 @@ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
     name = "python";
     publisher = "ms-python";
     version = "2026.2.2026021801";
-    sha256 = "1d6k088123gbwwiri7hwl49jhf7ll3npwizyrai3x4871i254cwz";
+    sha256 = "sha256-IDBMaNk9KlDbw7RSCALyKG/8Fs8S5/DQ8uRZnEINj2s=";
   }
   {
     name = "copilot";

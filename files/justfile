@@ -10,19 +10,19 @@ default:
 
 # Start AI stack (Ollama, WebUI, n8n)
 ai-up:
-    sudo systemctl start ai-services.target
+    sudo systemctl start ollama.service podman-litellm.service podman-comfyui.service podman-langflow.service podman-langfuse.service podman-langfuse-db.service container@open-webui.service container@n8n.service
 
 # Stop AI stack
 ai-down:
-    sudo systemctl stop ai-services.target
+    sudo systemctl stop ollama.service podman-litellm.service podman-comfyui.service podman-langflow.service podman-langfuse.service podman-langfuse-db.service container@open-webui.service container@n8n.service
 
 # Check AI status
 ai-status:
-    systemctl status ai-services.target ollama open-webui n8n
+    systemctl status ollama.service podman-litellm.service podman-comfyui.service podman-langflow.service podman-langfuse.service podman-langfuse-db.service container@open-webui.service container@n8n.service
 
 # Follow AI logs
 ai-logs:
-    journalctl -u ollama -u open-webui -u n8n -f
+    journalctl -u ollama.service -u podman-litellm.service -u podman-comfyui.service -u podman-langflow.service -u podman-langfuse.service -u podman-langfuse-db.service -u container@open-webui.service -u container@n8n.service -f
 
 # --- System ---
 

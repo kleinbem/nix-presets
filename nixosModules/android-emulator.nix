@@ -148,7 +148,7 @@ in
 
     gpuMode = lib.mkOption {
       type = lib.types.str;
-      default = "swiftshader_indirect";
+      default = "auto";
       description = "GPU emulation mode (e.g. host, swiftshader_indirect, auto)";
     };
 
@@ -190,7 +190,7 @@ in
     # Systemd User Service for Emulator Daemon
     systemd.user.services.android-emulator = {
       description = "Background Android Emulator for Integrated Workspace";
-      wantedBy = [ "graphical-session.target" ];
+      # Remove wantedBy to disable auto-start
       partOf = [ "graphical-session.target" ];
       environment = {
         ANDROID_AVD_NAME = cfg.avdName;

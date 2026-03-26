@@ -29,6 +29,20 @@
           args = [
             "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
           ];
+          env = {
+            PYTHONPATH = "${pkgs.python3Packages.python-lsp-server}/lib/python3.12/site-packages"; # Example to ensure libs
+          };
+        };
+
+        # 3. Monitoring (VictoriaMetrics)
+        prometheus = {
+          command = "${pkgs.nodejs_22}/bin/npx";
+          args = [
+            "-y"
+            "@modelcontextprotocol/server-prometheus"
+            "--endpoint"
+            "http://10.85.46.1:8428" # VictoriaMetrics Endpoint
+          ];
         };
 
         # 3. GitHub (Nixified)

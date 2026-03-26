@@ -41,9 +41,11 @@
         else if lowerName == "langfuse" then
           "chart-line"
         else if lowerName == "vllm" then
-          "server"
+          "vllm"
         else if lowerName == "openclaw" then
           "robot"
+        else if lowerName == "monitoring" then
+          "grafana"
         else
           "sh-monitor"; # Default generic icon
 
@@ -62,11 +64,17 @@
             url = "https://${node.ip}:${toString node.port}";
             key = "{{HOMEPAGE_VAR_N8N_KEY}}";
           }
-        else if (lowerName == "open webui") then
+        else if (lowerName == "vllm") then
           {
-            type = "openwebui";
+            type = "vllm";
             url = "http://${node.ip}:${toString node.port}";
-            key = "{{HOMEPAGE_VAR_OPENWEBUI_KEY}}";
+          }
+        else if (lowerName == "monitoring") then
+          {
+            type = "grafana";
+            url = "http://${node.ip}:${toString node.port}";
+            username = "admin";
+            password = "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}";
           }
         else
           null;
@@ -156,13 +164,13 @@
           ]
         ];
 
-        # Custom Background (Unsplash Nature)
+        # Custom Background (Sleek Dark Gradient / Architecture)
         background = {
-          image = "https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80";
+          image = "https://images.unsplash.com/photo-1518770660439-4636190af475?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"; # Tech/Architecture
           blur = "sm"; # sm, md, lg, xl
           saturate = "50%"; # 0-100%
-          brightness = "70%"; # 0-100%
-          opacity = "50%"; # 0-100%
+          brightness = "60%"; # 0-100%
+          opacity = "40%"; # 0-100%
         };
 
         # Network settings
@@ -200,6 +208,14 @@
               timeStyle = "short"; # 12:00 PM
               dateStyle = "short"; # 1/1/2024
             };
+          };
+        }
+        {
+          glances = {
+            url = "http://10.85.46.1:61208";
+            label = "Workstation";
+            cpu = true;
+            memo = true;
           };
         }
       ];

@@ -13,6 +13,10 @@
       type = lib.types.listOf (
         lib.types.submodule {
           options = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              description = "Logical name of the upstream service (e.g., 'ollama').";
+            };
             target = lib.mkOption {
               type = lib.types.str;
               description = "IP of the upstream container.";
@@ -27,6 +31,16 @@
       );
       default = [ ];
       description = "List of upstream containers to connect to via mTLS.";
+    };
+    airlock = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Strictly block all internet egress from this container.";
+    };
+    whitelistDomains = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "List of domains to dynamically whitelist for this container's airlock.";
     };
   };
 }

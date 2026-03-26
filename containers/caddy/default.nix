@@ -47,6 +47,7 @@ in
         name = "caddy";
         cfg = cfg // {
           hostDataDir = null;
+          privateUsers = "no";
         };
         innerConfig = {
           users.groups.caddy.gid = lib.mkForce 3000;
@@ -58,13 +59,14 @@ in
 
           services.caddy = {
             enable = true;
+            logFormat = "output stderr";
             globalConfig = "debug";
 
-            # This is now just one clean line of logic
+            # Restore the full generative logic with proven fixes
             virtualHosts = h.genVHosts {
               inherit proxyTargets;
               inherit (cfg) hostIP;
-              isGlobalMaint = inv.globalMaintenance or false;
+              isGlobalMaint = myInventory.globalMaintenance or false;
               helpers = h;
             };
           };
@@ -76,14 +78,36 @@ in
             443
           ]
           ++ (lib.mapAttrsToList (_: node: node.externalPort) proxyTargets);
+
+          # Ensure the bind-mount points exist inside the container
+          systemd.tmpfiles.rules = [
+            "d /etc/pki 0755 root root - -"
+            "d /etc/pki/internal 0755 root root - -"
+          ];
         };
 
-        bindMounts = lib.mkIf (cfg.hostDataDir != null) {
-          "/var/lib/caddy" = {
-            hostPath = cfg.hostDataDir;
-            isReadOnly = false;
+        bindMounts =
+          (lib.mkIf (cfg.hostDataDir != null) {
+            "/var/lib/caddy" = {
+              hostPath = cfg.hostDataDir;
+              isReadOnly = false;
+            };
+          })
+          // {
+            # Manually mount the certificates to avoid the factory's sidecar conflict
+            "/etc/pki/internal/ca.crt" = {
+              hostPath = "/nix/persist/pki/internal/ca.crt";
+              isReadOnly = true;
+            };
+            "/etc/pki/internal/client.crt" = {
+              hostPath = "/nix/persist/pki/internal/certs/client.crt";
+              isReadOnly = true;
+            };
+            "/etc/pki/internal/client.key" = {
+              hostPath = "/nix/persist/pki/internal/certs/client.key";
+              isReadOnly = true;
+            };
           };
-        };
       })
       {
         systemd.tmpfiles.rules = lib.mkIf (cfg.hostDataDir != null) [

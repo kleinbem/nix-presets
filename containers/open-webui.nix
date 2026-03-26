@@ -15,7 +15,10 @@ in
     enable = lib.mkEnableOption "Open WebUI Container";
     ip = lib.mkOption { type = lib.types.str; };
     hostDataDir = lib.mkOption { type = lib.types.str; };
-    ollamaUrl = lib.mkOption { type = lib.types.str; };
+    ollamaUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+    };
     vllmUrl = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -55,7 +58,7 @@ in
         environmentFile = "/run/secrets/openwebui.env";
         environment = {
           OLLAMA_BASE_URL = cfg.ollamaUrl;
-          OPENAI_API_BASE_URL = if cfg.vllmUrl != null then cfg.vllmUrl else "";
+          OPENAI_API_BASE_URL = "https://litellm.internal"; # Use the new "Pro" gateway
           WEBUI_AUTH = "True";
         };
       };

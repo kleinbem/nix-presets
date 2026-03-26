@@ -46,7 +46,8 @@ in
           N8N_SECURE_COOKIE = "false";
           N8N_CORS_ALLOWED_ORIGINS = "*";
           N8N_RUNNERS_AUTH_TOKEN_FILE = "/dev/null";
-          N8N_USER_FOLDER = "/var/lib/n8n";
+          OLLAMA_HOST = "http://localhost:11434";
+          QDRANT_HOST = "http://localhost:6333";
         };
       };
       systemd.services.n8n.serviceConfig = {

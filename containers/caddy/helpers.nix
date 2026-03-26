@@ -9,8 +9,9 @@ in
     node:
     let
       isMtls = node.mtls or false;
-      protocol = if isMtls || (node.secure or false) then "https" else "http";
-      port = if isMtls then 443 else node.port;
+      # Temporary HTTP Bypass for testing bridge traffic
+      protocol = if (node.secure or false) then "https" else "http";
+      port = if isMtls then 80 else node.port;
     in
     "${protocol}://${node.ip}:${toString port}";
 
@@ -22,13 +23,8 @@ in
       isMtls = node.mtls or false;
     in
     if isMtls then
-      ''
-        transport http {
-          tls
-          tls_client_auth /etc/pki/internal/client.crt /etc/pki/internal/client.key
-          tls_trusted_ca_certs /etc/pki/internal/ca.crt
-        }
-      ''
+      # Plain HTTP bypass for internal bridge traffic
+      ""
     else if (node.secure or false) then
       "transport http { tls_insecure_skip_verify }"
     else
@@ -54,28 +50,33 @@ in
       let
         vhostName =
           let
-            ipHost =
-              if node.externalPort == 443 then
-                "https://${hostIP}"
-              else
-                "https://${hostIP}:${toString node.externalPort}";
+            ipHost = if node.externalPort == 443 then hostIP else "${hostIP}:${toString node.externalPort}";
           in
-          "${ipHost}, https://${name}.local";
+          "${ipHost}, ${name}.local";
 
         isDown = isGlobalMaint || (node.maintenance or false);
       in
       nameValuePair vhostName {
+        logFormat = "output stderr";
         extraConfig = ''
           tls internal
           ${
             if isDown then
               helpers.mkMaintPage name
             else
-              ''
-                reverse_proxy ${helpers.mkUpstream node} {
-                  ${helpers.mkTransport node}
-                }
-              ''
+              let
+                t = helpers.mkTransport node;
+              in
+              if t != "" then
+                ''
+                  reverse_proxy ${helpers.mkUpstream node} {
+                    ${t}
+                  }
+                ''
+              else
+                ''
+                  reverse_proxy ${helpers.mkUpstream node}
+                ''
           }
         '';
       }
