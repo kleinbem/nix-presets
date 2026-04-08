@@ -1,5 +1,5 @@
 { self }:
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 let
   cfg = config.my.containers.monitoring;
   inherit (self.lib) mkContainer;
@@ -25,6 +25,7 @@ in
     inherit config;
     name = "monitoring";
     inherit cfg;
+    timeout = "5m";
     innerConfig = {
       services.victoriametrics = {
         enable = true;
@@ -73,6 +74,29 @@ in
         3000
         8428
       ];
+
+      systemd.services.victoriametrics = {
+        serviceConfig = {
+          DynamicUser = lib.mkForce false;
+          User = "victoriametrics";
+          Group = "victoriametrics";
+          ExecStartPre = [
+            "+${pkgs.coreutils}/bin/chown -R victoriametrics:victoriametrics /var/lib/victoria-metrics"
+          ];
+        };
+      };
+
+      users.users.victoriametrics = {
+        isSystemUser = true;
+        group = "victoriametrics";
+      };
+      users.groups.victoriametrics = {};
+
+      systemd.services.grafana = {
+        serviceConfig.ExecStartPre = [
+          "+${pkgs.coreutils}/bin/chown -R grafana:grafana /var/lib/grafana"
+        ];
+      };
     };
     bindMounts = {
       "/var/lib/victoria-metrics" = {

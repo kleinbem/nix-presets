@@ -7,42 +7,7 @@
 }:
 let
   cfg = config.programs.zen-browser;
-  # Common extensions for all profiles
-  commonExtensions = with pkgs.nur.repos.rycee.firefox-addons; [
-    ublock-origin
-    privacy-badger
-    darkreader
-    multi-account-containers
-    bitwarden
-  ];
-
-  # Arkenfox-style hardening (from previous config)
-  commonSettings = {
-    # --- PRIVACY & TRACKING ---
-    "privacy.resistFingerprinting" = true;
-    "privacy.trackingprotection.enabled" = true;
-    "privacy.trackingprotection.socialtracking.enabled" = true;
-    "privacy.firstparty.isolate" = true;
-
-    # --- SECURITY BITS ---
-    "dom.event.clipboardevents.enabled" = false;
-    "media.peerconnection.enabled" = false;
-    "network.dns.disableIPv6" = true;
-
-    # --- CLEANUP (TELEMETRY & BLOAT) ---
-    "datareporting.healthreport.uploadEnabled" = false;
-    "toolkit.telemetry.enabled" = false;
-    "browser.newtabpage.activity-stream.feeds.telemetry" = false;
-    "browser.newtabpage.activity-stream.telemetry" = false;
-    "extensions.pocket.enabled" = false;
-    "browser.topsites.controversial.enabled" = false;
-
-    # --- CONVENIENCE & UI ---
-    "browser.download.panel.shown" = true;
-    "browser.startup.page" = 3;
-    "identity.fxaccounts.enabled" = false;
-    "zen.view.compact-mode" = true;
-  };
+  browserSettings = import ./firefox-settings.nix { inherit pkgs; };
 in
 {
   options.programs.zen-browser = {
@@ -90,10 +55,10 @@ in
           "x-scheme-handler/ftp"
         ];
       };
-      zen-ai = {
-        name = "Zen AI Workspace";
+      zen-laboratory = {
+        name = "Zen Laboratory";
         genericName = "AI Developer Browser";
-        exec = "zen-beta -P ai %u";
+        exec = "zen-beta -P laboratory %u";
         icon = "zen-browser";
         terminal = false;
         categories = [
@@ -102,10 +67,10 @@ in
           "Development"
         ];
       };
-      zen-pwa = {
-        name = "Zen PWA Engine";
-        genericName = "PWA Browser";
-        exec = "zen-beta -P pwa %u";
+      zen-vault = {
+        name = "Zen Vault";
+        genericName = "Secure Browser";
+        exec = "zen-beta -P vault %u";
         icon = "zen-browser";
         terminal = false;
         categories = [
@@ -117,41 +82,40 @@ in
 
     programs.firefox = {
       enable = true;
-      package = inputs.zen-browser.packages."${pkgs.system}".default;
+      package = inputs.zen-browser.packages."${pkgs.stdenv.hostPlatform.system}".default;
       nativeMessagingHosts = [ pkgs.firefoxpwa ];
 
       profiles = {
-        # --- Profile 1: Default (Hardened) ---
-        default = {
+        # --- Profile 1: Standard (Hardened Daily Driver) ---
+        standard = {
           id = 0;
-          name = "default";
+          name = "standard";
           isDefault = true;
-          extensions.packages = commonExtensions;
-          settings = commonSettings;
-        };
-
-        # --- Profile 2: AI (Workspace) ---
-        ai = {
-          id = 1;
-          name = "ai";
-          extensions.packages = commonExtensions;
-          settings = commonSettings // {
-            "browser.ml.chat.enabled" = true;
-            "browser.ml.chat.sidebar" = true;
-            "browser.ml.chat.provider" = "https://chat.openai.com";
-            "zen.view.split-view.enabled" = true;
-            "javascript.options.wasm" = true;
+          extensions.packages = browserSettings.standardExtensions;
+          settings = browserSettings.standardSettings // {
+            "zen.view.compact-mode" = true;
           };
         };
 
-        # --- Profile 3: PWA (Dedicated Bridge) ---
-        pwa = {
+        # --- Profile 2: Laboratory (AI & Power Workspace) ---
+        laboratory = {
+          id = 1;
+          name = "laboratory";
+          extensions.packages = browserSettings.laboratoryExtensions;
+          settings = browserSettings.laboratorySettings // {
+            "zen.view.compact-mode" = true;
+            "zen.view.split-view.enabled" = true;
+          };
+        };
+
+        # --- Profile 3: Vault (Banking & Sensitive) ---
+        vault = {
           id = 2;
-          name = "pwa";
-          extensions.packages = commonExtensions ++ [
-            pkgs.nur.repos.rycee.firefox-addons.pwas-for-firefox
-          ];
-          settings = commonSettings;
+          name = "vault";
+          extensions.packages = browserSettings.vaultExtensions;
+          settings = browserSettings.vaultSettings // {
+            "zen.view.compact-mode" = true;
+          };
         };
       };
     };

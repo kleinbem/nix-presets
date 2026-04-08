@@ -14,9 +14,7 @@ let
   };
 
   commonData = import ./code-common/settings.nix;
-  extensionsCommon = import ./code-common/extensions/common.nix { inherit pkgs; };
-  extensionsVSCode = import ./code-common/extensions/vscode.nix { inherit pkgs; };
-  extensionsCursor = import ./code-common/extensions/cursor.nix { inherit pkgs; };
+  extensions = import ./code-common/extensions.nix { inherit pkgs; };
 
   # Helper to bundle extensions
   mkBundle =
@@ -26,9 +24,11 @@ let
       paths = exts;
     };
 
-  bundleAntigravity = mkBundle "antigravity" (extensionsCommon ++ extensionsVSCode); # Antigravity needs the pin too
-  bundleCursor = mkBundle "cursor" (extensionsCommon ++ extensionsCursor);
-  bundleWindsurf = mkBundle "windsurf" extensionsCommon;
+  bundleAntigravity = mkBundle "antigravity" (
+    extensions.common ++ extensions.ai ++ extensions.vscodeExtra
+  );
+  bundleCursor = mkBundle "cursor" (extensions.common ++ extensions.ai ++ extensions.cursorExtra);
+  bundleWindsurf = mkBundle "windsurf" (extensions.common ++ extensions.ai);
 
   # The Unified "Code Family"
   codeFamily = [
@@ -183,11 +183,11 @@ in
     enable = true;
     defaultApplications = {
       "x-scheme-handler/x-github-client" = [ "github-desktop.desktop" ];
-      "text/html" = [ "google-chrome-stable.desktop" ];
-      "x-scheme-handler/http" = [ "google-chrome-stable.desktop" ];
-      "x-scheme-handler/https" = [ "google-chrome-stable.desktop" ];
-      "x-scheme-handler/about" = [ "google-chrome-stable.desktop" ];
-      "x-scheme-handler/unknown" = [ "google-chrome-stable.desktop" ];
+      "text/html" = [ "firefox.desktop" ];
+      "x-scheme-handler/http" = [ "firefox.desktop" ];
+      "x-scheme-handler/https" = [ "firefox.desktop" ];
+      "x-scheme-handler/about" = [ "firefox.desktop" ];
+      "x-scheme-handler/unknown" = [ "firefox.desktop" ];
     };
   };
 

@@ -172,6 +172,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+
     # System Requirements
     # programs.adb.enable = true; # Deprecated in systemd 258
     users.users.${cfg.user}.extraGroups = [
@@ -215,6 +216,18 @@ in
       launchScript
       launchVaultScript
       scrcpyClient
+      (pkgs.makeDesktopItem {
+        name = "android-emulator";
+        desktopName = "Android Emulator";
+        genericName = "Mobile Device Emulator";
+        exec = "${launchScript}/bin/launch-android-daily-driver";
+        icon = "android-studio";
+        terminal = false;
+        categories = [
+          "Development"
+          "System"
+        ];
+      })
       # Audio/Video Support
       pkgs.alsa-utils
       pkgs.v4l-utils

@@ -71,13 +71,21 @@
         user = {
           inherit (my.git) name;
           inherit (my.git) email;
-          signingKey = "${config.home.homeDirectory}/.ssh/id_ed25519_sk.pub";
+          # Point directly to the private key to bypass ssh-agent bugs
+          signingKey = "${config.home.homeDirectory}/.ssh/id_ed25519_sk";
         };
 
         commit.gpgsign = true;
 
         # SSH Signing Configuration
         gpg.format = "ssh";
+        # Custom wrapper completely completely isolate ssh-keygen from terminal bugs
+        "gpg.ssh".program = "${pkgs.writeShellScript "git-ssh-sign" ''
+          unset SSH_AUTH_SOCK
+          export SSH_ASKPASS_REQUIRE=force
+          exec ${pkgs.openssh}/bin/ssh-keygen "$@"
+        ''}";
+        
         # This file tells Git which public keys belong to which email addresses.
         # Without this, your local 'git log' will show "Unknown Signature" for your own commits.
         "gpg.ssh".allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";

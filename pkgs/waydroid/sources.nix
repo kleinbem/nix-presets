@@ -15,10 +15,10 @@
     hash = "sha256-ry+LKhhYPcqPliqPSWkFABmulGMeWbLdQlEa9acoEj8=";
   };
 
-  # Kitsune Mask (formerly Magisk Delta) - Official latest release
+  # Official Magisk - Stable release
   magisk = pkgs.fetchurl {
-    url = "https://github.com/1q23lyc45/KitsuneMagisk/releases/download/v27.2-kitsune-4/app-release.apk";
-    sha256 = "129sjs8cy4dsaz31grb69cbfbhwyqgxm0d4mrirybnixg01gm341";
+    url = "https://github.com/topjohnwu/Magisk/releases/download/v27.0/Magisk-v27.0.apk";
+    hash = "sha256-9RG9M9MkKRHQWwk5+RCjEz7yug4P8eCYEo+fPNDBZhA=";
   };
 
   # Waydroid Images (Lineage 20.0 GAPPS)
@@ -30,6 +30,6 @@
 
   vendor_img = pkgs.fetchurl {
     url = "https://downloads.sourceforge.net/project/waydroid/images/vendor/waydroid_x86_64/lineage-20.0-20250809-MAINLINE-waydroid_x86_64-vendor.zip";
-    sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Update this later with nix run .#update-hashes
+    sha256 = "sha256-FN8//Hc6MMLBV/pvl+bHkziZC2CshdaVWbv7gncmUO8="; # Update this later with nix run .#update-hashes
   };
 }

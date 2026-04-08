@@ -5,6 +5,7 @@
   config,
   innerConfig ? { },
   bindMounts ? { },
+  timeout ? "90s",
 }:
 let
   inherit (lib) mkMerge mkIf mkDefault;
@@ -250,5 +251,6 @@ in
         MemoryMax = mkIf (cfg ? memoryLimit && cfg.memoryLimit != null) cfg.memoryLimit;
         MemorySwapMax = mkIf (cfg ? memorySwapMax && cfg.memorySwapMax != null) cfg.memorySwapMax;
         CPUQuota = mkIf (cfg ? cpuLimit && cfg.cpuLimit != null) cfg.cpuLimit;
+        TimeoutStartSec = mkDefault timeout;
       };
 }
