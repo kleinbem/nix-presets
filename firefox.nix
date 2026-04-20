@@ -11,7 +11,7 @@ let
     default = "Google.ie";
     engines = {
       "Google.ie" = {
-        urls = [{ template = "https://www.google.ie/search?q={searchTerms}"; }];
+        urls = [ { template = "https://www.google.ie/search?q={searchTerms}"; } ];
         icon = "https://www.google.com/favicon.ico";
         updateInterval = 24 * 60 * 60 * 1000; # every day
         definedAliases = [ "@g" ];
@@ -29,25 +29,49 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = [ pkgs.firefoxpwa ];
+    home.packages = [
+      pkgs.firefox-beta
+      pkgs.firefox-devedition
+    ];
+
+    # Unify Developer Edition and Firefox profile directories declaratively
+    home.file.".mozilla/firefox-dev-edition".source =
+      config.lib.file.mkOutOfStoreSymlink "/home/${config.home.username}/.mozilla/firefox";
 
     xdg.desktopEntries = {
+      # --- Hide default package launchers to avoid menu clutter ---
+      firefox = {
+        name = "Firefox (Default)";
+        exec = "firefox-beta %u";
+        settings.NoDisplay = "true";
+      };
+      firefox-devedition = {
+        name = "Firefox Dev (Default)";
+        exec = "firefox-devedition %u";
+        settings.NoDisplay = "true";
+      };
+      firefox-beta = {
+        name = "Firefox Beta (Hidden)";
+        exec = "firefox-beta %u";
+        settings.NoDisplay = "true";
+      };
+
       firefox-standard = {
-        name = "Firefox Standard";
+        name = "Firefox";
         genericName = "Web Browser";
-        exec = "${lib.getExe pkgs.firefox} -P standard %u";
-        icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
+        exec = "${lib.getExe pkgs.firefox-beta} -P standard %u";
+        icon = "firefox";
         terminal = false;
         categories = [
           "Network"
           "WebBrowser"
         ];
       };
-      firefox-laboratory = {
-        name = "Firefox Laboratory";
-        genericName = "AI Developer Browser";
-        exec = "${lib.getExe pkgs.firefox} -P laboratory %u";
-        icon = "${pkgs.firefox-devedition}/share/icons/hicolor/128x128/apps/firefox-devedition.png";
+      firefox-developer = {
+        name = "Firefox Developer Edition";
+        genericName = "Developer Web Browser";
+        exec = "${lib.getExe pkgs.firefox-devedition} -P laboratory %u";
+        icon = "firefox-devedition";
         terminal = false;
         categories = [
           "Network"
@@ -57,8 +81,8 @@ in
       };
       firefox-vault = {
         name = "Firefox Vault";
-        genericName = "Secure Browser";
-        exec = "${lib.getExe pkgs.firefox} -P vault %u";
+        genericName = "Secure Browser (Beta)";
+        exec = "${lib.getExe pkgs.firefox-beta} -P vault %u";
         icon = "${pkgs.adwaita-icon-theme}/share/icons/Adwaita/symbolic/status/security-high-symbolic.svg";
         terminal = false;
         categories = [
@@ -66,17 +90,10 @@ in
           "WebBrowser"
         ];
       };
-
-      # Hide the PWA manager from the main launcher
-      firefoxpwa = {
-        name = "FirefoxPWA";
-        noDisplay = true;
-      };
     };
 
     programs.firefox = {
       enable = true;
-      nativeMessagingHosts = [ pkgs.firefoxpwa ];
 
       profiles = {
         # --- Profile 1: Standard (Hardened Daily Driver) ---

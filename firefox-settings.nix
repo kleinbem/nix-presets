@@ -13,6 +13,35 @@ let
     "identity.fxaccounts.enabled" = false;
     "network.dns.disableIPv6" = true;
     "security.webauth.webauthn" = true;
+
+    # --- PWA Related ---
+    "browser.taskbarTabs.enabled" = true;
+    "dom.installevents.enabled" = true;
+    "dom.webshare.enabled" = true;
+    "browser.pwa.enabled" = true;
+    "browser.pwa.installer.enabled" = true;
+
+    # --- Hardware Authentication & Linux Integration ---
+    "security.webauth.u2f" = true;
+    "security.webauth.webauthn_enable_usbtoken" = true;
+    "widget.use-xdg-desktop-portal.file-picker" = 1; # Native Linux file picker
+    "widget.use-xdg-desktop-portal.mime-handler" = 1;
+    "widget.use-xdg-desktop-portal.settings" = 1;
+
+    # --- Performance & Hardware Acceleration ---
+    "media.ffmpeg.vaapi.enabled" = true; # HW video decoding
+    "gfx.webrender.all" = true; # Force WebRender
+    "layers.acceleration.force-enabled" = true;
+
+    # --- Privacy & Security ---
+    "network.http.referer.XOriginPolicy" = 1;
+    "privacy.trackingprotection.cryptomining.enabled" = true;
+    "privacy.trackingprotection.fingerprinting.enabled" = true;
+
+    # --- UI Cleanliness ---
+    "browser.urlbar.suggest.quicksuggest.sponsored" = false;
+    "browser.newtabpage.activity-stream.showSponsored" = false;
+    "browser.tabs.closeWindowWithLastTab" = false;
   };
 
   # Common extensions for ALL profiles
@@ -22,7 +51,8 @@ let
     darkreader
     multi-account-containers
     bitwarden
-    pwas-for-firefox
+    clearurls
+    consent-o-matic
   ];
 in
 {
@@ -37,6 +67,7 @@ in
   };
   standardExtensions = commonExtensions ++ [
     pkgs.nur.repos.rycee.firefox-addons.localcdn
+    pkgs.nur.repos.rycee.firefox-addons.auto-tab-discard
   ];
 
   # --- Level 2: Laboratory (AI & Power User) ---
@@ -55,6 +86,7 @@ in
       languagetool
       sidebery
       markdownload
+      violentmonkey
     ]);
 
   # --- Level 3: Vault (Banking & Sensitive) ---

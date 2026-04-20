@@ -26,10 +26,10 @@ utils.mkSandboxed {
           ];
         };
         env = {
-          # Open links on host
-          DBUS_SESSION_BUS_ADDRESS = sloth.env "DBUS_SESSION_BUS_ADDRESS";
-          BROWSER = "xdg-open";
+          # Restrict D-Bus to prevent context escape
+          # Only BROWSER/xdg-open should be able to communicate back to host
           NIXOS_OZONE_WL = "1";
+          BROWSER = "xdg-open";
         };
       };
     };

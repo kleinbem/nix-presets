@@ -6,6 +6,7 @@
 }:
 let
   cfg = config.my.containers.code-server;
+  commonData = import ../code-common/settings.nix;
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
@@ -30,23 +31,33 @@ in
     inherit config;
     name = "code-server";
     inherit cfg;
-    innerConfig = {
-      users.users.${cfg.user} = {
-        isNormalUser = true;
-        uid = 1000;
-        extraGroups = [ "users" ];
-      };
+    innerConfig =
+      { pkgs, ... }:
+      {
+        users.users.${cfg.user} = {
+          isNormalUser = true;
+          uid = 1000;
+          extraGroups = [ "users" ];
+        };
 
-      services.code-server = {
-        enable = true;
-        inherit (cfg) user;
-        group = "users";
-        host = "0.0.0.0";
-        auth = "none";
-        disableTelemetry = true;
+        system.activationScripts.code-server-settings = {
+          text = ''
+            mkdir -p /home/${cfg.user}/.local/share/code-server/User
+            ln -sf ${pkgs.writeText "code-server-settings.json" (builtins.toJSON commonData.settings)} /home/${cfg.user}/.local/share/code-server/User/settings.json
+            chown -R ${cfg.user}:users /home/${cfg.user}/.local/share/code-server
+          '';
+        };
+
+        services.code-server = {
+          enable = true;
+          inherit (cfg) user;
+          group = "users";
+          host = "0.0.0.0";
+          auth = "none";
+          disableTelemetry = true;
+        };
+        networking.firewall.allowedTCPPorts = [ 4444 ];
       };
-      networking.firewall.allowedTCPPorts = [ 4444 ];
-    };
     bindMounts = {
       "/home/${cfg.user}/Develop" = {
         hostPath = cfg.hostDataDir;

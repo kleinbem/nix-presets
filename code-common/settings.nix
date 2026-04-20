@@ -9,7 +9,69 @@
 
     # --- Nix Integration ---
     "nix.enableLanguageServer" = true;
-    "nix.serverPath" = "nil";
+    "nix.serverPath" = "nixd";
+    "nix.formatterPath" = "nixfmt";
+    "direnv.restart.automatic" = true;
+
+    "nix.serverSettings" = {
+      "nixd" = {
+        "formatting" = {
+          "command" = [ "nixfmt" ];
+        };
+        "options" = {
+          "nixos" = {
+            "expr" = "(builtins.getFlake \"\${workspaceFolder}\").nixosConfigurations.nixos-nvme.options";
+          };
+          "home-manager" = {
+            "expr" =
+              "(builtins.getFlake \"\${workspaceFolder}\").homeConfigurations.\"martin@nixos-nvme\".options";
+          };
+        };
+      };
+    };
+
+    # --- Todo Tree & Productivity ---
+    "todo-tree.general.tags" = [
+      "TODO"
+      "FIXME"
+      "HACK"
+      "WAITING"
+      "QUESTION"
+      "PERF"
+      "NOTE"
+    ];
+    "todo-tree.highlights.defaultHighlight" = {
+      "type" = "text";
+      "foreground" = "#ffffff";
+      "borderRadius" = "2px";
+    };
+    "todo-tree.highlights.customHighlight" = {
+      "FIXME" = {
+        "foreground" = "#f44336";
+        "icon" = "fire";
+        "iconColour" = "#f44336";
+      };
+      "WAITING" = {
+        "foreground" = "#ff9800";
+        "icon" = "clock";
+        "iconColour" = "#ff9800";
+      };
+      "TODO" = {
+        "foreground" = "#2196f3";
+        "icon" = "check";
+        "iconColour" = "#2196f3";
+      };
+      "PERF" = {
+        "foreground" = "#9c27b0";
+        "icon" = "zap";
+        "iconColour" = "#9c27b0";
+      };
+      "NOTE" = {
+        "foreground" = "#4caf50";
+        "icon" = "info";
+        "iconColour" = "#4caf50";
+      };
+    };
 
     # --- Marketplace Fix (CRITICAL) ---
     # Forces Windsurf, Cursor, and Antigravity to use the official VS Code Marketplace

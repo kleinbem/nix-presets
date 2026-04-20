@@ -61,24 +61,27 @@ let
   # Wrapper generator for strict isolation
   mkIsolatedEditor =
     app:
-    pkgs.writeShellScriptBin (lib.toLower app.name) ''
-      exec ${
-        pkgs."${
-          if app.name == "Windsurf" then
-            "windsurf"
-          else if app.name == "Cursor" then
-            "code-cursor-fhs"
-          else
-            "google-antigravity"
-        }"
-      }/bin/${
+    let
+      # Use the exact package names confirmed from search.nixos.org
+      pkg =
         if app.name == "Windsurf" then
-          "windsurf"
+          pkgs.windsurf
         else if app.name == "Cursor" then
-          "cursor"
+          pkgs.code-cursor-fhs
         else
+          pkgs.antigravity-fhs;
+
+      # Correct binary names for the FHS wrappers
+      binName =
+        if app.name == "Cursor" then
+          "cursor"
+        else if app.name == "Antigravity" then
           "antigravity"
-      } \
+        else
+          "windsurf";
+    in
+    pkgs.writeShellScriptBin (lib.toLower app.name) ''
+      exec ${pkg}/bin/${binName} \
         --user-data-dir "$HOME/${app.configDir}/data" \
         --extensions-dir "$HOME/${app.extDir}" \
         "$@"
@@ -118,14 +121,13 @@ in
       sandboxedApps.obsidian
       sandboxedApps.mpv # Nixpak (Safe)
       sandboxedApps.google-chrome-stable # Standard Profile (Renamed from google-chrome)
-      sandboxedApps.google-chrome-stable-vault
-      sandboxedApps.google-chrome-stable-hazard
       sandboxedApps.lmstudio # Nixpak (Safe)
       sandboxedApps.bitwarden
+      pkgs.rbw
+      pkgs.rofi-rbw-wayland
       github-desktop
       chromium # Fallback (Unsafe) - Local Dev
       pkgs.brotab # Browser Automation (asked by user)
-      pkgs.brave # Secure Browser (asked by user)
 
       # Math and Matrix stuff. Using 'octaveFull' to get the standard packages included.
       octaveFull

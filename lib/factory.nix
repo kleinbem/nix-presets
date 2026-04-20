@@ -8,7 +8,7 @@
   timeout ? "90s",
 }:
 let
-  inherit (lib) mkMerge mkIf mkDefault;
+  inherit (lib) mkIf mkDefault;
 
   # ─── mTLS Sidecar Configuration ─────────────────────────────
   hasTls = cfg ? tls && cfg.tls ? enable && cfg.tls.enable;
@@ -125,81 +125,74 @@ in
       ++ (cfg.extraCapabilities or [ ]);
 
     config =
-      { pkgs, ... }:
-      mkMerge [
-        {
-          networking = {
-            hostName = cfg.hostName or name;
-            firewall.enable = mkDefault true;
-            nftables.enable = mkDefault true;
+      { pkgs, ... }@args:
+      {
+        imports = [
+          (_: {
+            networking = {
+              hostName = cfg.hostName or name;
+              firewall.enable = mkDefault true;
+              nftables.enable = mkDefault true;
 
-            # Zero Trust: restrict outbound to bridge subnet (defense-in-depth)
-            # Host-level nftables enforce the real policy; this is a second layer.
-            nftables.tables.zt-factory = {
-              family = "inet";
-              content = ''
-                chain output {
-                  type filter hook output priority filter; policy accept;
-                  ct state { established, related } accept
-                  ip daddr 10.85.46.0/24 accept
-                  oifname "lo" accept
-                  ${fwUpstreamRules}
-                  # ip daddr 10.85.46.0/24 log prefix "ZT-CTR-DENY: " drop
-                }
-              '';
+              # Zero Trust: restrict outbound to bridge subnet (defense-in-depth)
+              nftables.tables.zt-factory = {
+                family = "inet";
+                content = ''
+                  chain output {
+                    type filter hook output priority filter; policy accept;
+                    ct state { established, related } accept
+                    ip daddr 10.85.46.0/24 accept
+                    oifname "lo" accept
+                    ${fwUpstreamRules}
+                  }
+                '';
+              };
             };
-          };
 
-          services.avahi = {
-            enable = true;
-            nssmdns4 = true;
-            publish = {
+            services.avahi = {
               enable = true;
-              addresses = true;
-              workstation = true;
+              nssmdns4 = true;
+              publish = {
+                enable = true;
+                addresses = true;
+                workstation = true;
+              };
+              openFirewall = true;
             };
-            openFirewall = true;
-          };
 
-          system.stateVersion = mkDefault "25.11";
-        }
+            system.stateVersion = mkDefault "25.11";
+          })
 
-        # ─── mTLS PKI Trust (when TLS is enabled) ──────────────
-        (mkIf hasTls {
-          # System-wide trust for runtime-generated certs is handled via explicit sidecar config
-        })
+          # mTLS Sidecar (only when there's inbound/outbound to proxy)
+          (mkIf (hasTls && (serverPort > 0 || upstreams != [ ])) {
+            networking.firewall.allowedTCPPorts = lib.mkIf (serverPort > 0) [
+              80
+              443
+            ];
 
-        # ─── mTLS Sidecar (only when there's inbound/outbound to proxy) ──
-        (mkIf (hasTls && (serverPort > 0 || upstreams != [ ])) {
-          # Open port 443 for inbound mTLS connections
-          networking.firewall.allowedTCPPorts = lib.mkIf (serverPort > 0) [
-            80
-            443
-          ];
+            environment.systemPackages = [ pkgs.caddy ];
 
-          environment.systemPackages = [ pkgs.caddy ];
+            systemd.services.mtls-sidecar = {
+              description = "mTLS Sidecar Proxy (Caddy)";
+              after = [ "network.target" ];
+              wantedBy = [ "multi-user.target" ];
 
-          # Caddy sidecar service
-          systemd.services.mtls-sidecar = {
-            description = "mTLS Sidecar Proxy (Caddy)";
-            after = [ "network.target" ];
-            wantedBy = [ "multi-user.target" ];
-
-            serviceConfig = {
-              Type = "simple";
-              ExecStart = "${pkgs.caddy}/bin/caddy run --config /etc/caddy-sidecar/Caddyfile --adapter caddyfile";
-              Restart = "on-failure";
-              RestartSec = "5s";
-              AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
+              serviceConfig = {
+                Type = "simple";
+                ExecStart = "${pkgs.caddy}/bin/caddy run --config /etc/caddy-sidecar/Caddyfile --adapter caddyfile";
+                Restart = "on-failure";
+                RestartSec = "5s";
+                AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
+              };
             };
-          };
 
-          # Write the Caddyfile
-          environment.etc."caddy-sidecar/Caddyfile".text = sidecarCaddyfile;
-        })
+            environment.etc."caddy-sidecar/Caddyfile".text = sidecarCaddyfile;
+          })
 
-        innerConfig
-      ];
+          # Inject the user-provided config
+          (if builtins.isFunction innerConfig then innerConfig args else innerConfig)
+        ];
+      };
 
     bindMounts =
       bindMounts
@@ -248,9 +241,9 @@ in
         || (cfg ? cpuLimit && cfg.cpuLimit != null)
       )
       {
-        MemoryMax = mkIf (cfg ? memoryLimit && cfg.memoryLimit != null) cfg.memoryLimit;
-        MemorySwapMax = mkIf (cfg ? memorySwapMax && cfg.memorySwapMax != null) cfg.memorySwapMax;
-        CPUQuota = mkIf (cfg ? cpuLimit && cfg.cpuLimit != null) cfg.cpuLimit;
+        MemoryMax = mkIf (cfg ? memoryLimit && cfg.memoryLimit != null) (cfg.memoryLimit or null);
+        MemorySwapMax = mkIf (cfg ? memorySwapMax && cfg.memorySwapMax != null) (cfg.memorySwapMax or null);
+        CPUQuota = mkIf (cfg ? cpuLimit && cfg.cpuLimit != null) (cfg.cpuLimit or null);
         TimeoutStartSec = mkDefault timeout;
       };
 }

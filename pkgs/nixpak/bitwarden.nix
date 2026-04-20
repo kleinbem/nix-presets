@@ -7,10 +7,14 @@ utils.mkSandboxed {
   package = pkgs.stable.bitwarden-desktop;
   name = "bitwarden";
   configDir = "Bitwarden";
+  extraPackages = [ pkgs.xdg-utils ];
   presets = [
     "wayland"
     "gpu"
     "network"
+    "dbus"
+    "usb"
+    "u2f"
   ];
   extraPerms = _: {
     bubblewrap.bind = {

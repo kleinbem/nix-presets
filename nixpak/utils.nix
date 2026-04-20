@@ -44,10 +44,21 @@ rec {
         wayland =
           { sloth, ... }:
           {
+            bubblewrap.bind.rw = [
+              "/tmp/.X11-unix"
+            ];
             bubblewrap.env = {
               NIXOS_OZONE_WL = "1";
               XDG_SESSION_TYPE = "wayland";
               WAYLAND_DISPLAY = sloth.env "WAYLAND_DISPLAY";
+              DISPLAY = sloth.env "DISPLAY";
+            };
+          };
+        dbus =
+          { sloth, ... }:
+          {
+            bubblewrap.env = {
+              DBUS_SESSION_BUS_ADDRESS = sloth.env "DBUS_SESSION_BUS_ADDRESS";
             };
           };
         gpu = {
@@ -72,6 +83,18 @@ rec {
               "/sys/bus/usb"
               "/sys/dev"
               "/run/udev"
+            ];
+          };
+        };
+        u2f = {
+          bubblewrap.bind = {
+            dev = [ "/dev/bus/usb" ] ++ (map (i: "/dev/hidraw" + toString i) (pkgs.lib.lists.range 0 20));
+            rw = [ "/run/pcscd" ];
+            ro = [
+              "/sys/class/hidraw"
+              "/sys/bus/hid"
+              "/sys/devices"
+              "/run/udev/data"
             ];
           };
         };

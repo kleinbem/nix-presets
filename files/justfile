@@ -10,19 +10,19 @@ default:
 
 # Start AI stack (Ollama, WebUI, n8n)
 ai-up:
-    sudo systemctl start ollama.service podman-litellm.service podman-comfyui.service podman-langflow.service podman-langfuse.service podman-langfuse-db.service container@open-webui.service container@n8n.service
+    sudo systemctl start ollama.service container@litellm.service podman-comfyui.service podman-langflow.service container@langfuse.service container@langfuse-db.service container@open-webui.service container@n8n.service
 
 # Stop AI stack
 ai-down:
-    sudo systemctl stop ollama.service podman-litellm.service podman-comfyui.service podman-langflow.service podman-langfuse.service podman-langfuse-db.service container@open-webui.service container@n8n.service
+    sudo systemctl stop ollama.service container@litellm.service podman-comfyui.service podman-langflow.service container@langfuse.service container@langfuse-db.service container@open-webui.service container@n8n.service
 
 # Check AI status
 ai-status:
-    systemctl status ollama.service podman-litellm.service podman-comfyui.service podman-langflow.service podman-langfuse.service podman-langfuse-db.service container@open-webui.service container@n8n.service
+    systemctl status ollama.service container@litellm.service podman-comfyui.service podman-langflow.service container@langfuse.service container@langfuse-db.service container@open-webui.service container@n8n.service
 
 # Follow AI logs
 ai-logs:
-    journalctl -u ollama.service -u podman-litellm.service -u podman-comfyui.service -u podman-langflow.service -u podman-langfuse.service -u podman-langfuse-db.service -u container@open-webui.service -u container@n8n.service -f
+    journalctl -u ollama.service -u container@litellm.service -u podman-comfyui.service -u podman-langflow.service -u container@langfuse.service -u container@langfuse-db.service -u container@open-webui.service -u container@n8n.service -f
 
 # --- System ---
 
@@ -48,11 +48,21 @@ status service:
 
 # Rebuild system (Apply changes)
 rebuild:
-    nh os switch --ask --diff always {{FLAKE_PATH}}
+    @if [ -d ~/Develop/github.com/kleinbem/nix ]; then \
+        echo "🔄 Workspace found! Running unified switch..."; \
+        just --justfile ~/Develop/github.com/kleinbem/nix/justfile switch; \
+    else \
+        nh os switch --ask --diff always {{FLAKE_PATH}}; \
+    fi
 
 # Smart Rebuild (Checks build count first)
 rebuild-smart:
-    smart-switch {{FLAKE_PATH}}
+    @if [ -d ~/Develop/github.com/kleinbem/nix ]; then \
+        echo "🔄 Workspace found! Running smart switch..."; \
+        ~/Develop/github.com/kleinbem/nix/nix-config/scripts/smart-switch.sh ~/Develop/github.com/kleinbem/nix/nix-config; \
+    else \
+        ./scripts/smart-switch.sh {{FLAKE_PATH}}; \
+    fi
 
 # Rollback to previous generation
 rollback:
@@ -78,8 +88,15 @@ verify-store:
 
 # Garbage Collect (Free space)
 clean:
+    @echo "🧹 Cleaning Nix Store..."
     nh clean all
-    # Also clean old generations (keep last 3 days)
+    @echo "🧹 Pruning Host Podman Cache..."
+    podman system prune -f
+    @if systemctl is-active --quiet container@langfuse.service; then \
+        echo "🧹 Pruning Nested Langfuse Podman Cache..."; \
+        sudo machinectl shell langfuse /run/current-system/sw/bin/podman system prune -f; \
+    fi
+    @echo "🧹 Cleaning Old System Generations..."
     sudo nix-collect-garbage --delete-older-than 3d
 
 # System Logs

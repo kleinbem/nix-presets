@@ -1,5 +1,10 @@
 _:
-{ config, lib, myInventory, ... }:
+{
+  config,
+  lib,
+  myInventory,
+  ...
+}:
 let
   cfg = config.my.containers.falco;
   inv = myInventory;
@@ -7,7 +12,7 @@ in
 {
   options.my.containers.falco = {
     enable = lib.mkEnableOption "Falco Runtime Security";
-    ip = lib.mkOption { 
+    ip = lib.mkOption {
       type = lib.types.str;
       default = inv.network.nodes.falco.ip or "10.85.46.120";
     };
@@ -25,7 +30,7 @@ in
     virtualisation.oci-containers.containers = {
       # --- Falco Engine (The Scanner) ---
       falco = {
-        image = "falcosecurity/falco:latest-debian";
+        image = "docker.io/falcosecurity/falco:0.43.1";
         autoStart = true;
         extraOptions = [
           "--privileged"
@@ -48,15 +53,18 @@ in
         environment = { };
         cmd = [
           "/usr/bin/falco"
-          "-o" "engine.kind=modern_ebpf"
-          "-o" "http_output.enabled=true"
-          "-o" "http_output.url=http://${lib.head (lib.splitString "/" cfg.sidekickIp)}:2801"
+          "-o"
+          "engine.kind=modern_ebpf"
+          "-o"
+          "http_output.enabled=true"
+          "-o"
+          "http_output.url=http://${lib.head (lib.splitString "/" cfg.sidekickIp)}:2801"
         ];
       };
 
       # --- FalcoSidekick (The Alerter) ---
       falcosidekick = {
-        image = "falcosecurity/falcosidekick:latest";
+        image = "docker.io/falcosecurity/falcosidekick:2.31.0";
         autoStart = true;
         extraOptions = [
           "--net=cbr0"

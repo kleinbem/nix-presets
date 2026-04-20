@@ -23,8 +23,12 @@
       url = "github:openclaw/nix-openclaw";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nix-devshells.url = "path:/home/martin/Develop/github.com/kleinbem/nix/nix-devshells";
-    nix-devshells.inputs.nixpkgs.follows = "nixpkgs";
+    nix-devshells = {
+      url = "path:/home/martin/Develop/github.com/kleinbem/nix/nix-devshells";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nix-packages.url = "path:/home/martin/Develop/github.com/kleinbem/nix/nix-packages";
+    nix-packages.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -43,7 +47,7 @@
         let
           # Custom pkgs for standalone app building (needs unfree + stable alias)
           appsPkgs = import inputs.nixpkgs {
-            inherit system;
+            hostPlatform = system;
             config.allowUnfree = true;
             overlays = [
               (_final: prev: {
@@ -109,7 +113,7 @@
           frigate = import ./containers/frigate.nix { inherit self; };
           caddy = import ./containers/caddy { inherit self; };
           comfyui = import ./containers/comfyui.nix { inherit self; };
-          langfuse = import ./containers/langfuse.nix { inherit self; };
+          langfuse = import ./containers/langfuse.nix { inherit self inputs; };
           langflow = import ./containers/langflow.nix { inherit self; };
           vllm = import ./containers/vllm.nix { inherit self; };
           openclaw = import ./containers/openclaw.nix { inherit self inputs; };
@@ -128,9 +132,14 @@
         homeManagerModules = {
           opencode = import ./opencode.nix;
           terminal = import ./terminal.nix;
+          git = import ./git.nix;
           desktop = import ./desktop.nix;
-          zen-browser = import ./zen-browser.nix;
-          firefox-browser = import ./firefox.nix;
+          firefox-browser =
+            { ... }:
+            {
+              imports = [ ./firefox.nix ];
+              _module.args.inputs = inputs;
+            };
         };
       };
     };

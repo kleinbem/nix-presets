@@ -28,6 +28,4 @@ in
 
   # Chrome Variants
   google-chrome-stable = chrome.stable;
-  google-chrome-stable-vault = chrome.vault;
-  google-chrome-stable-hazard = chrome.hazard;
 }

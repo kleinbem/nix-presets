@@ -1,0 +1,123 @@
+{
+  pkgs,
+  config,
+  my,
+  ...
+}:
+
+{
+  home.packages = [
+    pkgs.git-credential-oauth
+  ];
+
+  programs = {
+    delta = {
+      enable = true;
+    };
+
+    lazygit = {
+      enable = true;
+      settings = {
+        gui.theme = {
+          lightTheme = false;
+          activeBorderColor = [
+            "green"
+            "bold"
+          ];
+          inactiveBorderColor = [ "white" ];
+          selectedLineBgColor = [ "reverse" ];
+        };
+      };
+    };
+
+    jujutsu = {
+      enable = true;
+      settings = {
+        user = {
+          inherit (my.git) name email;
+        };
+        signing = {
+          sign-all = true;
+          backend = "ssh";
+        };
+      };
+    };
+
+    git = {
+      enable = true;
+      lfs.enable = true;
+
+      # Global Default Settings (Fallback)
+      settings = {
+        user = {
+          inherit (my.git) name email;
+        };
+        alias = {
+          st = "status";
+          co = "checkout";
+          sw = "switch";
+          br = "branch";
+          gl = "log --graph --pretty=format:'%C(yellow)%h%C(reset) %C(bold magenta)%G?%C(reset) -%C(red)%d%C(reset) %s %C(dim green)(%cr) %C(bold blue)<%an>%C(reset)'";
+        };
+        commit.gpgsign = true;
+        gpg.format = "ssh";
+
+        gpg.ssh.allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
+
+        # Painless HTTPS Logins (Browser Pop-up instead of keys/passwords)
+        # Replaces raw SSH pushing for standard repositories
+        credential.helper = [
+          "oauth"
+          "cache --timeout 3600"
+        ];
+      };
+
+      # ==========================================
+      # Conditional Profiles (Directory-based Handoff)
+      # ==========================================
+      includes = [
+        {
+          condition = "gitdir:~/Develop/github.com/";
+          contents = {
+            user.email = my.git.email; # Modify if you use a distinct github.com email
+          };
+        }
+        {
+          condition = "gitdir:~/Develop/gitlab.com/";
+          contents = {
+            # Automatically swap identity for GitLab projects
+            user.email = my.git.email; # Example: "martin.gitlab@domain.com";
+          };
+        }
+        {
+          condition = "gitdir:~/Develop/bitbucket.org/";
+          contents = {
+            # Automatically swap identity for Bitbucket projects
+            user.email = my.git.email;
+          };
+        }
+        {
+          condition = "gitdir:~/Develop/amazon.com/";
+          contents = {
+            # Identity for Amazon / AWS CodeCommit / CodeCatalyst
+            user.email = my.git.email;
+          };
+        }
+        {
+          condition = "gitdir:~/Develop/google.com/";
+          contents = {
+            # Identity for Google / GCP Cloud Source Repositories
+            user.email = my.git.email;
+          };
+        }
+        {
+          condition = "gitdir:~/Develop/microsoft.com/";
+          contents = {
+            # Identity for Microsoft / Azure DevOps / GitHub Enterprise
+            user.email = my.git.email;
+          };
+        }
+      ];
+    };
+  };
+}

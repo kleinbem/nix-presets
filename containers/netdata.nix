@@ -1,48 +1,69 @@
-_:
-{ config, lib, myInventory, ... }:
+{ self }:
+{
+  config,
+  lib,
+  myInventory,
+  ...
+}:
 let
   cfg = config.my.containers.netdata;
-  inv = myInventory;
+  inherit (self.lib) mkContainer;
 in
 {
   options.my.containers.netdata = {
-    enable = lib.mkEnableOption "Netdata Real-time Telemetry";
-    ip = lib.mkOption { 
+    enable = lib.mkEnableOption "Netdata NixOS-Native Container";
+    ip = lib.mkOption {
       type = lib.types.str;
-      default = inv.network.nodes.netdata.ip or "10.85.46.122";
+      default = myInventory.network.nodes.netdata.ip or "10.85.46.122";
     };
-  };
+    hostDataDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/images/netdata";
+    };
+  }
+  // import ../lib/tls-options.nix { inherit lib; };
 
-  config = lib.mkIf cfg.enable {
-    virtualisation.oci-containers.containers.netdata = {
-      image = "netdata/netdata:latest";
-      autoStart = true;
-      extraOptions = [
-        "--privileged"
-        "--net=cbr0"
-        "--ip=${lib.head (lib.splitString "/" cfg.ip)}"
-        "--security-opt=label=disable"
-        # Host access for telemetry
-        "--volume=netdataconfig:/etc/netdata"
-        "--volume=netdatalib:/var/lib/netdata"
-        "--volume=netdatacache:/var/cache/netdata"
-        "--volume=/:/host/root:ro"
-        "--volume=/etc/passwd:/host/etc/passwd:ro"
-        "--volume=/etc/group:/host/etc/group:ro"
-        "--volume=/proc:/host/proc:ro"
-        "--volume=/sys:/host/sys:ro"
-        "--volume=/etc/os-release:/host/etc/os-release:ro"
-        "--volume=/var/run/podman/podman.sock:/var/run/podman/podman.sock"
-      ];
-      environment = {
-        NETDATA_HOSTNAME = config.networking.hostName;
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
+    name = "netdata";
+    inherit cfg;
+    innerConfig = {
+      services.netdata = {
+        enable = true;
+        config = {
+          global = {
+            "history main" = "86400";
+            "memory mode" = "dbengine";
+          };
+        };
+      };
+
+      networking.firewall.allowedTCPPorts = [ 19999 ];
+    };
+
+    # Bind-mount history and config to host for persistence
+    bindMounts = {
+      "/var/lib/netdata" = {
+        hostPath = "${cfg.hostDataDir}/lib";
+        isReadOnly = false;
+      };
+      "/var/cache/netdata" = {
+        hostPath = "${cfg.hostDataDir}/cache";
+        isReadOnly = false;
+      };
+      # Netdata needs host access to monitor the system
+      "/host/proc" = {
+        hostPath = "/proc";
+        isReadOnly = true;
+      };
+      "/host/sys" = {
+        hostPath = "/sys";
+        isReadOnly = true;
+      };
+      "/host/etc/os-release" = {
+        hostPath = "/etc/os-release";
+        isReadOnly = true;
       };
     };
-
-    # Dependencies
-    systemd.services.podman-netdata = {
-      after = [ "podman-network-cbr0.service" ];
-      requires = [ "podman-network-cbr0.service" ];
-    };
-  };
+  });
 }

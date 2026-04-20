@@ -14,8 +14,6 @@
         in
         if lowerName == "caddy proxy" then
           "caddy"
-        else if lowerName == "glances" then
-          "glances"
         else if lowerName == "ollama" then
           "ollama"
         else if lowerName == "open webui" then
@@ -56,8 +54,8 @@
         let
           lowerName = lib.toLower node.meta.name;
         in
-        if (lowerName == "glances" || lowerName == "sh-monitor") then
-          null # Disabled due to v4 compat issue
+        if (lowerName == "sh-monitor") then
+          null
         else if (lowerName == "n8n automation") then
           {
             type = "n8n";
@@ -208,14 +206,6 @@
               timeStyle = "short"; # 12:00 PM
               dateStyle = "short"; # 1/1/2024
             };
-          };
-        }
-        {
-          glances = {
-            url = "http://10.85.46.1:61208";
-            label = "Workstation";
-            cpu = true;
-            memo = true;
           };
         }
       ];

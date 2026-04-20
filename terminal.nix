@@ -1,7 +1,6 @@
 {
   pkgs,
   config,
-  my,
   ...
 }:
 
@@ -24,6 +23,7 @@
         tree = "eza --tree --icons";
         update = "nh os switch";
         cleanup = "nh clean all";
+        yubi-mount = "ssh-add -s ${pkgs.opensc}/lib/opensc-pkcs11.so";
         hm-logs = "journalctl -xeu home-manager-${config.home.username}.service";
 
         # System Control
@@ -48,6 +48,20 @@
           disabled = false;
           ignore_submodules = true;
         };
+        direnv = {
+          disabled = false;
+          symbol = "󱄅 ";
+          style = "bold orange";
+        };
+        nix_shell = {
+          symbol = " ";
+          format = "via [$symbol$name]($style) ";
+          style = "bold blue";
+        };
+        cmd_duration = {
+          min_time = 500;
+          format = "took [$duration]($style) ";
+        };
       };
     };
 
@@ -63,51 +77,34 @@
       ];
     };
 
-    git = {
-      enable = true;
-      lfs.enable = true;
-
-      settings = {
-        user = {
-          inherit (my.git) name;
-          inherit (my.git) email;
-          # Point directly to the private key to bypass ssh-agent bugs
-          signingKey = "${config.home.homeDirectory}/.ssh/id_ed25519_sk";
-        };
-
-        commit.gpgsign = true;
-
-        # SSH Signing Configuration
-        gpg.format = "ssh";
-        # Custom wrapper completely completely isolate ssh-keygen from terminal bugs
-        "gpg.ssh".program = "${pkgs.writeShellScript "git-ssh-sign" ''
-          unset SSH_AUTH_SOCK
-          export SSH_ASKPASS_REQUIRE=force
-          exec ${pkgs.openssh}/bin/ssh-keygen "$@"
-        ''}";
-        
-        # This file tells Git which public keys belong to which email addresses.
-        # Without this, your local 'git log' will show "Unknown Signature" for your own commits.
-        "gpg.ssh".allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
-
-        alias = {
-          st = "status";
-          co = "checkout";
-          sw = "switch";
-          br = "branch";
-
-          # 'gl' - Graph Log with Signature Verification
-          # %h: Hash | %G?: Signature Status (G=Good, B=Bad, U=Unknown)
-          # %d: Refs (branches/tags) | %s: Subject | %cr: Date | %an: Author
-          gl = "log --graph --pretty=format:'%C(yellow)%h%C(reset) %C(bold magenta)%G?%C(reset) -%C(red)%d%C(reset) %s %C(dim green)(%cr) %C(bold blue)<%an>%C(reset)'";
-        };
-      };
-    };
-
     direnv = {
       enable = true;
       nix-direnv.enable = true;
-      config.global.hide_env_diff = true;
+      config.global = {
+        hide_env_diff = true;
+        warn_timeout = "30s";
+      };
+      stdlib = ''
+        use_devenv() {
+          # Automatically detect the workspace root (Git toplevel)
+          local root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+          
+          if has devenv && [[ -f "$root/devenv.nix" || -f "$root/devenv.yaml" ]]; then
+            # Watch files relative to root
+            watch_file "$root/devenv.nix"
+            watch_file "$root/devenv.yaml"
+            [[ -f "$root/devenv.lock" ]] && watch_file "$root/devenv.lock"
+            
+            # Load the environment by switching to root (version-agnostic)
+            pushd "$root" > /dev/null
+            eval "$(devenv print-dev-env)"
+            popd > /dev/null
+          else
+            # Fallback to standard flake loading
+            use flake "$root"
+          fi
+        }
+      '';
     };
 
     fzf = {
@@ -122,30 +119,11 @@
       enableBashIntegration = true;
     };
 
-    delta = {
-      enable = true;
-    };
-
     zellij = {
       enable = true;
       enableBashIntegration = false;
       settings = {
         theme = "tokyo-night";
-      };
-    };
-
-    lazygit = {
-      enable = true;
-      settings = {
-        gui.theme = {
-          lightTheme = false;
-          activeBorderColor = [
-            "green"
-            "bold"
-          ];
-          inactiveBorderColor = [ "white" ];
-          selectedLineBgColor = [ "reverse" ];
-        };
       };
     };
 
@@ -170,12 +148,14 @@
 
   home = {
     file = {
-      ".justfile".source = ./files/justfile;
+      ".justfile" = {
+        source = ./files/justfile;
+        force = true;
+      };
     };
 
     sessionVariables = {
       TERMINAL = "cosmic-terminal";
-      SSH_ASKPASS = "${pkgs.lxqt.lxqt-openssh-askpass}/bin/lxqt-openssh-askpass";
     };
 
     packages = with pkgs; [
@@ -186,6 +166,7 @@
       btop # Essential for monitoring n8n/Ollama resources
       usbutils # lsusb
       pciutils # lspci
+      devenv # Added for advanced direnv integration
     ];
 
   };
