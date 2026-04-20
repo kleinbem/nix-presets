@@ -140,7 +140,9 @@
         };
         "github.com" = {
           user = "git";
-          identityFile = "${config.home.homeDirectory}/.ssh/id_ecdsa_sk_auth";
+          extraOptions = {
+            PKCS11Provider = "${pkgs.opensc}/lib/opensc-pkcs11.so";
+          };
         };
       };
     };
