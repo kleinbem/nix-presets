@@ -1,5 +1,10 @@
 { self }:
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.containers.monitoring;
   inherit (self.lib) mkContainer;
@@ -90,7 +95,7 @@ in
         isSystemUser = true;
         group = "victoriametrics";
       };
-      users.groups.victoriametrics = {};
+      users.groups.victoriametrics = { };
 
       systemd.services.grafana = {
         serviceConfig.ExecStartPre = [

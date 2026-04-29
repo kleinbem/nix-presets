@@ -6,6 +6,11 @@
   innerConfig ? { },
   bindMounts ? { },
   timeout ? "90s",
+  enableNesting ? false,
+  enableGPU ? false,
+  enableAudio ? false,
+  enableVideo ? false,
+  enableUSB ? false,
 }:
 let
   inherit (lib) mkIf mkDefault;
@@ -68,31 +73,29 @@ let
 in
 {
   containers.${name} = {
+    ephemeral = true;
     autoStart = cfg.autoStart or true;
     privateNetwork = true;
     hostBridge = cfg.hostBridge or config.my.network.bridge;
     localAddress = cfg.ip;
     privateUsers =
-      if (cfg ? privateUsers) then
-        cfg.privateUsers
-      else
-        (if (cfg.enableNesting or false) then "no" else "no");
+      if (cfg ? privateUsers) then cfg.privateUsers else (if enableNesting then "no" else "pick");
 
     # Conditionally allow hardware device pass-through
     allowedDevices =
-      (lib.optionals (cfg.enableGPU or false) [
+      (lib.optionals enableGPU [
         {
           node = config.my.hardware.gpuRenderNode;
           modifier = "rw";
         }
       ])
-      ++ (lib.optionals (cfg.enableAudio or false) [
+      ++ (lib.optionals enableAudio [
         {
           node = "/dev/snd";
           modifier = "rw";
         }
       ])
-      ++ (lib.optionals (cfg.enableVideo or false) [
+      ++ (lib.optionals enableVideo [
         {
           node = "/dev/video0";
           modifier = "rw";
@@ -102,13 +105,13 @@ in
           modifier = "rw";
         }
       ])
-      ++ (lib.optionals (cfg.enableUSB or false) [
+      ++ (lib.optionals enableUSB [
         {
           node = "/dev/bus/usb";
           modifier = "rw";
         }
       ])
-      ++ (lib.optionals (cfg.enableNesting or false) [
+      ++ (lib.optionals enableNesting [
         {
           node = "/dev/fuse";
           modifier = "rw";
@@ -117,7 +120,7 @@ in
       ++ (cfg.extraAllowedDevices or [ ]);
 
     additionalCapabilities =
-      (lib.optionals (cfg.enableNesting or false) [
+      (lib.optionals enableNesting [
         "CAP_SYS_ADMIN"
         "CAP_MKNOD"
         "CAP_SETFCAP"
@@ -219,7 +222,7 @@ in
           isReadOnly = true;
         };
       })
-      // (lib.optionalAttrs (cfg.enableNesting or false) {
+      // (lib.optionalAttrs enableNesting {
         "/dev/fuse" = {
           hostPath = "/dev/fuse";
           isReadOnly = false;

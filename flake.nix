@@ -8,8 +8,7 @@
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
     pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
-    nixpak.url = "github:nixpak/nixpak";
-    nixpak.inputs.nixpkgs.follows = "nixpkgs";
+
     # Redroid GApps
     gapps-arm64 = {
       url = "https://github.com/MindTheGapps/16.0.0-arm64/releases/download/MindTheGapps-16.0.0-arm64-20250812_214353/MindTheGapps-16.0.0-arm64-20250812_214353.zip";
@@ -24,10 +23,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nix-devshells = {
-      url = "path:/home/martin/Develop/github.com/kleinbem/nix/nix-devshells";
+      url = "github:kleinbem/nix-devshells";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nix-packages.url = "path:/home/martin/Develop/github.com/kleinbem/nix/nix-packages";
+    nix-packages.url = "github:kleinbem/nix-packages";
     nix-packages.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -44,18 +43,7 @@
           system,
           ...
         }:
-        let
-          # Custom pkgs for standalone app building (needs unfree + stable alias)
-          appsPkgs = import inputs.nixpkgs {
-            hostPlatform = system;
-            config.allowUnfree = true;
-            overlays = [
-              (_final: prev: {
-                stable = prev;
-              })
-            ];
-          };
-        in
+        # Custom pkgs for standalone app building (needs unfree + stable alias)
         {
           formatter = inputs.nix-devshells.formatter.${system};
 
@@ -81,11 +69,7 @@
           };
 
           packages =
-            (import ./pkgs/nixpak/default.nix {
-              pkgs = appsPkgs;
-              inherit (inputs) nixpak;
-            })
-            // (import ./pkgs/waydroid/default.nix {
+            (import ./pkgs/waydroid/default.nix {
               inherit pkgs;
             })
             // (import ./pkgs/redroid/default.nix {
@@ -101,6 +85,9 @@
         nixosModules = {
           # Generic Modules
           container-common = import ./containers/common.nix;
+          github-runner = import ./containers/github-runner.nix { inherit self; };
+          cups = import ./containers/cups.nix { inherit self; };
+          ollama = import ./containers/ollama.nix { inherit self; };
           n8n = import ./containers/n8n.nix { inherit self; };
           code-server = import ./containers/code-server.nix { inherit self; };
           open-webui = import ./containers/open-webui.nix { inherit self; };
@@ -120,6 +107,7 @@
           monitoring = import ./containers/monitoring.nix { inherit self; };
           monitoring-node = import ./nixosModules/monitoring-node.nix;
           agent-zero = import ./containers/agent-zero.nix { inherit self; };
+          agent-team = import ./containers/agent-team.nix { inherit self; };
           litellm = import ./containers/litellm.nix { inherit self; };
           loki = import ./containers/loki.nix { inherit self; };
           falco = import ./containers/falco.nix { inherit self; };

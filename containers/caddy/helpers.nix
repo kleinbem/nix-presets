@@ -67,12 +67,16 @@ in
               let
                 t = helpers.mkTransport node;
                 # Authelia Forward Auth Logic
-                authConfig = if (node.auth or false) then ''
-                  forward_auth 10.85.46.123:9091 {
-                    uri /api/verify?rd=https://authelia.local/
-                    copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
-                  }
-                '' else "";
+                authConfig =
+                  if (node.auth or false) then
+                    ''
+                      forward_auth 10.85.46.123:9091 {
+                        uri /api/verify?rd=https://authelia.local/
+                        copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
+                      }
+                    ''
+                  else
+                    "";
               in
               if t != "" then
                 ''

@@ -19,6 +19,11 @@ let
       "google".metaData.hidden = true;
       "bing".metaData.hidden = true;
       "ebay".metaData.hidden = true;
+      "Obsidian" = {
+        urls = [ { template = "obsidian://search?query={searchTerms}"; } ];
+        icon = "https://obsidian.md/favicon.ico";
+        definedAliases = [ "@obs" ];
+      };
     };
     force = true;
   };
@@ -66,6 +71,18 @@ in
           "Network"
           "WebBrowser"
         ];
+        mimeType = [
+          "text/html"
+          "text/xml"
+          "application/xhtml+xml"
+          "application/vnd.mozilla.xul+xml"
+          "x-scheme-handler/http"
+          "x-scheme-handler/https"
+        ];
+        settings = {
+          StartupNotify = "true";
+          StartupWMClass = "firefox-beta";
+        };
       };
       firefox-developer = {
         name = "Firefox Developer Edition";
@@ -78,6 +95,18 @@ in
           "WebBrowser"
           "Development"
         ];
+        mimeType = [
+          "text/html"
+          "text/xml"
+          "application/xhtml+xml"
+          "application/vnd.mozilla.xul+xml"
+          "x-scheme-handler/http"
+          "x-scheme-handler/https"
+        ];
+        settings = {
+          StartupNotify = "true";
+          StartupWMClass = "firefox-devedition";
+        };
       };
       firefox-vault = {
         name = "Firefox Vault";
@@ -89,11 +118,24 @@ in
           "Network"
           "WebBrowser"
         ];
+        mimeType = [
+          "text/html"
+          "text/xml"
+          "application/xhtml+xml"
+          "application/vnd.mozilla.xul+xml"
+          "x-scheme-handler/http"
+          "x-scheme-handler/https"
+        ];
+        settings = {
+          StartupNotify = "true";
+          StartupWMClass = "firefox-beta";
+        };
       };
     };
 
     programs.firefox = {
       enable = true;
+      configPath = ".mozilla/firefox";
 
       profiles = {
         # --- Profile 1: Standard (Hardened Daily Driver) ---

@@ -1,18 +1,10 @@
 {
   pkgs,
   lib,
-  config,
-  nixpak,
   ...
 }:
 
 let
-  # Import modular apps catalog
-  sandboxedApps = import ./nixpak/apps.nix {
-    inherit pkgs nixpak;
-    inherit (config.home) homeDirectory;
-  };
-
   commonData = import ./code-common/settings.nix;
   extensions = import ./code-common/extensions.nix { inherit pkgs; };
 
@@ -113,21 +105,24 @@ in
       obs-studio # Streaming/Recording Software
 
       # --- Communication ---
-      sandboxedApps.discord
-      sandboxedApps.slack
-      sandboxedApps.signal-desktop
+      discord
+      slack
+      signal-desktop
 
-      # -- Sandboxed Apps --
-      sandboxedApps.obsidian
-      sandboxedApps.mpv # Nixpak (Safe)
-      sandboxedApps.google-chrome-stable # Standard Profile (Renamed from google-chrome)
-      sandboxedApps.lmstudio # Nixpak (Safe)
-      sandboxedApps.bitwarden
+      # -- Apps (Sandboxed via Firejail on host) --
+      obsidian
+      logseq
+      mpv
+      google-chrome
+      lmstudio
+      bitwarden-desktop
       pkgs.rbw
       pkgs.rofi-rbw-wayland
       github-desktop
       chromium # Fallback (Unsafe) - Local Dev
       pkgs.brotab # Browser Automation (asked by user)
+      pkgs.cliphist # Clipboard history
+      pkgs.wl-clipboard # Required for cliphist
 
       # Math and Matrix stuff. Using 'octaveFull' to get the standard packages included.
       octaveFull
@@ -140,6 +135,11 @@ in
 
     # Generate declarative config files for all agents
     file = lib.mkMerge (map mkConfigs codeFamily);
+
+    # Create cloud mount directories for rclone
+    activation.createCloudMounts = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      $DRY_RUN_CMD mkdir -p $HOME/GoogleDrive $HOME/OneDrive
+    '';
 
     # Sync Extensions Script (Runs on switch)
     # This creates symlinks from the generated extensions.nix profile to each editor's extension dir.
@@ -190,6 +190,7 @@ in
       "x-scheme-handler/https" = [ "firefox.desktop" ];
       "x-scheme-handler/about" = [ "firefox.desktop" ];
       "x-scheme-handler/unknown" = [ "firefox.desktop" ];
+      "x-scheme-handler/obsidian" = [ "obsidian.desktop" ];
     };
   };
 
@@ -198,63 +199,83 @@ in
 
   programs.waybar.enable = true;
 
-  systemd.user.services.rclone-gdrive-mount = {
-    Unit = {
-      Description = "Mount Google Drive via Rclone";
-      After = [ "network-online.target" ];
+  systemd.user.services = {
+    rclone-gdrive-mount = {
+      Unit = {
+        Description = "Mount Google Drive via Rclone";
+        After = [ "network-online.target" ];
+      };
+      Service = {
+        Type = "simple";
+        Environment = "PATH=/run/wrappers/bin:$PATH";
+        # Wait for network to be fully ready before mounting
+        ExecStartPre = [
+          "${pkgs.coreutils}/bin/sleep 5"
+          "${pkgs.coreutils}/bin/mkdir -p %h/GoogleDrive"
+        ];
+        ExecStart = ''
+          ${pkgs.rclone}/bin/rclone mount gdrive: %h/GoogleDrive \
+            --allow-other \
+            --allow-non-empty \
+            --vfs-cache-mode full \
+            --vfs-cache-max-size 10G \
+            --vfs-cache-max-age 24h \
+            --dir-cache-time 1000h \
+            --log-level INFO
+        '';
+        ExecStop = "/run/wrappers/bin/fusermount3 -u %h/GoogleDrive";
+        Restart = "on-failure";
+        RestartSec = "10s";
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
+      };
     };
-    Service = {
-      Type = "simple";
-      Environment = "PATH=/run/wrappers/bin:$PATH";
-      # Wait for network to be fully ready before mounting
-      ExecStartPre = [
-        "${pkgs.coreutils}/bin/sleep 5"
-        "${pkgs.coreutils}/bin/mkdir -p %h/GoogleDrive"
-      ];
-      ExecStart = ''
-        ${pkgs.rclone}/bin/rclone mount gdrive: %h/GoogleDrive \
-          --vfs-cache-mode full \
-          --vfs-cache-max-size 10G \
-          --vfs-cache-max-age 24h \
-          --dir-cache-time 1000h \
-          --log-level INFO
-      '';
-      ExecStop = "/run/wrappers/bin/fusermount3 -u %h/GoogleDrive";
-      Restart = "on-failure";
-      RestartSec = "10s";
-    };
-    Install = {
-      WantedBy = [ "default.target" ];
-    };
-  };
 
-  systemd.user.services.rclone-onedrive-mount = {
-    Unit = {
-      Description = "Mount OneDrive via Rclone";
-      After = [ "network-online.target" ];
+    rclone-onedrive-mount = {
+      Unit = {
+        Description = "Mount OneDrive via Rclone";
+        After = [ "network-online.target" ];
+      };
+      Service = {
+        Type = "simple";
+        Environment = "PATH=/run/wrappers/bin:$PATH";
+        # Wait for network to be fully ready before mounting
+        ExecStartPre = [
+          "${pkgs.coreutils}/bin/sleep 5"
+          "${pkgs.coreutils}/bin/mkdir -p %h/OneDrive"
+        ];
+        ExecStart = ''
+          ${pkgs.rclone}/bin/rclone mount onedrive: %h/OneDrive \
+            --allow-other \
+            --allow-non-empty \
+            --vfs-cache-mode full \
+            --vfs-cache-max-size 10G \
+            --vfs-cache-max-age 24h \
+            --dir-cache-time 1000h \
+            --log-level INFO
+        '';
+        ExecStop = "/run/wrappers/bin/fusermount3 -u %h/OneDrive";
+        Restart = "on-failure";
+        RestartSec = "10s";
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
+      };
     };
-    Service = {
-      Type = "simple";
-      Environment = "PATH=/run/wrappers/bin:$PATH";
-      # Wait for network to be fully ready before mounting
-      ExecStartPre = [
-        "${pkgs.coreutils}/bin/sleep 5"
-        "${pkgs.coreutils}/bin/mkdir -p %h/OneDrive"
-      ];
-      ExecStart = ''
-        ${pkgs.rclone}/bin/rclone mount onedrive: %h/OneDrive \
-          --vfs-cache-mode full \
-          --vfs-cache-max-size 10G \
-          --vfs-cache-max-age 24h \
-          --dir-cache-time 1000h \
-          --log-level INFO
-      '';
-      ExecStop = "/run/wrappers/bin/fusermount3 -u %h/OneDrive";
-      Restart = "on-failure";
-      RestartSec = "10s";
-    };
-    Install = {
-      WantedBy = [ "default.target" ];
+
+    cliphist = {
+      Unit = {
+        Description = "Clipboard history service (cliphist)";
+        After = [ "graphical-session.target" ];
+      };
+      Service = {
+        ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --watch ${pkgs.cliphist}/bin/cliphist store";
+        Restart = "on-failure";
+      };
+      Install = {
+        WantedBy = [ "graphical-session.target" ];
+      };
     };
   };
 }

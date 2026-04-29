@@ -30,7 +30,7 @@ in
     virtualisation.oci-containers.containers = {
       # --- Falco Engine (The Scanner) ---
       falco = {
-        image = "docker.io/falcosecurity/falco:0.43.1";
+        image = "docker.io/falcosecurity/falco:latest";
         autoStart = true;
         extraOptions = [
           "--privileged"
@@ -64,7 +64,7 @@ in
 
       # --- FalcoSidekick (The Alerter) ---
       falcosidekick = {
-        image = "docker.io/falcosecurity/falcosidekick:2.31.0";
+        image = "docker.io/falcosecurity/falcosidekick:latest";
         autoStart = true;
         extraOptions = [
           "--net=cbr0"

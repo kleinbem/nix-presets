@@ -1,5 +1,10 @@
 { self }:
-{ config, lib, myInventory, ... }:
+{
+  config,
+  lib,
+  myInventory,
+  ...
+}:
 let
   cfg = config.my.containers.authelia;
   inherit (self.lib) mkContainer;
@@ -8,7 +13,7 @@ in
 {
   options.my.containers.authelia = {
     enable = lib.mkEnableOption "Authelia SSO Container";
-    ip = lib.mkOption { 
+    ip = lib.mkOption {
       type = lib.types.str;
       default = inv.network.nodes.authelia.ip or "10.85.46.123";
     };

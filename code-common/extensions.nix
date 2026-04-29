@@ -24,6 +24,8 @@ in
     # --- Productivity ---
     mkt.usernamehw.errorlens
     mkt.gruntfuggly.todo-tree
+    mkt.shd101wyy.markdown-preview-enhanced
+    mkt.yzhang.markdown-all-in-one
 
     # --- Infrastructure ---
     mkt.hashicorp.terraform

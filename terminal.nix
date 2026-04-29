@@ -14,7 +14,7 @@
         export HISTSIZE=100000
         export HISTFILESIZE=100000
         shopt -s histappend
-        PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"
+        PROMPT_COMMAND="history -a; history -n; $PROMPT_COMMAND"
       '';
 
       shellAliases = {
@@ -63,18 +63,6 @@
           format = "took [$duration]($style) ";
         };
       };
-    };
-
-    keychain = {
-      enable = false; # Disabled to prevent conflict with system-wide ssh-agent
-      enableBashIntegration = true;
-      keys = [
-        "id_ed25519_sk"
-        "id_ed25519_sk_backup"
-        "id_ed25519_sk_no_touch"
-        "id_ecdsa_sk_auth"
-        "id_ecdsa_sk_auth_backup"
-      ];
     };
 
     direnv = {

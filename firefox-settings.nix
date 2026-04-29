@@ -10,9 +10,13 @@ let
     "browser.topsites.controversial.enabled" = false;
     "browser.download.panel.shown" = true;
     "browser.startup.page" = 3; # Restore previous session
+    "browser.sessionstore.interval" = 5000; # Save session every 5 seconds (default is 15s)
+    "browser.sessionstore.warnOnQuit" = true; # Warn before quitting to prevent accidental state loss
     "identity.fxaccounts.enabled" = false;
     "network.dns.disableIPv6" = true;
     "security.webauth.webauthn" = true;
+    "signon.rememberSignons" = false; # Use Bitwarden
+    "browser.formfill.enable" = false; # No autocomplete
 
     # --- PWA Related ---
     "browser.taskbarTabs.enabled" = true;
@@ -68,6 +72,8 @@ in
   standardExtensions = commonExtensions ++ [
     pkgs.nur.repos.rycee.firefox-addons.localcdn
     pkgs.nur.repos.rycee.firefox-addons.auto-tab-discard
+    pkgs.nur.repos.rycee.firefox-addons.tab-session-manager
+    pkgs.nur.repos.rycee.firefox-addons.sidebery
   ];
 
   # --- Level 2: Laboratory (AI & Power User) ---
@@ -97,8 +103,6 @@ in
     "privacy.clearOnShutdown.cookies" = true;
     "privacy.clearOnShutdown.history" = true;
     "browser.privatebrowsing.autostart" = false;
-    "signon.rememberSignons" = false; # Never save passwords (use Bitwarden)
-    "browser.formfill.enable" = false; # No autocomplete
     "network.IDN_show_punycode" = true; # Phishing protection
   };
   vaultExtensions = commonExtensions; # Keep minimal
