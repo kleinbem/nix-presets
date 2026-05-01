@@ -28,13 +28,13 @@ emulator "@$AVD_NAME" \
 EMULATOR_PID=$!
 
 # Trap to kill emulator when script exits
-trap "kill $EMULATOR_PID" EXIT
+trap 'kill $EMULATOR_PID' EXIT
 
 # 3. Wait for ADB
 echo "Waiting for device..."
 adb wait-for-device
 
-# Optional: Poll specifically for boot completion if needed, 
+# Optional: Poll specifically for boot completion if needed,
 # but scrcpy usually handles connecting to a partially booted device fairly well.
 echo "Waiting for boot completion..."
 while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do

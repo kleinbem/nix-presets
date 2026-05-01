@@ -88,8 +88,10 @@ verify-store:
 
 # Garbage Collect (Free space)
 clean:
-    @echo "🧹 Cleaning Nix Store..."
-    nh clean all
+    @echo "🧹 Cleaning Nix Store (keeping 3 generations)..."
+    nh clean all --keep 3
+    @echo "🔄 Optimizing Nix store..."
+    nix-store --optimise
     @echo "🧹 Pruning Host Podman Cache..."
     podman system prune -f
     @if systemctl is-active --quiet container@langfuse.service; then \

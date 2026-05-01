@@ -46,6 +46,8 @@ let
     "browser.urlbar.suggest.quicksuggest.sponsored" = false;
     "browser.newtabpage.activity-stream.showSponsored" = false;
     "browser.tabs.closeWindowWithLastTab" = false;
+    "browser.translations.enable" = true;
+    "browser.translations.ui.showUpsell" = true;
   };
 
   # Common extensions for ALL profiles
@@ -54,7 +56,6 @@ let
     privacy-badger
     darkreader
     multi-account-containers
-    bitwarden
     clearurls
     consent-o-matic
   ];

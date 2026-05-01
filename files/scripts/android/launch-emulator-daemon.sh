@@ -9,12 +9,12 @@ ADB_SERIAL="${ANDROID_ADB_SERIAL:-emulator-5554}"
 TIMEOUT=300
 
 # Argument Parsing
-if [[ "$*" == *"--rootable"* ]]; then
-    AVD_NAME="NixIntegratedRoot"
-    SYSTEM_IMAGE="system-images;android-36;google_apis;x86_64"
-    echo "🔓 MODE: Rootable (Google APIs) - No Play Store"
+if [[ $* == *"--rootable"* ]]; then
+  AVD_NAME="NixIntegratedRoot"
+  SYSTEM_IMAGE="system-images;android-36;google_apis;x86_64"
+  echo "🔓 MODE: Rootable (Google APIs) - No Play Store"
 else
-    echo "🔒 MODE: Standard (Play Store) - Default"
+  echo "🔒 MODE: Standard (Play Store) - Default"
 fi
 
 echo "🚀 Starting Emulator Daemon: $AVD_NAME"
@@ -48,7 +48,7 @@ ARGS=(
 )
 
 if [ "$HEADLESS" = "true" ]; then
-    ARGS+=("-no-window")
+  ARGS+=("-no-window")
 fi
 
 echo "Starting Emulator process..."
@@ -59,9 +59,9 @@ EMULATOR_PID=$!
 
 # Trap signals to shut down emulator cleanly
 cleanup() {
-    echo "Shutting down emulator..."
-    kill $EMULATOR_PID
-    wait $EMULATOR_PID
+  echo "Shutting down emulator..."
+  kill $EMULATOR_PID
+  wait $EMULATOR_PID
 }
 trap cleanup SIGINT SIGTERM EXIT
 
@@ -73,12 +73,12 @@ adb wait-for-device -s "$ADB_SERIAL"
 echo "⏳ Android is booting (Waiting for sys.boot_completed)..."
 ITER=0
 while [ "$(adb -s "$ADB_SERIAL" shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
-    sleep 2
-    ITER=$((ITER + 2))
-    if [ "$ITER" -gt "$TIMEOUT" ]; then
-        echo "❌ Timeout: Android failed to boot within $TIMEOUT seconds."
-        exit 1
-    fi
+  sleep 2
+  ITER=$((ITER + 2))
+  if [ "$ITER" -gt "$TIMEOUT" ]; then
+    echo "❌ Timeout: Android failed to boot within $TIMEOUT seconds."
+    exit 1
+  fi
 done
 echo "✅ Android Booted Successfully!"
 

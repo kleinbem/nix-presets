@@ -1,99 +1,68 @@
 { pkgs, config, ... }:
 
 {
-  # Ensure Node.js is available for npx
-  home.packages = [ pkgs.nodejs_22 ];
+  # Ensure Atlas is available in the home environment
+  home.packages = [
+    (pkgs.callPackage ./atlas/default.nix { })
+  ];
 
-  # Declare the secrets we need
-  # sops.secrets.github_pat = { };
-  # sops.secrets.brave_api_key = { };
+  sops.secrets = {
+    github_app_id = { };
+    github_app_installation_id = { };
+    github_app_private_key = { };
+    brave_api_key = { };
+  };
 
-  # Use sops.templates to inject real tokens into the config
+  # Secure Claude Config
   sops.templates."Claude/claude_desktop_config.json" = {
     path = "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json";
     content = builtins.toJSON {
       mcpServers = {
-        # 1. Filesystem (Nixified)
+        # 1. Workspace Atlas (Native command)
+        workspace-atlas = {
+          command = "atlas";
+          args = [
+            "mcp"
+            "launch"
+            "atlas"
+            "${pkgs.python3}/bin/python3"
+            "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
+          ];
+        };
+
+        # 2. GitHub (Secure, Short-Lived Tokens)
+        github = {
+          command = "atlas";
+          args = [
+            "mcp"
+            "launch"
+            "github"
+            "${pkgs.nodejs_22}/bin/npx"
+            "-y"
+            "@modelcontextprotocol/server-github"
+          ];
+        };
+
+        # 3. Brave Search (Secure, No disk secrets)
+        brave-search = {
+          command = "atlas";
+          args = [
+            "mcp"
+            "launch"
+            "brave-search"
+            "${pkgs.nodejs_22}/bin/npx"
+            "-y"
+            "@modelcontextprotocol/server-brave-search"
+          ];
+        };
+
+        # 4. Standard Servers
         filesystem = {
           command = "${pkgs.nodejs_22}/bin/npx";
           args = [
             "-y"
             "@modelcontextprotocol/server-filesystem"
             "${config.home.homeDirectory}/Develop"
-          ];
-        };
-
-        # 2. Workspace Atlas (Custom Nix-Native)
-        workspace-atlas = {
-          command = "${pkgs.python3}/bin/python3";
-          args = [
-            "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
-          ];
-          env = {
-            PYTHONPATH = "${pkgs.python3Packages.python-lsp-server}/lib/python3.12/site-packages"; # Example to ensure libs
-          };
-        };
-
-        # 3. Monitoring (VictoriaMetrics)
-        prometheus = {
-          command = "${pkgs.nodejs_22}/bin/npx";
-          args = [
-            "-y"
-            "@modelcontextprotocol/server-prometheus"
-            "--endpoint"
-            "http://10.85.46.1:8428" # VictoriaMetrics Endpoint
-          ];
-        };
-
-        # 3. GitHub (Nixified)
-        github = {
-          command = "${pkgs.nodejs_22}/bin/npx";
-          args = [
-            "-y"
-            "@modelcontextprotocol/server-github"
-          ];
-          env = {
-            # GITHUB_PERSONAL_ACCESS_TOKEN = config.sops.placeholder.github_pat;
-          };
-        };
-
-        # 4. Brave Search (Nixified)
-        brave-search = {
-          command = "${pkgs.nodejs_22}/bin/npx";
-          args = [
-            "-y"
-            "@modelcontextprotocol/server-brave-search"
-          ];
-          env = {
-            # BRAVE_API_KEY = config.sops.placeholder.brave_api_key;
-          };
-        };
-
-        # 5. Puppeteer (Nixified)
-        puppeteer = {
-          command = "${pkgs.nodejs_22}/bin/npx";
-          args = [
-            "-y"
-            "@modelcontextprotocol/server-puppeteer"
-          ];
-        };
-
-        # 6. Database (Postgres) — connection string should be updated when DB is provisioned
-        postgres = {
-          command = "${pkgs.nodejs_22}/bin/npx";
-          args = [
-            "-y"
-            "@modelcontextprotocol/server-postgres"
-            "postgresql://user:password@localhost:5432/dbname"
-          ];
-        };
-
-        # 7. Local Git (Nixified)
-        git = {
-          command = "${pkgs.nodejs_22}/bin/npx";
-          args = [
-            "-y"
-            "mcp-server-git"
           ];
         };
       };

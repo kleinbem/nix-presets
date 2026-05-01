@@ -10,16 +10,19 @@ PIF_REPO="osm0sis/PlayIntegrityFork"
 PIF_FILE="PlayIntegrityFork.zip"
 
 log() { echo -e "\033[1;32m[*]\033[0m $*"; }
-err() { echo -e "\033[1;31m[!]\033[0m $*" >&2; exit 1; }
+err() {
+  echo -e "\033[1;31m[!]\033[0m $*" >&2
+  exit 1
+}
 
 [[ $EUID -eq 0 ]] || err "Run as root"
-[[ -n "$ASSETS" ]] || err "ASSETS not set"
+[[ -n $ASSETS ]] || err "ASSETS not set"
 
-img_dir() { 
+img_dir() {
   grep -Po 'images_path\s*=\s*\K.*' "$WAYDROID_DIR/waydroid.cfg" 2>/dev/null || echo "$WAYDROID_DIR/images"
 }
 
-overlayfs() { 
+overlayfs() {
   grep -q 'mount_overlays\s*=\s*True' "$WAYDROID_DIR/waydroid.cfg" 2>/dev/null
 }
 
@@ -28,10 +31,10 @@ prop() {
   local key="$1"
   local value="$2"
   local cfg="$WAYDROID_DIR/waydroid.cfg"
-  
+
   # Remove existing entry (if any) to avoid duplicates
   sed -i "/^${key}\s*=/d" "$cfg" 2>/dev/null || true
-  
+
   # Add new entry under [properties]
   sed -i "/^\[properties\]/a ${key} = ${value}" "$cfg"
 }
@@ -46,15 +49,15 @@ if overlayfs; then
 else
   COPY_DIR="/tmp/waydroid"
   img=$(img_dir)
-  
+
   for p in system vendor; do
     img_path="$img/$p.img"
     mp="$COPY_DIR"
-    [[ "$p" != "system" ]] && mp="$COPY_DIR/$p"
-    
+    [[ $p != "system" ]] && mp="$COPY_DIR/$p"
+
     log "Mounting $p..."
     e2fsck -yf "$img_path" >/dev/null 2>&1 || true
-    resize2fs "$img_path" "$(($(stat -c%s "$img_path")/1024/1024+500))M" >/dev/null 2>&1
+    resize2fs "$img_path" "$(($(stat -c%s "$img_path") / 1024 / 1024 + 500))M" >/dev/null 2>&1
     mkdir -p "$mp"
     mountpoint -q "$mp" && umount "$mp"
     mount -o rw "$img_path" "$mp"
@@ -104,7 +107,7 @@ if ! overlayfs; then
   log "Unmounting..."
   for p in vendor system; do
     mp="$COPY_DIR"
-    [[ "$p" != "system" ]] && mp="$COPY_DIR/$p"
+    [[ $p != "system" ]] && mp="$COPY_DIR/$p"
     umount "$mp" 2>/dev/null || true
   done
 fi
@@ -113,15 +116,15 @@ log "Checking Waydroid session..."
 
 # Check if session is running. If not, we can't do Magisk config yet.
 if waydroid status 2>/dev/null | grep -q "Session:.*RUNNING"; then
-    log "Session running, configuring MagiskHide..."
-    waydroid shell -- sh -c "magiskhide enable" || true
-    waydroid shell -- sh -c "magiskhide add com.google.android.gms" || true
-    waydroid shell -- sh -c "magiskhide add com.android.vending" || true
-    waydroid shell -- sh -c "magisk --install-module /data/local/tmp/$PIF_FILE" || true
-    log "Done! System is fully patched and activated."
+  log "Session running, configuring MagiskHide..."
+  waydroid shell -- sh -c "magiskhide enable" || true
+  waydroid shell -- sh -c "magiskhide add com.google.android.gms" || true
+  waydroid shell -- sh -c "magiskhide add com.android.vending" || true
+  waydroid shell -- sh -c "magisk --install-module /data/local/tmp/$PIF_FILE" || true
+  log "Done! System is fully patched and activated."
 else
-    log "Images patched! However, couldn't start session as root."
-    log "NEXT STEPS:"
-    log "1. Start session as your user: waydroid session start"
-    log "2. Run: just activate (to finish Magisk/Play Store fix)"
+  log "Images patched! However, couldn't start session as root."
+  log "NEXT STEPS:"
+  log "1. Start session as your user: waydroid session start"
+  log "2. Run: just activate (to finish Magisk/Play Store fix)"
 fi

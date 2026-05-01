@@ -3,7 +3,10 @@
 set -euo pipefail
 
 log() { echo -e "\033[1;32m[*]\033[0m $*"; }
-err() { echo -e "\033[1;31m[!]\033[0m $*" >&2; exit 1; }
+err() {
+  echo -e "\033[1;31m[!]\033[0m $*" >&2
+  exit 1
+}
 
 PIF_URL="https://github.com/chiteroman/PlayIntegrityFix/releases/latest/download/PlayIntegrityFix.zip"
 WAYDROID_DATA="${HOME}/.local/share/waydroid/data"

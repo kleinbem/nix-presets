@@ -34,13 +34,13 @@ update_docker() {
   arch=$1
   sed_digest=$2
   sed_sha=$3
-  
+
   echo "Fetching $IMAGE:$TAG ($arch)..."
   # Use nix-prefetch-docker
   json=$(nix run nixpkgs#nix-prefetch-docker -- --image-name "$IMAGE" --image-tag "$TAG" --os linux --arch "$arch" --json)
   digest=$(echo "$json" | grep -oP '"imageDigest": "\K[^"]+')
   sha=$(echo "$json" | grep -oP '"sha256": "\K[^"]+')
-  
+
   if [ -n "$digest" ] && [ -n "$sha" ]; then
     echo "Updating $arch: $digest"
     # Replace content. Match the comment markers.

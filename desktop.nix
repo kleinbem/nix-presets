@@ -96,13 +96,10 @@ in
       pavucontrol
       nwg-look
       mission-center # System Monitor (Task Manager)
-      zathura # PDF Viewer
-      imv # Image Viewer
       p7zip # Archives
       rclone-browser # GUI for Rclone
       restic-browser # GUI for Restic Backups
       restic # CLI Tool (Required for Restic Browser)
-      obs-studio # Streaming/Recording Software
 
       # --- Communication ---
       discord
@@ -116,10 +113,13 @@ in
       google-chrome
       lmstudio
       bitwarden-desktop
+      obs-studio
+      github-desktop
+      chromium
+      zathura
+      imv # Image Viewer
       pkgs.rbw
       pkgs.rofi-rbw-wayland
-      github-desktop
-      chromium # Fallback (Unsafe) - Local Dev
       pkgs.brotab # Browser Automation (asked by user)
       pkgs.cliphist # Clipboard history
       pkgs.wl-clipboard # Required for cliphist

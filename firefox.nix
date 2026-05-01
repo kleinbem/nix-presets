@@ -64,7 +64,7 @@ in
       firefox-standard = {
         name = "Firefox";
         genericName = "Web Browser";
-        exec = "${lib.getExe pkgs.firefox-beta} -P standard %u";
+        exec = "firefox -P standard %u";
         icon = "firefox";
         terminal = false;
         categories = [
@@ -87,7 +87,7 @@ in
       firefox-developer = {
         name = "Firefox Developer Edition";
         genericName = "Developer Web Browser";
-        exec = "${lib.getExe pkgs.firefox-devedition} -P laboratory %u";
+        exec = "firefox-devedition -P laboratory %u";
         icon = "firefox-devedition";
         terminal = false;
         categories = [
@@ -111,7 +111,7 @@ in
       firefox-vault = {
         name = "Firefox Vault";
         genericName = "Secure Browser (Beta)";
-        exec = "${lib.getExe pkgs.firefox-beta} -P vault %u";
+        exec = "firefox -P vault %u";
         icon = "${pkgs.adwaita-icon-theme}/share/icons/Adwaita/symbolic/status/security-high-symbolic.svg";
         terminal = false;
         categories = [
@@ -136,6 +136,17 @@ in
     programs.firefox = {
       enable = true;
       configPath = ".mozilla/firefox";
+
+      nativeMessagingHosts = [ pkgs.bitwarden-desktop ];
+
+      policies = {
+        ExtensionSettings = {
+          "{446900e4-71c2-419f-a6a7-df9c091e268b}" = {
+            installation_mode = "force_installed";
+            install_url = "https://addons.mozilla.org/firefox/downloads/latest/bitwarden-password-manager/latest.xpi";
+          };
+        };
+      };
 
       profiles = {
         # --- Profile 1: Standard (Hardened Daily Driver) ---
