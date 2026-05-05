@@ -11,6 +11,7 @@
   enableAudio ? false,
   enableVideo ? false,
   enableUSB ? false,
+  additionalCapabilities ? [ ],
 }:
 let
   inherit (lib) mkIf mkDefault;
@@ -125,6 +126,7 @@ in
         "CAP_MKNOD"
         "CAP_SETFCAP"
       ])
+      ++ additionalCapabilities
       ++ (cfg.extraCapabilities or [ ]);
 
     config =

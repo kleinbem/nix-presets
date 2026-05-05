@@ -13,6 +13,7 @@ let
     "browser.sessionstore.interval" = 5000; # Save session every 5 seconds (default is 15s)
     "browser.sessionstore.warnOnQuit" = true; # Warn before quitting to prevent accidental state loss
     "identity.fxaccounts.enabled" = false;
+    "security.enterprise_roots.enabled" = true; # Trust system CA store
     "network.dns.disableIPv6" = true;
     "security.webauth.webauthn" = true;
     "signon.rememberSignons" = false; # Use Bitwarden
@@ -48,10 +49,14 @@ let
     "browser.tabs.closeWindowWithLastTab" = false;
     "browser.translations.enable" = true;
     "browser.translations.ui.showUpsell" = true;
+
+    # --- UI Customization ---
+    "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
   };
 
   # Common extensions for ALL profiles
   commonExtensions = with pkgs.nur.repos.rycee.firefox-addons; [
+    bitwarden
     ublock-origin
     privacy-badger
     darkreader
@@ -74,6 +79,7 @@ in
     pkgs.nur.repos.rycee.firefox-addons.localcdn
     pkgs.nur.repos.rycee.firefox-addons.auto-tab-discard
     pkgs.nur.repos.rycee.firefox-addons.tab-session-manager
+    pkgs.nur.repos.rycee.firefox-addons.tab-stash
     pkgs.nur.repos.rycee.firefox-addons.sidebery
   ];
 
@@ -92,6 +98,7 @@ in
       sponsorblock
       languagetool
       sidebery
+      tab-stash
       markdownload
       violentmonkey
     ]);

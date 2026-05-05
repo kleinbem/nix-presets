@@ -46,7 +46,6 @@ in
         inherit config;
         name = "caddy";
         cfg = cfg // {
-          hostDataDir = null;
           privateUsers = "no";
         };
         innerConfig = {
@@ -99,12 +98,8 @@ in
               hostPath = "/nix/persist/pki/internal/ca.crt";
               isReadOnly = true;
             };
-            "/etc/pki/internal/client.crt" = {
-              hostPath = "/nix/persist/pki/internal/certs/client.crt";
-              isReadOnly = true;
-            };
-            "/etc/pki/internal/client.key" = {
-              hostPath = "/nix/persist/pki/internal/certs/client.key";
+            "/etc/pki/internal/certs" = {
+              hostPath = "/nix/persist/pki/internal/certs";
               isReadOnly = true;
             };
           };

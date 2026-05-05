@@ -11,8 +11,14 @@ in
 {
   options.my.containers.vllm = {
     enable = lib.mkEnableOption "vLLM High-Throughput Inference Container";
-    ip = lib.mkOption { type = lib.types.str; };
-    hostDataDir = lib.mkOption { type = lib.types.str; };
+    ip = lib.mkOption {
+      type = lib.types.str;
+      default = "10.85.46.111/24";
+    };
+    hostDataDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/images/vllm";
+    };
     enableGPU = lib.mkOption {
       type = lib.types.bool;
       default = true;

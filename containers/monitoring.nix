@@ -24,6 +24,11 @@ in
       default = [ ];
       description = "List of vLLM IPs to scrape for metrics.";
     };
+    ollamaTargets = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "List of Ollama container IPs to scrape for metrics.";
+    };
   };
 
   config = lib.mkIf cfg.enable (mkContainer {
@@ -49,6 +54,9 @@ in
           - job_name: 'vllm'
             static_configs:
               - targets: ${builtins.toJSON (map (t: "${t}:8000") cfg.vllmTargets)}
+          - job_name: 'ollama'
+            static_configs:
+              - targets: ${builtins.toJSON (map (t: "${t}:11434") cfg.ollamaTargets)}
       '';
 
       services.grafana = {

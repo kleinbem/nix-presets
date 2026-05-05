@@ -103,7 +103,6 @@ in
 
       # --- Communication ---
       discord
-      slack
       signal-desktop
 
       # -- Apps (Sandboxed via Firejail on host) --
@@ -111,11 +110,7 @@ in
       logseq
       mpv
       google-chrome
-      lmstudio
       bitwarden-desktop
-      obs-studio
-      github-desktop
-      chromium
       zathura
       imv # Image Viewer
       pkgs.rbw
@@ -124,12 +119,12 @@ in
       pkgs.cliphist # Clipboard history
       pkgs.wl-clipboard # Required for cliphist
 
-      # Math and Matrix stuff. Using 'octaveFull' to get the standard packages included.
-      octaveFull
+      # -- Volatile tools moved to DevShells --
+      # Run: just pentest    (Wireshark, Chromium, Metasploit, etc.)
+      # Run: just ai-dev     (claude-code, lmstudio, fabric-ai, etc.)
+      # Run: just math       (octaveFull, typst, tinymist)
+      # Run: just media      (obs-studio)
 
-      # Modern LaTeX alternative. Much faster for writing docs.
-      typst
-      tinymist # autocompletion in VS Code/Neovim (formerly typst-lsp)
       nixd # Nix Language Server
     ];
 

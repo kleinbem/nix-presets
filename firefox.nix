@@ -140,11 +140,11 @@ in
       nativeMessagingHosts = [ pkgs.bitwarden-desktop ];
 
       policies = {
-        ExtensionSettings = {
-          "{446900e4-71c2-419f-a6a7-df9c091e268b}" = {
-            installation_mode = "force_installed";
-            install_url = "https://addons.mozilla.org/firefox/downloads/latest/bitwarden-password-manager/latest.xpi";
-          };
+        Certificates = {
+          Install = [
+            "/home/martin/.pki/caddy-root.crt"
+            "/nix/persist/pki/internal/ca.crt"
+          ];
         };
       };
 
@@ -156,6 +156,26 @@ in
           isDefault = true;
           extensions.packages = browserSettings.standardExtensions;
           settings = browserSettings.standardSettings;
+          userChrome = ''
+            /* High-visibility active tab highlight (Top Bar) */
+            .tabbrowser-tab[selected="true"] {
+              background-color: rgba(255, 255, 255, 0.1) !important;
+            }
+            .tab-background[selected="true"] {
+              outline: 2px solid #00ddff !important;
+              outline-offset: -2px !important;
+            }
+
+            /* Sidebar (Sidebery) container tweaks */
+            #sidebar-header {
+              background-color: #1a1a1a !important;
+              color: #efefef !important;
+              border-bottom: 1px solid #333 !important;
+            }
+            #sidebar-box {
+              --sidebar-background-color: #1a1a1a !important;
+            }
+          '';
           search = commonSearch;
         };
 
@@ -165,6 +185,23 @@ in
           name = "laboratory";
           extensions.packages = browserSettings.laboratoryExtensions;
           settings = browserSettings.laboratorySettings;
+          userChrome = ''
+            /* High-visibility active tab highlight (Top Bar) */
+            .tabbrowser-tab[selected="true"] {
+              background-color: rgba(255, 255, 255, 0.1) !important;
+            }
+            .tab-background[selected="true"] {
+              outline: 2px solid #ff00ff !important; /* Magenta accent for Laboratory */
+              outline-offset: -2px !important;
+            }
+
+            /* Sidebar (Sidebery) container tweaks */
+            #sidebar-header {
+              background-color: #1a1a1a !important;
+              color: #efefef !important;
+              border-bottom: 1px solid #333 !important;
+            }
+          '';
           search = commonSearch;
         };
 

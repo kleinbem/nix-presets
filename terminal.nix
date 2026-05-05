@@ -15,6 +15,12 @@
         export HISTFILESIZE=100000
         shopt -s histappend
         PROMPT_COMMAND="history -a; history -n; $PROMPT_COMMAND"
+
+        # --- System Health Check ---
+        if systemctl is-system-running --quiet | grep -q "degraded"; then
+          echo -e "\n\e[1;31m  🚨 SYSTEM DEGRADED: Some services failed to start.\e[0m"
+          echo -e "  \e[33mRun 'systemctl --failed' to investigate.\e[0m\n"
+        fi
       '';
 
       shellAliases = {
@@ -54,9 +60,16 @@
           style = "bold orange";
         };
         nix_shell = {
-          symbol = " ";
-          format = "via [$symbol$name]($style) ";
-          style = "bold blue";
+          disabled = true;
+        };
+        custom = {
+          devshell = {
+            description = "Show active isolated devshell";
+            command = "echo -n $STARSHIP_SHELL_SYMBOL$DEV_SHELL_NAME";
+            when = "test -n \"$DEV_SHELL_NAME\"";
+            format = "via [$output]($style) ";
+            style = "bold blue";
+          };
         };
         cmd_duration = {
           min_time = 500;
@@ -201,6 +214,8 @@
             ${pkgs.coreutils}/bin/cp --remove-destination "$ssh_config" "$ssh_config.real"
             ${pkgs.coreutils}/bin/mv "$ssh_config.real" "$ssh_config"
             ${pkgs.coreutils}/bin/chmod 600 "$ssh_config"
+            # Cleanup the backup to prevent collisions on next activation
+            ${pkgs.coreutils}/bin/rm -f "$ssh_config.backup"
           fi
         ''
       );

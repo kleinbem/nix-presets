@@ -110,12 +110,13 @@
           agent-team = import ./containers/agent-team.nix { inherit self; };
           litellm = import ./containers/litellm.nix { inherit self; };
           loki = import ./containers/loki.nix { inherit self; };
-          falco = import ./containers/falco.nix { inherit self; };
           netdata = import ./containers/netdata.nix { inherit self; };
           authelia = import ./containers/authelia.nix { inherit self; };
           waydroid = import ./nixosModules/waydroid.nix { inherit self; };
           android-emulator = import ./nixosModules/android-emulator.nix;
           home-assistant = import ./containers/home-assistant.nix { inherit self; };
+          syncthing = import ./containers/syncthing.nix { inherit self; };
+          backup = import ./containers/backup.nix { inherit self; };
         };
         homeManagerModules = {
           opencode = import ./opencode.nix;

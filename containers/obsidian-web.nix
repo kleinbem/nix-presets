@@ -12,8 +12,14 @@ in
 {
   options.my.containers.obsidian-web = {
     enable = lib.mkEnableOption "Obsidian Web UI (Nix-Native/Distroless)";
-    ip = lib.mkOption { type = lib.types.str; };
-    hostDataDir = lib.mkOption { type = lib.types.str; };
+    ip = lib.mkOption {
+      type = lib.types.str;
+      default = "10.85.46.128/24";
+    };
+    hostDataDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/images/obsidian-web";
+    };
     user = lib.mkOption {
       type = lib.types.str;
       default = "martin";

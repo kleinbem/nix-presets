@@ -14,7 +14,10 @@ in
 {
   options.my.containers.agent-team = {
     enable = lib.mkEnableOption "CrewAI Enterprise Agent Team Container";
-    ip = lib.mkOption { type = lib.types.str; };
+    ip = lib.mkOption {
+      type = lib.types.str;
+      default = "10.85.46.126/24";
+    };
     hostDataDir = lib.mkOption {
       type = lib.types.str;
       default = "/var/lib/images/agent-team";
