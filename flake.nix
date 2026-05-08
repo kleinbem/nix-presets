@@ -9,15 +9,6 @@
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
     pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Redroid GApps
-    gapps-arm64 = {
-      url = "https://github.com/MindTheGapps/16.0.0-arm64/releases/download/MindTheGapps-16.0.0-arm64-20250812_214353/MindTheGapps-16.0.0-arm64-20250812_214353.zip";
-      flake = false;
-    };
-    gapps-amd64 = {
-      url = "path:./pkgs/redroid/placeholder.zip";
-      flake = false;
-    };
     openclaw = {
       url = "github:openclaw/nix-openclaw";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -32,6 +23,7 @@
 
   outputs =
     inputs@{ flake-parts, self, ... }:
+
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" ];
       imports = [ ];
@@ -68,13 +60,7 @@
             ];
           };
 
-          packages =
-            (import ./pkgs/waydroid/default.nix {
-              inherit pkgs;
-            })
-            // (import ./pkgs/redroid/default.nix {
-              inherit pkgs inputs;
-            });
+          packages = { };
         };
 
       flake = {
@@ -112,8 +98,8 @@
           loki = import ./containers/loki.nix { inherit self; };
           netdata = import ./containers/netdata.nix { inherit self; };
           authelia = import ./containers/authelia.nix { inherit self; };
-          waydroid = import ./nixosModules/waydroid.nix { inherit self; };
           android-emulator = import ./nixosModules/android-emulator.nix;
+
           home-assistant = import ./containers/home-assistant.nix { inherit self; };
           syncthing = import ./containers/syncthing.nix { inherit self; };
           backup = import ./containers/backup.nix { inherit self; };
@@ -123,6 +109,7 @@
           terminal = import ./terminal.nix;
           git = import ./git.nix;
           desktop = import ./desktop.nix;
+          dx = import ./dx.nix;
           firefox-browser =
             { ... }:
             {

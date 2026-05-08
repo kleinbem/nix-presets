@@ -51,7 +51,7 @@ in
           allowFrom = [ "all" ];
           browsing = true;
           defaultShared = true;
-          stateless = false; # Fix: bind mount makes /var/lib/cups "busy" for the stateless cleanup script
+          stateless = true;
           extraConf = ''
             DefaultEncryption Never
             ServerAlias *
@@ -62,9 +62,17 @@ in
         hardware.printers = {
           ensurePrinters = [
             {
-              name = "Ricoh_SP_220Nw";
+              name = "Ricoh_SP_220Nw_Legacy";
               deviceUri = "socket://10.0.5.10:9100";
               model = "ricoh/RICOH-SP-220Nw.ppd";
+              ppdOptions = {
+                PageSize = "A4";
+              };
+            }
+            {
+              name = "Ricoh_SP_220Nw"; # New primary driverless entry
+              deviceUri = "ipp://10.0.5.10/ipp/print";
+              model = "everywhere";
               ppdOptions = {
                 PageSize = "A4";
               };

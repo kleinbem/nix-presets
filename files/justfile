@@ -103,7 +103,27 @@ clean:
 
 # System Logs
 logs:
-    journalctl -f
+    @just --justfile ~/.justfile --list | grep logs-
+
+# Show all messages from this boot
+logs-this-boot:
+    journalctl -b 0 --no-hostname
+
+# Show all messages from last boot
+logs-last-boot:
+    journalctl -b -1 --no-hostname
+
+# --- System Diagnostics (Bluefin style) ---
+
+# Run a one minute system benchmark
+benchmark:
+    @echo "🚀 Running a 1 minute system benchmark..."
+    stress-ng --matrix 0 -t 1m --times
+
+# Show BIOS/Hardware info
+bios-info:
+    @echo "🖥️  Hardware Information:"
+    @sudo bash -c 'echo "Manufacturer: $(dmidecode -s baseboard-manufacturer)"; echo "Product Name: $(dmidecode -s baseboard-product-name)"; echo "Version: $(dmidecode -s bios-version)"; echo "Release Date: $(dmidecode -s bios-release-date)"'
 
 # --- Fixes ---
 
@@ -119,3 +139,25 @@ fix-chrome:
     pkill -f google-chrome || true
     just fix-yubikey
     google-chrome-stable > /dev/null 2>&1 &
+
+# --- Developer Experience (DX) ---
+
+# Create a standard Fedora development distrobox
+dx-create-fedora name="fedora-dev":
+    distrobox create --image registry.fedoraproject.org/fedora:40 --name {{name}}
+
+# Create a standard Ubuntu development distrobox
+dx-create-ubuntu name="ubuntu-dev":
+    distrobox create --image ubuntu:24.04 --name {{name}}
+
+# Enter a distrobox
+dx-enter name="fedora-dev":
+    distrobox enter {{name}}
+
+# List all distroboxes
+dx-list:
+    distrobox list
+
+# Update all distroboxes
+dx-update:
+    distrobox upgrade --all

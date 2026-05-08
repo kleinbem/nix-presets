@@ -81,6 +81,8 @@ in
     pkgs.nur.repos.rycee.firefox-addons.tab-session-manager
     pkgs.nur.repos.rycee.firefox-addons.tab-stash
     pkgs.nur.repos.rycee.firefox-addons.sidebery
+    pkgs.nur.repos.rycee.firefox-addons.sponsorblock
+    pkgs.nur.repos.rycee.firefox-addons.languagetool
   ];
 
   # --- Level 2: Laboratory (AI & Power User) ---
@@ -101,6 +103,7 @@ in
       tab-stash
       markdownload
       violentmonkey
+      auto-tab-discard
     ]);
 
   # --- Level 3: Vault (Banking & Sensitive) ---
@@ -113,5 +116,5 @@ in
     "browser.privatebrowsing.autostart" = false;
     "network.IDN_show_punycode" = true; # Phishing protection
   };
-  vaultExtensions = commonExtensions; # Keep minimal
+  vaultExtensions = commonExtensions ++ [ pkgs.nur.repos.rycee.firefox-addons.sidebery ]; # Keep minimal, but ensure UI consistency
 }

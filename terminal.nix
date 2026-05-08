@@ -16,9 +16,28 @@
         shopt -s histappend
         PROMPT_COMMAND="history -a; history -n; $PROMPT_COMMAND"
 
+        # --- Bluefin-inspired Welcome Banner ---
+        if [[ -z "$TERMINAL_MOTD_SHOWN" && ! -f "$HOME/.config/no-show-user-motd" ]]; then
+          export TERMINAL_MOTD_SHOWN=1
+          echo -e "\n\e[1;37;44m 🚀 Welcome to your Nix Station \e[0m"
+          echo -e "\e[38;5;244m 󱄅  $(hostname) | NixOS $(nixos-version | cut -d' ' -f1) \e[0m\n"
+
+          echo -e " \e[1;34m>_ Command\e[0m             | \e[1;34mDescription\e[0m"
+          echo -e " -----------------------|---------------------------------------"
+          echo -e " \e[31mos\e[0m                     | Show all available system commands"
+          echo -e " \e[31mos rebuild\e[0m             | Apply changes to your configuration"
+          echo -e " \e[31mos clean\e[0m               | Clean up old generations & free space"
+          echo -e " \e[31mopen <file>\e[0m            | Open any file or URL from terminal"
+          echo -e " \e[31mdevenv shell\e[0m          | Enter a project-specific dev environment"
+          echo ""
+          echo -e " • 󰊤 \e[32mRepo\e[0m   \e[4mhttps://github.com/kleinbem/nix\e[0m"
+          echo -e " • 󰋖 \e[32mDocs\e[0m   \e[4mhttps://nixos.org/manual/nixos/stable/\e[0m"
+          echo ""
+        fi
+
         # --- System Health Check ---
         if systemctl is-system-running --quiet | grep -q "degraded"; then
-          echo -e "\n\e[1;31m  🚨 SYSTEM DEGRADED: Some services failed to start.\e[0m"
+          echo -e "\e[1;31m  🚨 SYSTEM DEGRADED: Some services failed to start.\e[0m"
           echo -e "  \e[33mRun 'systemctl --failed' to investigate.\e[0m\n"
         fi
       '';
@@ -34,6 +53,7 @@
 
         # System Control
         os = "just --justfile ~/.justfile";
+        open = "xdg-open";
       };
     };
 
@@ -43,7 +63,7 @@
         add_newline = true;
         scan_timeout = 100;
         character = {
-          success_symbol = "[➜](bold green)";
+          success_symbol = "[➜](bold cyan)";
           error_symbol = "[✗](bold red)";
         };
         directory = {
@@ -158,7 +178,7 @@
     };
 
     sessionVariables = {
-      TERMINAL = "cosmic-terminal";
+      TERMINAL = "ptyxis";
     };
 
     packages = with pkgs; [
