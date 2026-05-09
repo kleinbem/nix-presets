@@ -39,34 +39,9 @@
         {
           formatter = inputs.nix-devshells.formatter.${system};
 
-          checks.pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
-            src = ./.;
-            hooks = {
-              nixfmt.enable = true;
-              statix.enable = true;
-              deadnix.enable = true;
-            };
-          };
-
-          devShells.default = pkgs.mkShell {
-            shellHook = ''
-              ${config.checks.pre-commit-check.shellHook}
-              echo "🧩 Presets Flake DevEnv"
-            '';
-            buildInputs = [
-              pkgs.nixfmt
-              pkgs.statix
-              pkgs.deadnix
-            ];
-          };
-
-          packages = { };
-
           # ---------------------------------------------------------
-          # Container Verification Checks
+          # Checks & Verifications
           # ---------------------------------------------------------
-          # This ensures that all container modules exported by this flake
-          # can actually evaluate correctly in a NixOS configuration.
           checks =
             let
               # Helper to create a minimal check for a NixOS module
@@ -100,7 +75,31 @@
                 name: module: inputs.nixpkgs.lib.nameValuePair "module-${name}" (mkModuleCheck module)
               ) (inputs.nixpkgs.lib.filterAttrs (n: _: !(builtins.elem n excludedModules)) self.nixosModules);
             in
-            config.checks.pre-commit-check // moduleChecks;
+            {
+              pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
+                src = ./.;
+                hooks = {
+                  nixfmt.enable = true;
+                  statix.enable = true;
+                  deadnix.enable = true;
+                };
+              };
+            }
+            // moduleChecks;
+
+          devShells.default = pkgs.mkShell {
+            shellHook = ''
+              ${config.checks.pre-commit-check.shellHook}
+              echo "🧩 Presets Flake DevEnv"
+            '';
+            buildInputs = [
+              pkgs.nixfmt
+              pkgs.statix
+              pkgs.deadnix
+            ];
+          };
+
+          packages = { };
         };
 
       flake = {
