@@ -61,6 +61,46 @@
           };
 
           packages = { };
+
+          # ---------------------------------------------------------
+          # Container Verification Checks
+          # ---------------------------------------------------------
+          # This ensures that all container modules exported by this flake
+          # can actually evaluate correctly in a NixOS configuration.
+          checks =
+            let
+              # Helper to create a minimal check for a NixOS module
+              mkModuleCheck =
+                module:
+                (inputs.nixpkgs.lib.nixosSystem {
+                  inherit system;
+                  modules = [
+                    module
+                    # Provide minimal requirements for the container factory
+                    {
+                      my.network.bridge = "br0";
+                      my.hardware.gpuRenderNode = "/dev/dri/renderD128";
+                      boot.isContainer = true;
+                      system.stateVersion = "25.11";
+                      # Mock sops if used
+                      sops.templates = inputs.nixpkgs.lib.mkOptionDefault { };
+                      sops.secrets = inputs.nixpkgs.lib.mkOptionDefault { };
+                    }
+                  ];
+                }).config.system.build.toplevel;
+
+              # Exclude modules that require complex external inputs or specific setups
+              # for basic evaluation testing.
+              excludedModules = [
+                "container-common" # Basic helper, not a full module
+                "monitoring-node" # Requires more host-level setup
+              ];
+
+              moduleChecks = inputs.nixpkgs.lib.mapAttrs' (
+                name: module: inputs.nixpkgs.lib.nameValuePair "module-${name}" (mkModuleCheck module)
+              ) (inputs.nixpkgs.lib.filterAttrs (n: _: !(builtins.elem n excludedModules)) self.nixosModules);
+            in
+            config.checks.pre-commit-check // moduleChecks;
         };
 
       flake = {
