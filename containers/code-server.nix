@@ -24,6 +24,14 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "4G";
     };
+    privateUsers = lib.mkOption {
+      type = lib.types.str;
+      default = "pick";
+    };
+    autoStart = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+    };
   }
   // tlsOpts;
 
@@ -44,7 +52,7 @@ in
           text = ''
             mkdir -p /home/${cfg.user}/.local/share/code-server/User
             ln -sf ${pkgs.writeText "code-server-settings.json" (builtins.toJSON commonData.settings)} /home/${cfg.user}/.local/share/code-server/User/settings.json
-            chown -R ${cfg.user}:users /home/${cfg.user}/.local/share/code-server
+            chown -R ${cfg.user}:users /home/${cfg.user}/.local
           '';
         };
 
@@ -56,7 +64,10 @@ in
           auth = "none";
           disableTelemetry = true;
         };
-        networking.firewall.allowedTCPPorts = [ 4444 ];
+        networking.firewall.allowedTCPPorts = [
+          8080
+          4444
+        ];
       };
     bindMounts = {
       "/home/${cfg.user}/Develop" = {

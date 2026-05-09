@@ -23,6 +23,22 @@ in
       default = "/var/lib/images/agent-team";
       description = "Where to store container images and persistent podman state.";
     };
+    autoStart = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+    };
+    memoryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    cpuLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    secretsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
 
     # Team Configuration
     agents = lib.mkOption {
@@ -123,31 +139,79 @@ in
           CREWAI_TELEMETRY_OPT_OUT = "true";
           # Python specific
           PYTHONUNBUFFERED = "1";
+          PYTHONPATH = "/app/workspace";
           UV_PROJECT_ENVIRONMENT = "/app/state/venv";
         };
 
         serviceConfig = {
           Type = "simple";
           WorkingDirectory = "/app/workspace";
+          EnvironmentFile = lib.optional (cfg.secretsFile != null) "/run/secrets/agent-team.env";
           # First-run initialization and then start orchestrator
-          ExecStart = pkgs.writeShellScript "start-crew" ''
-            if [ ! -d "/app/state/venv" ]; then
-              echo "⚙️ Initializing 'Distroless' Python environment with uv..."
-              # Use the Nix-provided Python instead of downloading one
-              ${pkgs.uv}/bin/uv venv --python ${pkgs.python3}/bin/python3 /app/state/venv
-              ${pkgs.uv}/bin/uv pip install --no-cache crewai langfuse
-            fi
+          ExecStart =
+            let
+              # Helper to escape Python strings
+              pyStr = s: "'''${s}'''";
 
-            if [ ! -f "/app/state/venv/bin/activate" ]; then
-              echo "❌ Failed to initialize virtualenv. Retrying next time."
-              exit 1
-            fi
+              # Generate the Python agent definitions
+              agentsPy = lib.concatStringsSep "\n" (
+                lib.mapAttrsToList (name: agent: ''
+                  ${name} = Agent(
+                      role=${pyStr agent.role},
+                      goal=${pyStr agent.goal},
+                      backstory=${pyStr agent.backstory},
+                      allow_delegation=${if agent.allowDelegation then "True" else "False"},
+                      memory=${if agent.memory then "True" else "False"},
+                      verbose=${if agent.verbose then "True" else "False"}
+                  )
+                '') cfg.agents
+              );
 
-            echo "🚀 CrewAI Team Ready. Roles Loaded: ${lib.concatStringsSep ", " (lib.attrNames cfg.agents)}"
-            source /app/state/venv/bin/activate
-            # For now, tail to keep service alive if no main entrypoint yet
-            tail -f /dev/null 
-          '';
+              mainPy = pkgs.writeText "main.py" ''
+                import os
+                from crewai import Agent, Task, Crew, Process
+
+                # Initialize Agents from Nix Configuration
+                ${agentsPy}
+
+                # Define a generic task for the team
+                # In a real scenario, this would be driven by an external API or file
+                task1 = Task(
+                    description="Audit the current NixOS security policies in the workspace and suggest improvements.",
+                    expected_output="A detailed security audit report with actionable Nix code snippets.",
+                    agent=auditor if 'auditor' in locals() else developer
+                )
+
+                # Instantiate the Crew
+                crew = Crew(
+                    agents=[${lib.concatStringsSep ", " (lib.attrNames cfg.agents)}],
+                    tasks=[task1],
+                    process=Process.${cfg.manager.process},
+                    verbose=True
+                )
+
+                if __name__ == "__main__":
+                    print("🚀 CrewAI Team starting task execution...")
+                    result = crew.kickoff()
+                    print("\n\n✨ FINAL RESULT:\n")
+                    print(result)
+              '';
+            in
+            pkgs.writeShellScript "start-crew" ''
+              if [ ! -d "/app/state/venv" ]; then
+                echo "⚙️ Initializing 'Distroless' Python environment with uv..."
+                ${pkgs.uv}/bin/uv venv --python ${pkgs.python3}/bin/python3 /app/state/venv
+                ${pkgs.uv}/bin/uv pip install --no-cache crewai langfuse
+              fi
+
+              source /app/state/venv/bin/activate
+
+              # Copy the Nix-generated main.py to the workspace if it doesn't exist or has changed
+              cp ${mainPy} /app/workspace/main.py
+
+              echo "🚀 CrewAI Team Ready. Roles Loaded: ${lib.concatStringsSep ", " (lib.attrNames cfg.agents)}"
+              python3 /app/workspace/main.py
+            '';
           Restart = "on-failure";
           RestartSec = "10s";
         };
@@ -164,16 +228,23 @@ in
       ];
     };
 
-    bindMounts = {
-      # Redirect internal paths to host persistence
-      "/app/workspace" = {
-        hostPath = "${cfg.hostDataDir}/workspace";
-        isReadOnly = false;
+    bindMounts =
+      (lib.optionalAttrs (cfg.secretsFile != null) {
+        "/run/secrets/agent-team.env" = {
+          hostPath = cfg.secretsFile;
+          isReadOnly = true;
+        };
+      })
+      // {
+        # Redirect internal paths to host persistence
+        "/app/workspace" = {
+          hostPath = "${cfg.hostDataDir}/workspace";
+          isReadOnly = false;
+        };
+        "/app/state" = {
+          hostPath = "${cfg.hostDataDir}/state";
+          isReadOnly = false;
+        };
       };
-      "/app/state" = {
-        hostPath = "${cfg.hostDataDir}/state";
-        isReadOnly = false;
-      };
-    };
   });
 }
