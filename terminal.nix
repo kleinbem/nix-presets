@@ -9,6 +9,14 @@
     bash = {
       enable = true;
       initExtra = ''
+        # --- YubiKey SSH Agent Stability ---
+        # Detect if we are using the restricted GNOME keyring agent and replace it with a full ssh-agent
+        # We include a whitelist (-P) so the agent is allowed to load the OpenSC driver from the Nix store.
+        if [[ -z "$SSH_AUTH_SOCK" || "$SSH_AUTH_SOCK" == *"/keyring/ssh" ]]; then
+          eval $(ssh-agent -s -P "/nix/store/*,/run/current-system/*") > /dev/null
+          ssh-add -s /run/current-system/sw/lib/opensc-pkcs11.so 2>/dev/null || true
+        fi
+
         # History Sync
         export HISTCONTROL=ignoreboth:erasedups
         export HISTSIZE=100000
@@ -48,13 +56,24 @@
         tree = "eza --tree --icons";
         update = "nh os switch";
         cleanup = "nh clean all";
-        yubi-mount = "ssh-add -s ${pkgs.opensc}/lib/opensc-pkcs11.so";
+        yubi-mount = "ssh-add -s /run/current-system/sw/lib/opensc-pkcs11.so";
         hm-logs = "journalctl -xeu home-manager-${config.home.username}.service";
 
         # System Control
         os = "just --justfile ~/.justfile";
         open = "xdg-open";
       };
+    };
+
+    zsh = {
+      enable = true;
+      initContent = ''
+        # --- YubiKey SSH Agent Stability ---
+        if [[ -z "$SSH_AUTH_SOCK" || "$SSH_AUTH_SOCK" == *"/keyring/ssh" ]]; then
+          eval $(ssh-agent -s -P "/nix/store/*,/run/current-system/*") > /dev/null
+          ssh-add -s /run/current-system/sw/lib/opensc-pkcs11.so 2>/dev/null || true
+        fi
+      '';
     };
 
     starship = {
