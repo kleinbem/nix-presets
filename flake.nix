@@ -52,15 +52,42 @@
                   modules = [
                     module
                     # Provide minimal requirements for the container factory
-                    {
-                      my.network.bridge = "br0";
-                      my.hardware.gpuRenderNode = "/dev/dri/renderD128";
-                      boot.isContainer = true;
-                      system.stateVersion = "25.11";
-                      # Mock sops if used
-                      sops.templates = inputs.nixpkgs.lib.mkOptionDefault { };
-                      sops.secrets = inputs.nixpkgs.lib.mkOptionDefault { };
-                    }
+                    (
+                      { lib, ... }:
+                      {
+                        options.my = {
+                          network.bridge = lib.mkOption {
+                            type = lib.types.str;
+                            default = "br0";
+                          };
+                          hardware.gpuRenderNode = lib.mkOption {
+                            type = lib.types.str;
+                            default = "/dev/dri/renderD128";
+                          };
+                          username = lib.mkOption {
+                            type = lib.types.str;
+                            default = "test";
+                          };
+                        };
+                        options.sops = {
+                          templates = lib.mkOption {
+                            type = lib.types.attrsOf lib.types.attrs;
+                            default = { };
+                          };
+                          secrets = lib.mkOption {
+                            type = lib.types.attrsOf lib.types.attrs;
+                            default = { };
+                          };
+                        };
+                        config = {
+                          boot.isContainer = true;
+                          system.stateVersion = "25.11";
+                          # Mock sops if used
+                          sops.templates = lib.mkOptionDefault { };
+                          sops.secrets = lib.mkOptionDefault { };
+                        };
+                      }
+                    )
                   ];
                 }).config.system.build.toplevel;
 
