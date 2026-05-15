@@ -52,9 +52,13 @@ let
 
     # --- UI Customization ---
     "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
+
+    # --- Native Vertical Tabs (Input from Heise/Archive) ---
+    "sidebar.revamp" = true;
+    "sidebar.verticalTabs" = true;
+    "sidebar.main.width" = 220;
   };
 
-  # Common extensions for ALL profiles
   commonExtensions = with pkgs.nur.repos.rycee.firefox-addons; [
     bitwarden
     ublock-origin
@@ -63,6 +67,7 @@ let
     multi-account-containers
     clearurls
     consent-o-matic
+    markdownload
   ];
 in
 {
@@ -74,13 +79,22 @@ in
     "privacy.firstparty.isolate" = true;
     "dom.event.clipboardevents.enabled" = true;
     "media.peerconnection.enabled" = true;
+
+    # --- AI Support ---
+    "browser.ml.enable" = true;
+    "browser.ml.chat.enabled" = true;
+    "browser.ml.chat.page" = true;
+    "browser.ml.chat.menu" = true;
+    "pdfjs.enableAltTextModelDownload" = true;
+    "pdfjs.enableGuessAltText" = true;
+    "browser.tabs.groups.enabled" = true;
+    "browser.labs.tab-notes.enabled" = true;
   };
   standardExtensions = commonExtensions ++ [
     pkgs.nur.repos.rycee.firefox-addons.localcdn
     pkgs.nur.repos.rycee.firefox-addons.auto-tab-discard
     pkgs.nur.repos.rycee.firefox-addons.tab-session-manager
     pkgs.nur.repos.rycee.firefox-addons.tab-stash
-    pkgs.nur.repos.rycee.firefox-addons.sidebery
     pkgs.nur.repos.rycee.firefox-addons.sponsorblock
     pkgs.nur.repos.rycee.firefox-addons.languagetool
   ];
@@ -93,17 +107,25 @@ in
     "browser.ml.chat.sidebar" = true;
     "browser.ml.chat.provider" = "https://chat.openai.com";
     "devtools.toolbox.host" = "right"; # Better for split-view
+
+    # --- Full AI Suite & Tab Notes ---
+    "browser.ml.enable" = true;
+    "browser.ml.chat.page" = true;
+    "browser.ml.chat.menu" = true;
+    "pdfjs.enableAltTextModelDownload" = true;
+    "pdfjs.enableGuessAltText" = true;
+    "browser.tabs.groups.enabled" = true;
+    "browser.labs.tab-notes.enabled" = true;
   };
   laboratoryExtensions =
     commonExtensions
     ++ (with pkgs.nur.repos.rycee.firefox-addons; [
       sponsorblock
       languagetool
-      sidebery
       tab-stash
-      markdownload
       violentmonkey
       auto-tab-discard
+      user-agent-string-switcher
     ]);
 
   # --- Level 3: Vault (Banking & Sensitive) ---
@@ -115,6 +137,10 @@ in
     "privacy.clearOnShutdown.history" = true;
     "browser.privatebrowsing.autostart" = false;
     "network.IDN_show_punycode" = true; # Phishing protection
+
+    # --- Explicitly Disable AI for Privacy ---
+    "browser.ml.enable" = false;
+    "browser.ml.chat.enabled" = false;
   };
-  vaultExtensions = commonExtensions ++ [ pkgs.nur.repos.rycee.firefox-addons.sidebery ]; # Keep minimal, but ensure UI consistency
+  vaultExtensions = commonExtensions; # Sidebery removed, keeping UI minimal
 }

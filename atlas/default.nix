@@ -17,6 +17,9 @@ pkgs.writeShellApplication {
     pkgs.nix
     pkgs.sops
     pkgs.systemd
+    pkgs.colmena
+    pkgs.netbird
+    pkgs.btrfs-progs
   ];
 
   text = ''

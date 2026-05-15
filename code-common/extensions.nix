@@ -35,7 +35,6 @@ in
   ai = [
     mkt.github.copilot
     mkt.rooveterinaryinc.roo-cline
-    mkt.supermaven.supermaven
     # WAITING: temporarily disabled because the extension depends on the yanked 2.1.88 src!
     # pkgs.vscode-extensions.anthropic.claude-code
   ];

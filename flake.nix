@@ -140,6 +140,7 @@
           github-runner = import ./containers/github-runner.nix { inherit self; };
           cups = import ./containers/cups.nix { inherit self; };
           ollama = import ./containers/ollama.nix { inherit self; };
+          llama-cpp = import ./containers/llama-cpp.nix { inherit self; };
           n8n = import ./containers/n8n.nix { inherit self; };
           code-server = import ./containers/code-server.nix { inherit self; };
           open-webui = import ./containers/open-webui.nix { inherit self; };
@@ -169,6 +170,8 @@
           home-assistant = import ./containers/home-assistant.nix { inherit self; };
           syncthing = import ./containers/syncthing.nix { inherit self; };
           backup = import ./containers/backup.nix { inherit self; };
+          paperless = import ./containers/paperless.nix { inherit self; };
+          anythingllm = import ./containers/anythingllm.nix { inherit self; };
         };
         homeManagerModules = {
           opencode = import ./opencode.nix;
@@ -182,6 +185,7 @@
               imports = [ ./firefox.nix ];
               _module.args.inputs = inputs;
             };
+          mcp = import ./mcp.nix;
         };
       };
     };

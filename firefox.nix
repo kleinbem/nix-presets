@@ -108,11 +108,11 @@ in
           StartupWMClass = "firefox-devedition";
         };
       };
-      firefox-vault = {
-        name = "Firefox Vault";
-        genericName = "Secure Browser (Beta)";
-        exec = "firefox -P vault %u";
-        icon = "${pkgs.adwaita-icon-theme}/share/icons/Adwaita/symbolic/status/security-high-symbolic.svg";
+      firefox-temp = {
+        name = "Firefox Temp";
+        genericName = "Ephemeral Browser (Beta)";
+        exec = "firefox -P temp %u";
+        icon = "${pkgs.adwaita-icon-theme}/share/icons/Adwaita/symbolic/status/weather-windy-symbolic.svg";
         terminal = false;
         categories = [
           "Network"
@@ -166,15 +166,6 @@ in
               outline-offset: -2px !important;
             }
 
-            /* Sidebar (Sidebery) container tweaks */
-            #sidebar-header {
-              background-color: #1a1a1a !important;
-              color: #efefef !important;
-              border-bottom: 1px solid #333 !important;
-            }
-            #sidebar-box {
-              --sidebar-background-color: #1a1a1a !important;
-            }
           '';
           search = commonSearch;
         };
@@ -195,20 +186,14 @@ in
               outline-offset: -2px !important;
             }
 
-            /* Sidebar (Sidebery) container tweaks */
-            #sidebar-header {
-              background-color: #1a1a1a !important;
-              color: #efefef !important;
-              border-bottom: 1px solid #333 !important;
-            }
           '';
           search = commonSearch;
         };
 
-        # --- Profile 3: Vault (Banking & Sensitive) ---
-        vault = {
+        # --- Profile 3: Temp (Ephemeral & Testing) ---
+        temp = {
           id = 2;
-          name = "vault";
+          name = "temp";
           extensions.packages = browserSettings.vaultExtensions;
           settings = browserSettings.vaultSettings;
           search = commonSearch;

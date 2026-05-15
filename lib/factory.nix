@@ -166,6 +166,8 @@ in
             };
 
             system.stateVersion = mkDefault "25.11";
+            nixpkgs.config.allowUnfree = mkDefault true;
+            nixpkgs.config.allowUnfreePredicate = mkDefault (_: true);
           })
 
           # mTLS Sidecar (only when there's inbound/outbound to proxy)

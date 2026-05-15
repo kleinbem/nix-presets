@@ -51,6 +51,7 @@ in
           allowFrom = [ "all" ];
           browsing = true;
           defaultShared = true;
+          startWhenNeeded = false; # Ensure service is ready for ensurePrinters
           stateless = true;
           extraConf = ''
             DefaultEncryption Never

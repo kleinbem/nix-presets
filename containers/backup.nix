@@ -137,7 +137,10 @@ in
           };
         };
 
-        environment.systemPackages = [ pkgs.rclone ];
+        environment.systemPackages = [
+          pkgs.rclone
+          pkgs.restic
+        ];
       };
 
     # Read-Only Bind Mounts

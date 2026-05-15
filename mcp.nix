@@ -1,71 +1,150 @@
-{ pkgs, config, ... }:
+{
+  pkgs,
+  config,
+  lib,
+  ...
+}:
 
 {
-  # Ensure Atlas is available in the home environment
-  home.packages = [
-    (pkgs.callPackage ./atlas/default.nix { })
-  ];
-
-  sops.secrets = {
-    github_app_id = { };
-    github_app_installation_id = { };
-    github_app_private_key = { };
-    brave_api_key = { };
+  options.modules.mcp = {
+    enable = lib.mkEnableOption "MCP Servers for AI Tools";
   };
 
-  # Secure Claude Config
-  sops.templates."Claude/claude_desktop_config.json" = {
-    path = "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json";
-    content = builtins.toJSON {
-      mcpServers = {
-        # 1. Workspace Atlas (Native command)
-        workspace-atlas = {
-          command = "atlas";
-          args = [
-            "mcp"
-            "launch"
-            "atlas"
-            "${pkgs.python3}/bin/python3"
-            "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
-          ];
-        };
+  config = lib.mkIf config.modules.mcp.enable {
+    # Ensure Atlas and Python with MCP are available in the home environment
+    home.packages = [
+      (pkgs.callPackage ./atlas/default.nix { })
+      (pkgs.python3.withPackages (
+        ps: with ps; [
+          mcp
+          google-auth
+          google-auth-oauthlib
+          google-api-python-client
+          requests
+          psutil
+        ]
+      ))
+    ];
 
-        # 2. GitHub (Secure, Short-Lived Tokens)
-        github = {
-          command = "atlas";
-          args = [
-            "mcp"
-            "launch"
-            "github"
-            "${pkgs.nodejs_22}/bin/npx"
-            "-y"
-            "@modelcontextprotocol/server-github"
-          ];
-        };
-
-        # 3. Brave Search (Secure, No disk secrets)
-        brave-search = {
-          command = "atlas";
-          args = [
-            "mcp"
-            "launch"
-            "brave-search"
-            "${pkgs.nodejs_22}/bin/npx"
-            "-y"
-            "@modelcontextprotocol/server-brave-search"
-          ];
-        };
-
-        # 4. Standard Servers
-        filesystem = {
-          command = "${pkgs.nodejs_22}/bin/npx";
-          args = [
-            "-y"
-            "@modelcontextprotocol/server-filesystem"
-            "${config.home.homeDirectory}/Develop"
-          ];
-        };
-      };
+    sops.secrets = {
+      github_app_id = { };
+      github_app_installation_id = { };
+      github_app_private_key = { };
     };
+
+    # Secure Claude Config
+    sops.templates."Claude/claude_desktop_config.json" = {
+      path = "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json";
+      content =
+        let
+          pythonWithMcp = pkgs.python3.withPackages (
+            ps: with ps; [
+              mcp
+              google-auth
+              google-auth-oauthlib
+              google-api-python-client
+              requests
+              psutil
+            ]
+          );
+        in
+        builtins.toJSON {
+          mcpServers = {
+            # 1. Workspace Atlas (Native command)
+            workspace-atlas = {
+              command = "${pythonWithMcp}/bin/python3";
+              args = [
+                "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
+              ];
+            };
+
+            # 2. GitHub (Secure, Short-Lived Tokens)
+            github = {
+              command = "atlas";
+              args = [
+                "mcp"
+                "launch"
+                "github"
+                "${pkgs.nodejs_22}/bin/npx"
+                "-y"
+                "@modelcontextprotocol/server-github"
+              ];
+            };
+
+            # 3. Standard Servers
+            filesystem = {
+              command = "${pkgs.nodejs_22}/bin/npx";
+              args = [
+                "-y"
+                "@modelcontextprotocol/server-filesystem"
+                "${config.home.homeDirectory}/Develop"
+              ];
+            };
+          };
+        };
+    };
+
+    # ---------------------------------------------------------
+    # Roo-Cline (Editor AI) Integration
+    # ---------------------------------------------------------
+    # This automatically registers the MCP servers in your editors
+    home.file =
+      let
+        pythonWithMcp = pkgs.python3.withPackages (
+          ps: with ps; [
+            mcp
+            google-auth
+            google-auth-oauthlib
+            google-api-python-client
+            requests
+            psutil
+          ]
+        );
+        mcpConfig = {
+          mcpServers = {
+            workspace-atlas = {
+              command = "${pythonWithMcp}/bin/python3";
+              args = [
+                "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
+              ];
+            };
+            github = {
+              command = "atlas";
+              args = [
+                "mcp"
+                "launch"
+                "github"
+                "${pkgs.nodejs_22}/bin/npx"
+                "-y"
+                "@modelcontextprotocol/server-github"
+              ];
+            };
+            filesystem = {
+              command = "${pkgs.nodejs_22}/bin/npx";
+              args = [
+                "-y"
+                "@modelcontextprotocol/server-filesystem"
+                "${config.home.homeDirectory}/Develop"
+              ];
+            };
+            cloudrun = {
+              command = "${pkgs.nodejs_22}/bin/npx";
+              args = [
+                "-y"
+                "@google-cloud/cloud-run-mcp"
+              ];
+            };
+          };
+        };
+      in
+      {
+        ".gemini/antigravity/mcp_config.json".text = builtins.toJSON mcpConfig;
+        ".config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json".text =
+          builtins.toJSON mcpConfig;
+        ".config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json".text =
+          builtins.toJSON mcpConfig;
+        ".config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json".text =
+          builtins.toJSON mcpConfig;
+      };
   };
 }
