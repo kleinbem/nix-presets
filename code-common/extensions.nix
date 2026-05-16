@@ -17,7 +17,6 @@ in
     mkt.tamasfe.even-better-toml
 
     # --- Coding & Git ---
-    mkt.eamodio.gitlens
     mkt.waderyan.gitblame
     mkt.ms-python.python
 
