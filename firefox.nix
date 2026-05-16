@@ -35,7 +35,6 @@ in
 
   config = lib.mkIf cfg.enable {
     home.packages = [
-      pkgs.firefox-beta
       pkgs.firefox-devedition
     ];
 
@@ -135,6 +134,7 @@ in
 
     programs.firefox = {
       enable = true;
+      package = pkgs.firefox-beta;
       configPath = ".mozilla/firefox";
 
       nativeMessagingHosts = [ pkgs.bitwarden-desktop ];
