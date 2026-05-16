@@ -23,7 +23,9 @@ in
   config = lib.mkIf cfg.enable (mkContainer {
     inherit config;
     name = "crowdsec";
-    inherit cfg;
+    cfg = cfg // {
+      privateUsers = "no";
+    };
     innerConfig = {
       services.crowdsec = {
         enable = true;

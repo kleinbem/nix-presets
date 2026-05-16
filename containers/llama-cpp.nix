@@ -56,7 +56,6 @@ in
 
       # Ensure we have the right license for CUDA components
       nixpkgs = {
-        perl.enable = false;
         config = {
           allowUnfree = true;
           allowUnfreePredicate = _: true;
