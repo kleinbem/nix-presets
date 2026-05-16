@@ -50,7 +50,6 @@ in
       # Disable all unnecessary NixOS features to reduce surface area
       documentation.enable = false;
       programs.command-not-found.enable = false;
-      environment.noXlibs = true;
       services.udisks2.enable = false;
       boot.isContainer = true;
 
