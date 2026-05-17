@@ -17,6 +17,8 @@
       (pkgs.python3.withPackages (
         ps: with ps; [
           mcp
+          pydantic
+          pydantic-core
           google-auth
           google-auth-oauthlib
           google-api-python-client
@@ -40,6 +42,8 @@
           pythonWithMcp = pkgs.python3.withPackages (
             ps: with ps; [
               mcp
+              pydantic
+              pydantic-core
               google-auth
               google-auth-oauthlib
               google-api-python-client
@@ -89,11 +93,13 @@
     # Roo-Cline (Editor AI) Integration
     # ---------------------------------------------------------
     # This automatically registers the MCP servers in your editors
-    home.file =
+    home.activation.setupMcpConfigs =
       let
         pythonWithMcp = pkgs.python3.withPackages (
           ps: with ps; [
             mcp
+            pydantic
+            pydantic-core
             google-auth
             google-auth-oauthlib
             google-api-python-client
@@ -138,15 +144,25 @@
             };
           };
         };
+        mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
       in
-      {
-        ".gemini/antigravity/mcp_config.json".text = builtins.toJSON mcpConfig;
-        ".config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json".text =
-          builtins.toJSON mcpConfig;
-        ".config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json".text =
-          builtins.toJSON mcpConfig;
-        ".config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json".text =
-          builtins.toJSON mcpConfig;
-      };
+      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        mkdir -p "${config.home.homeDirectory}/.gemini/antigravity"
+        mkdir -p "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+        mkdir -p "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+        mkdir -p "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+
+        cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
+        chmod 644 "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
+
+        cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+        chmod 644 "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+
+        cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+        chmod 644 "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+
+        cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+        chmod 644 "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+      '';
   };
 }
