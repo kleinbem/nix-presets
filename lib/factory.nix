@@ -136,6 +136,8 @@ in
           (_: {
             networking = {
               hostName = cfg.hostName or name;
+              defaultGateway = mkDefault config.my.network.hostAddress;
+              nameservers = mkDefault [ config.my.network.hostAddress ];
               firewall.enable = mkDefault true;
               nftables.enable = mkDefault true;
 

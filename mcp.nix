@@ -54,6 +54,7 @@
             workspace-atlas = {
               command = "${pythonWithMcp}/bin/python3";
               args = [
+                "-u"
                 "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
               ];
             };
@@ -105,6 +106,7 @@
             workspace-atlas = {
               command = "${pythonWithMcp}/bin/python3";
               args = [
+                "-u"
                 "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
               ];
             };

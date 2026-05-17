@@ -56,7 +56,7 @@
         tree = "eza --tree --icons";
         update = "nh os switch";
         cleanup = "nh clean all";
-        yubi-mount = "ssh-add -s /run/current-system/sw/lib/opensc-pkcs11.so";
+        yubi-mount = "ssh-add -e /run/current-system/sw/lib/opensc-pkcs11.so 2>/dev/null; sleep 0.5; ssh-add -s /run/current-system/sw/lib/opensc-pkcs11.so";
         hm-logs = "journalctl -xeu home-manager-${config.home.username}.service";
 
         # System Control
