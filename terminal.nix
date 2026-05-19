@@ -170,19 +170,17 @@
     ssh = {
       enable = true;
       enableDefaultConfig = false;
-      matchBlocks = {
+      settings = {
         "*" = {
-          addKeysToAgent = "yes";
-          controlMaster = "auto";
-          controlPath = "~/.ssh/control-%C";
-          controlPersist = "4h";
-          serverAliveInterval = 60;
+          AddKeysToAgent = "yes";
+          ControlMaster = "auto";
+          ControlPath = "~/.ssh/control-%C";
+          ControlPersist = "4h";
+          ServerAliveInterval = 60;
         };
         "github.com" = {
-          user = "git";
-          extraOptions = {
-            PKCS11Provider = "${pkgs.opensc}/lib/opensc-pkcs11.so";
-          };
+          User = "git";
+          PKCS11Provider = "${pkgs.opensc}/lib/opensc-pkcs11.so";
         };
       };
     };
