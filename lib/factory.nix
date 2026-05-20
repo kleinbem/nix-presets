@@ -138,7 +138,10 @@ in
               hostName = cfg.hostName or name;
               defaultGateway = lib.mkForce config.my.network.hostAddress;
               nameservers = lib.mkForce [ config.my.network.hostAddress ];
-              resolvconf.enable = lib.mkForce false;
+              resolvconf.extraConfig = lib.mkForce ''
+                name_servers='${config.my.network.hostAddress}'
+                resolv_conf_local_only=NO
+              '';
               firewall.enable = mkDefault true;
               nftables.enable = mkDefault true;
 
