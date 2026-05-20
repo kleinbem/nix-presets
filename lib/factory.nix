@@ -136,8 +136,9 @@ in
           (_: {
             networking = {
               hostName = cfg.hostName or name;
-              defaultGateway = mkDefault config.my.network.hostAddress;
-              nameservers = mkDefault [ config.my.network.hostAddress ];
+              defaultGateway = lib.mkForce config.my.network.hostAddress;
+              nameservers = lib.mkForce [ config.my.network.hostAddress ];
+              resolvconf.enable = lib.mkForce false;
               firewall.enable = mkDefault true;
               nftables.enable = mkDefault true;
 
