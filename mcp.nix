@@ -28,12 +28,6 @@
       ))
     ];
 
-    sops.secrets = {
-      github_app_id = { };
-      github_app_installation_id = { };
-      github_app_private_key = { };
-    };
-
     # Secure Claude Config
     sops.templates."Claude/claude_desktop_config.json" = {
       path = "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json";

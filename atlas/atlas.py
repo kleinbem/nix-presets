@@ -42,7 +42,30 @@ class AtlasEngine:
             return {"error": str(e)}
 
     def get_secret(self, key):
-        """Fetches a secret via SOPS without writing to disk."""
+        """Fetches a secret. First checks decrypted paths (avoiding YubiKey prompts), then falls back to SOPS."""
+        # 1. Check NixOS system-level sops path
+        sys_path = f"/run/secrets/{key}"
+        if os.path.exists(sys_path) and os.access(sys_path, os.R_OK):
+            try:
+                with open(sys_path, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        return content
+            except Exception:
+                pass
+
+        # 2. Check Home Manager sops-nix path
+        user_path = os.path.expanduser(f"~/.config/sops-nix/secrets/{key}")
+        if os.path.exists(user_path) and os.access(user_path, os.R_OK):
+            try:
+                with open(user_path, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        return content
+            except Exception:
+                pass
+
+        # 3. Fall back to running SOPS CLI
         try:
             # Use the centralized nix-secrets repository
             secrets_path = f"{self.flake_root}/nix-secrets/secrets.yaml"
