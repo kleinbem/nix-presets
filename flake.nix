@@ -40,7 +40,11 @@
           ...
         }:
         let
-          pkgsWithExts = pkgs.extend inputs.nix-vscode-extensions.overlays.default;
+          pkgsUnfree = import inputs.nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
+          pkgsWithExts = pkgsUnfree.extend inputs.nix-vscode-extensions.overlays.default;
           bundles = import ./code-common/bundles.nix { pkgs = pkgsWithExts; };
         in
         # Custom pkgs for standalone app building (needs unfree + stable alias)
