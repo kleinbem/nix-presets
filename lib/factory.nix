@@ -172,8 +172,13 @@ in
             };
 
             system.stateVersion = mkDefault "25.11";
-            nixpkgs.config.allowUnfree = mkDefault true;
-            nixpkgs.config.allowUnfreePredicate = mkDefault (_: true);
+            nixpkgs.config = {
+              allowUnfree = mkDefault true;
+              allowUnfreePredicate = mkDefault (_: true);
+              permittedInsecurePackages = [
+                "nodejs-20.20.2"
+              ];
+            };
           })
 
           # mTLS Sidecar (only when there's inbound/outbound to proxy)

@@ -82,6 +82,10 @@
                         config = {
                           boot.isContainer = true;
                           system.stateVersion = "25.11";
+                          nixpkgs.config.allowUnfree = true;
+                          nixpkgs.config.permittedInsecurePackages = [
+                            "nodejs-20.20.2"
+                          ];
                           # Mock sops if used
                           sops.templates = lib.mkOptionDefault { };
                           sops.secrets = lib.mkOptionDefault { };
