@@ -6,41 +6,24 @@
 
 let
   commonData = import ./code-common/settings.nix;
-  extensions = import ./code-common/extensions.nix { inherit pkgs; };
 
-  # Helper to bundle extensions
-  mkBundle =
-    name: exts:
-    pkgs.symlinkJoin {
-      name = "${name}-extensions-bundle";
-      paths = exts;
-    };
-
-  bundleAntigravity = mkBundle "antigravity" (
-    extensions.common ++ extensions.ai ++ extensions.vscodeExtra
-  );
-  bundleCursor = mkBundle "cursor" (extensions.common ++ extensions.ai ++ extensions.cursorExtra);
-  bundleWindsurf = mkBundle "windsurf" (extensions.common ++ extensions.ai);
-
-  # The Unified "Code Family"
+  # The Unified "Code Family" — bundles are built and synced independently
+  # via `just extensions::sync`, not as part of nixos-rebuild.
   codeFamily = [
     {
       name = "Antigravity";
       configDir = ".config/antigravity";
       extDir = ".config/antigravity/extensions";
-      bundle = bundleAntigravity;
     }
     {
       name = "Cursor";
       configDir = ".config/cursor";
       extDir = ".config/cursor/extensions";
-      bundle = bundleCursor;
     }
     {
       name = "Windsurf";
       configDir = ".config/windsurf";
       extDir = ".config/windsurf/extensions";
-      bundle = bundleWindsurf;
     }
   ];
 
@@ -136,28 +119,11 @@ in
       $DRY_RUN_CMD mkdir -p $HOME/GoogleDrive $HOME/OneDrive
     '';
 
-    # Sync Extensions Script (Runs on switch)
-    # This creates symlinks from the generated extensions.nix profile to each editor's extension dir.
+    # Prepare extension directories — extensions are synced separately via `just extensions::sync`.
     activation.syncCodeFamily = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       ${lib.concatMapStrings (app: ''
-        echo "⚡ Syncing ${app.name} extensions to isolated storage..."
         mkdir -p $HOME/${app.extDir}
         mkdir -p $HOME/${app.configDir}/data
-
-        # Link each extension from the Nix profile (app.bundle)
-        # We iterate over the store path to find the extensions
-        for ext in ${app.bundle}/share/vscode/extensions/*; do
-          target="$HOME/${app.extDir}/$(basename $ext)"
-          
-          # Force remove existing target (link or dir) to prevent dereferencing
-          if [ -e "$target" ] || [ -L "$target" ]; then
-            rm -rf "$target"
-          fi
-          
-          # Create fresh symlink
-          ln -sf "$ext" "$target"
-        done
-
       '') codeFamily}
     '';
   };

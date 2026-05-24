@@ -18,7 +18,7 @@ in
 
     # --- Coding & Git ---
     mkt.waderyan.gitblame
-    mkt.ms-python.python
+    # mkt.ms-python.python  # disabled: jedi-language-server-0.46.0 requires jedi<0.20, nixpkgs has 0.20.0
 
     # --- Productivity ---
     mkt.usernamehw.errorlens

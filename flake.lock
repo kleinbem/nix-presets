@@ -1795,6 +1795,26 @@
         "type": "github"
       }
     },
+    "nix-vscode-extensions": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1779595605,
+        "narHash": "sha256-nMGXHVI+rdKaUr7P9DtlKgNx5iWuK8RvxQQ23l8Ei+U=",
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "rev": "f2589bef04e71bff39d15a07e680021d2ee3818c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "type": "github"
+      }
+    },
     "nix2container": {
       "inputs": {
         "nixpkgs": [
@@ -2633,6 +2653,7 @@
         "flake-parts": "flake-parts",
         "nix-devshells": "nix-devshells",
         "nix-packages": "nix-packages",
+        "nix-vscode-extensions": "nix-vscode-extensions",
         "nixpkgs": "nixpkgs_13",
         "openclaw": "openclaw",
         "pre-commit-hooks": "pre-commit-hooks_8",

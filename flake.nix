@@ -4,6 +4,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    nix-vscode-extensions = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
@@ -35,6 +39,10 @@
           system,
           ...
         }:
+        let
+          pkgsWithExts = pkgs.extend inputs.nix-vscode-extensions.overlays.default;
+          bundles = import ./code-common/bundles.nix { pkgs = pkgsWithExts; };
+        in
         # Custom pkgs for standalone app building (needs unfree + stable alias)
         {
           formatter = inputs.nix-devshells.formatter.${system};
@@ -131,7 +139,11 @@
             ];
           };
 
-          packages = { };
+          packages = {
+            antigravity-extensions-bundle = bundles.antigravity;
+            cursor-extensions-bundle = bundles.cursor;
+            windsurf-extensions-bundle = bundles.windsurf;
+          };
         };
 
       flake = {
