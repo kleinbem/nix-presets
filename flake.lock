@@ -1717,11 +1717,11 @@
         "treefmt-nix": "treefmt-nix_5"
       },
       "locked": {
-        "lastModified": 1779662831,
-        "narHash": "sha256-pEkAjcJTws7q9SKQ+Xrgzgp9ctwEpgMhEL8icA6lP/U=",
+        "lastModified": 1779662931,
+        "narHash": "sha256-FtBNKIcJSzuGFjT5RiA9eoZwau20DvQKDz17eZHnyyk=",
         "ref": "refs/heads/main",
-        "rev": "1390244c8cbe99045e86a764412c92bcde03eba0",
-        "revCount": 44,
+        "rev": "463904f89e5f70598296e43499520d60ca194f37",
+        "revCount": 45,
         "type": "git",
         "url": "file:///home/martin/Develop/github.com/kleinbem/nix/nix-packages"
       },
