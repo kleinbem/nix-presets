@@ -58,6 +58,20 @@ in
       systemd.services.n8n.serviceConfig = {
         DynamicUser = lib.mkForce false;
         User = lib.mkForce "root";
+        Group = lib.mkForce "root";
+        CapabilityBoundingSet = lib.mkForce [
+          "CAP_CHOWN"
+          "CAP_FOWNER"
+          "CAP_DAC_OVERRIDE"
+          "CAP_SETUID"
+          "CAP_SETGID"
+        ];
+        SystemCallFilter = lib.mkForce [
+          "@system-service"
+          "@privileged"
+        ];
+        NoNewPrivileges = lib.mkForce false;
+        PrivateUsers = lib.mkForce false;
         ReadWritePaths = [ "/var/lib/n8n" ];
         EnvironmentFile = "/run/secrets/n8n.env";
       };
