@@ -129,7 +129,9 @@ in
       ++ additionalCapabilities
       ++ (cfg.extraCapabilities or [ ]);
 
-    config =
+    path = lib.mkIf (cfg.standaloneRunner or false) "/var/lib/machines/${name}/current";
+
+    config = lib.mkIf (!(cfg.standaloneRunner or false)) (
       { pkgs, ... }@args:
       {
         imports = [
@@ -211,7 +213,8 @@ in
           # Inject the user-provided config
           (if builtins.isFunction innerConfig then innerConfig args else innerConfig)
         ];
-      };
+      }
+    );
 
     bindMounts =
       bindMounts

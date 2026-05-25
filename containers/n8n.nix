@@ -23,6 +23,11 @@ in
       default = null;
       description = "Path on the host to a .env file containing N8N_ENCRYPTION_KEY and other secrets";
     };
+    standaloneRunner = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "If true, the host does not evaluate the container's closure and expects it at /var/lib/machines/<name>/current";
+    };
     noteDirs = lib.mkOption {
       type = lib.types.attrsOf lib.types.path;
       default = { };
