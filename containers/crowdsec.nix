@@ -66,10 +66,32 @@ in
         };
       };
 
-      systemd.services.crowdsec.serviceConfig.ExecStartPre = [
-        "${pkgs.crowdsec}/bin/cscli collections install crowdsecurity/caddy crowdsecurity/sshd crowdsecurity/linux || true"
-        "${pkgs.crowdsec}/bin/cscli bouncers add firewall -k $(cat /var/lib/crowdsec/bouncer-key) 2>/dev/null || true"
-      ];
+      systemd.services.crowdsec.serviceConfig = {
+        DynamicUser = lib.mkForce false;
+        User = lib.mkForce "root";
+        Group = lib.mkForce "root";
+        PrivateUsers = lib.mkForce false;
+        ProtectSystem = lib.mkForce "no";
+        ProtectHome = lib.mkForce false;
+        PrivateTmp = lib.mkForce false;
+        PrivateDevices = lib.mkForce false;
+        ProtectHostname = lib.mkForce false;
+        ProtectClock = lib.mkForce false;
+        ProtectKernelTunables = lib.mkForce false;
+        ProtectKernelModules = lib.mkForce false;
+        ProtectControlGroups = lib.mkForce false;
+        ProtectProc = lib.mkForce "default";
+        RestrictAddressFamilies = lib.mkForce [ ];
+        RestrictNamespaces = lib.mkForce false;
+        RestrictRealtime = lib.mkForce false;
+        RestrictSUIDSGID = lib.mkForce false;
+        SystemCallFilter = lib.mkForce [ ];
+        NoNewPrivileges = lib.mkForce false;
+        ExecStartPre = [
+          "${pkgs.bash}/bin/bash -c '${pkgs.crowdsec}/bin/cscli collections install crowdsecurity/caddy crowdsecurity/sshd crowdsecurity/linux || true'"
+          "${pkgs.bash}/bin/bash -c '${pkgs.crowdsec}/bin/cscli bouncers add firewall -k $(cat /var/lib/crowdsec/bouncer-key) 2>/dev/null || true'"
+        ];
+      };
 
       networking.firewall.allowedTCPPorts = [ 8080 ];
     };
