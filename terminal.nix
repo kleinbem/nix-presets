@@ -28,7 +28,12 @@
         if [[ -z "$TERMINAL_MOTD_SHOWN" && ! -f "$HOME/.config/no-show-user-motd" ]]; then
           export TERMINAL_MOTD_SHOWN=1
           echo -e "\n\e[1;37;44m 🚀 Welcome to your Nix Station \e[0m"
-          echo -e "\e[38;5;244m 󱄅  $(hostname) | NixOS $(nixos-version | cut -d' ' -f1) \e[0m\n"
+          spec=$(cat /etc/specialisation 2>/dev/null || echo "base")
+          if [ "$spec" = "base" ]; then
+            echo -e "\e[38;5;244m 󱄅  $(hostname) | NixOS $(nixos-version | cut -d' ' -f1) \e[0m\n"
+          else
+            echo -e "\e[38;5;244m 󱄅  $(hostname) \e[1;33m($spec)\e[0;38;5;244m | NixOS $(nixos-version | cut -d' ' -f1) \e[0m\n"
+          fi
 
           echo -e " \e[1;34m>_ Command\e[0m             | \e[1;34mDescription\e[0m"
           echo -e " -----------------------|---------------------------------------"
@@ -102,6 +107,13 @@
           disabled = true;
         };
         custom = {
+          specialisation = {
+            description = "Show active NixOS specialisation";
+            command = "cat /etc/specialisation";
+            when = "test -f /etc/specialisation && test \"$(cat /etc/specialisation)\" != \"base\"";
+            format = "in [󱄅 $output]($style) ";
+            style = "bold yellow";
+          };
           devshell = {
             description = "Show active isolated devshell";
             command = "echo -n $STARSHIP_SHELL_SYMBOL$DEV_SHELL_NAME";
