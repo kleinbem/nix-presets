@@ -10,8 +10,8 @@
     };
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
-    pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
-    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+    git-hooks.url = "github:cachix/git-hooks.nix";
+    git-hooks.inputs.nixpkgs.follows = "nixpkgs";
 
     openclaw = {
       url = "github:openclaw/nix-openclaw";
@@ -126,7 +126,7 @@
               ) (inputs.nixpkgs.lib.filterAttrs (n: _: !(builtins.elem n excludedModules)) self.nixosModules);
             in
             {
-              pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
+              pre-commit-check = inputs.git-hooks.lib.${system}.run {
                 src = ./.;
                 hooks = {
                   nixfmt.enable = true;
