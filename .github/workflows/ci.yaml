@@ -14,5 +14,5 @@ jobs:
       - uses: cachix/install-nix-action@v31.10.6
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      - run: nix flake check
+      - run: nix flake check --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages
       - run: nix fmt --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages -- --fail-on-change
