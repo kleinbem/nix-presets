@@ -85,9 +85,9 @@ in
         };
         # Use secrets from sops
         secrets = {
-          jwtSecretFile = config.sops.secrets.authelia_jwt_secret.path;
-          sessionSecretFile = config.sops.secrets.authelia_session_secret.path;
-          storageEncryptionKeyFile = config.sops.secrets.authelia_storage_encryption_key.path;
+          jwtSecretFile = "/run/secrets/authelia_jwt_secret";
+          sessionSecretFile = "/run/secrets/authelia_session_secret";
+          storageEncryptionKeyFile = "/run/secrets/authelia_storage_encryption_key";
         };
       };
 
@@ -97,11 +97,35 @@ in
       systemd.tmpfiles.rules = [
         "f /var/lib/authelia/users.yml 0600 root root - users: {}"
       ];
+
+      # Ensure the secret files are reachable inside the container with proper permissions
+      system.activationScripts.authelia-secrets.text = ''
+        mkdir -p /run/secrets
+        for secret in jwt_secret session_secret storage_encryption_key; do
+          if [ -f /run/secrets/authelia_''${secret}_host ]; then
+            cp -f /run/secrets/authelia_''${secret}_host /run/secrets/authelia_''${secret}
+            chown authelia-main:authelia-main /run/secrets/authelia_''${secret}
+            chmod 400 /run/secrets/authelia_''${secret}
+          fi
+        done
+      '';
     };
     bindMounts = {
       "/var/lib/authelia" = {
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
+      };
+      "/run/secrets/authelia_jwt_secret_host" = {
+        hostPath = config.sops.secrets.authelia_jwt_secret.path;
+        isReadOnly = true;
+      };
+      "/run/secrets/authelia_session_secret_host" = {
+        hostPath = config.sops.secrets.authelia_session_secret.path;
+        isReadOnly = true;
+      };
+      "/run/secrets/authelia_storage_encryption_key_host" = {
+        hostPath = config.sops.secrets.authelia_storage_encryption_key.path;
+        isReadOnly = true;
       };
     };
   });
