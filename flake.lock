@@ -1809,10 +1809,10 @@
         "treefmt-nix": "treefmt-nix_5"
       },
       "locked": {
-        "lastModified": 1779805242,
+        "lastModified": 1779805285,
         "narHash": "sha256-A8A8yL844Y5PQkKz3Ped/PNeYdcQAF5fhS6E/jn3Po8=",
         "ref": "refs/heads/main",
-        "rev": "f26e9b1e6b83cfe1d5258938b107f398042e3ec0",
+        "rev": "b6f9b73f1d5913c9fd229bc89fb88b791c781089",
         "revCount": 50,
         "type": "git",
         "url": "file:///home/martin/Develop/github.com/kleinbem/nix/nix-packages"
