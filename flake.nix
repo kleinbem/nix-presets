@@ -42,7 +42,10 @@
         let
           pkgsUnfree = import inputs.nixpkgs {
             inherit system;
-            config.allowUnfree = true;
+            config = {
+              allowUnfree = true;
+              android_sdk.accept_license = true;
+            };
           };
           pkgsWithExts = pkgsUnfree.extend inputs.nix-vscode-extensions.overlays.default;
           bundles = import ./code-common/bundles.nix { pkgs = pkgsWithExts; };
@@ -94,11 +97,14 @@
                         config = {
                           boot.isContainer = true;
                           system.stateVersion = "25.11";
-                          nixpkgs.config.allowUnfree = true;
-                          nixpkgs.config.permittedInsecurePackages = [
-                            "nodejs-20.20.2"
-                            "nodejs-slim-20.20.2"
-                          ];
+                          nixpkgs.config = {
+                            allowUnfree = true;
+                            android_sdk.accept_license = true;
+                            permittedInsecurePackages = [
+                              "nodejs-20.20.2"
+                              "nodejs-slim-20.20.2"
+                            ];
+                          };
                           # Mock sops if used
                           sops.templates = lib.mkOptionDefault { };
                           sops.secrets = lib.mkOptionDefault { };

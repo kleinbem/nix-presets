@@ -1642,13 +1642,12 @@
         "treefmt-nix": "treefmt-nix_2"
       },
       "locked": {
-        "lastModified": 1779785433,
+        "lastModified": 1779785580,
         "narHash": "sha256-E7PpDqajZvAFOnJ395EaerPzKnCtdeBnDRi68jNQnPM=",
-        "ref": "refs/heads/main",
-        "rev": "306f8ef5cc5dd5126eccec21b4eb3d7891aa5b4d",
-        "revCount": 43,
-        "type": "git",
-        "url": "file:///home/martin/Develop/github.com/kleinbem/nix/nix-devshells"
+        "owner": "kleinbem",
+        "repo": "nix-devshells",
+        "rev": "d8baa6ec49b7791c2b706d0dd0d6ca602728f61b",
+        "type": "github"
       },
       "original": {
         "owner": "kleinbem",
@@ -1717,13 +1716,12 @@
         "treefmt-nix": "treefmt-nix_5"
       },
       "locked": {
-        "lastModified": 1779785437,
+        "lastModified": 1779785581,
         "narHash": "sha256-vi3Kc79fosQt5sKBaCcxiVYeuSTKEZDTm2Vq8y8j0HY=",
-        "ref": "refs/heads/main",
-        "rev": "37f1963c3bd6a540348570dbff88881fc508cc29",
-        "revCount": 46,
-        "type": "git",
-        "url": "file:///home/martin/Develop/github.com/kleinbem/nix/nix-packages"
+        "owner": "kleinbem",
+        "repo": "nix-packages",
+        "rev": "24afb5a7ecf1836a14e206c9001c6c49db9c8088",
+        "type": "github"
       },
       "original": {
         "owner": "kleinbem",
