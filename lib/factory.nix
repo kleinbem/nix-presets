@@ -79,8 +79,7 @@ in
     privateNetwork = true;
     hostBridge = cfg.hostBridge or config.my.network.bridge;
     localAddress = cfg.ip;
-    privateUsers =
-      if (cfg ? privateUsers) then cfg.privateUsers else (if enableNesting then "no" else "pick");
+    privateUsers = if (cfg ? privateUsers) then cfg.privateUsers else "no";
 
     # Conditionally allow hardware device pass-through
     allowedDevices =
