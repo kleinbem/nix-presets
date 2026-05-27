@@ -36,7 +36,7 @@ in
         environmentFile = if cfg.secretsFile != null then "/etc/atticd-env" else null;
         settings = {
           listen = "[::]:8080";
-          api-endpoint = "https://cache.kleinbem.dev/"; # Recommended to configure in Caddy, but this is the default expected domain
+          api-endpoint = "http://cache.kleinbem.dev/"; # Configured for HTTP to avoid local cert issues
           storage = {
             type = "local";
             path = "/var/lib/atticd/storage";

@@ -55,7 +55,11 @@ in
                 if (node ? domain) then "" else "${hostIP}, "
               else
                 "${hostIP}:${toString node.externalPort}, ";
-            customDomain = if (node ? domain) then ", ${node.domain}" else "";
+            customDomain =
+              if (node ? domain) then
+                ", ${if (node.insecure or false) then "http://" else ""}${node.domain}"
+              else
+                "";
           in
           "${ipHostStr}${name}.local${customDomain}";
 
@@ -64,7 +68,7 @@ in
       nameValuePair vhostName {
         logFormat = "output stderr";
         extraConfig = ''
-          tls internal
+          ${if (node.insecure or false) then "" else "tls internal"}
           ${
             if isDown then
               helpers.mkMaintPage name
