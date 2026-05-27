@@ -39,7 +39,7 @@ let
     "layers.acceleration.force-enabled" = true;
 
     # --- Privacy & Security ---
-    "network.http.referer.XOriginPolicy" = 1;
+    "network.http.referer.XOriginPolicy" = 0; # 1 breaks PayPal and cross-site logins
     "privacy.trackingprotection.cryptomining.enabled" = true;
     "privacy.trackingprotection.fingerprinting.enabled" = true;
 
@@ -76,7 +76,7 @@ in
     "privacy.resistFingerprinting" = false;
     "privacy.trackingprotection.enabled" = true;
     "privacy.trackingprotection.socialtracking.enabled" = true;
-    "privacy.firstparty.isolate" = true;
+    "privacy.firstparty.isolate" = false; # true breaks cross-site payment gateways like PayPal
     "dom.event.clipboardevents.enabled" = true;
     "media.peerconnection.enabled" = true;
 
