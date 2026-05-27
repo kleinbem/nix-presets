@@ -50,10 +50,14 @@ in
       let
         vhostName =
           let
-            ipHost = if node.externalPort == 443 then hostIP else "${hostIP}:${toString node.externalPort}";
+            ipHostStr =
+              if node.externalPort == 443 then
+                if (node ? domain) then "" else "${hostIP}, "
+              else
+                "${hostIP}:${toString node.externalPort}, ";
             customDomain = if (node ? domain) then ", ${node.domain}" else "";
           in
-          "${ipHost}, ${name}.local${customDomain}";
+          "${ipHostStr}${name}.local${customDomain}";
 
         isDown = isGlobalMaint || (node.maintenance or false);
       in
