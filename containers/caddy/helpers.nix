@@ -51,15 +51,16 @@ in
         vhostName =
           let
             ipHost = if node.externalPort == 443 then hostIP else "${hostIP}:${toString node.externalPort}";
+            customDomain = if (node ? domain) then ", ${node.domain}" else "";
           in
-          "${ipHost}, ${name}.local";
+          "${ipHost}, ${name}.local${customDomain}";
 
         isDown = isGlobalMaint || (node.maintenance or false);
       in
       nameValuePair vhostName {
         logFormat = "output stderr";
         extraConfig = ''
-          tls internal
+          ${if (node ? domain) then "" else "tls internal"}
           ${
             if isDown then
               helpers.mkMaintPage name

@@ -169,6 +169,8 @@
           ollama = import ./containers/ollama.nix { inherit self; };
           llama-cpp = import ./containers/llama-cpp.nix { inherit self; };
           n8n = import ./containers/n8n.nix { inherit self; };
+          caddy = import ./containers/caddy { inherit self; };
+          attic = import ./containers/attic.nix { inherit self; };
           code-server = import ./containers/code-server.nix { inherit self; };
           open-webui = import ./containers/open-webui.nix { inherit self; };
           dashboard = import ./containers/dashboard { inherit self; };
@@ -178,7 +180,6 @@
           qdrant = import ./containers/qdrant.nix { inherit self; };
           playground = import ./containers/playground.nix { inherit self; };
           frigate = import ./containers/frigate.nix { inherit self; };
-          caddy = import ./containers/caddy { inherit self; };
           comfyui = import ./containers/comfyui.nix { inherit self; };
           langfuse = import ./containers/langfuse.nix { inherit self inputs; };
           langflow = import ./containers/langflow.nix { inherit self; };
