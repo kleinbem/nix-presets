@@ -64,7 +64,7 @@ in
       nameValuePair vhostName {
         logFormat = "output stderr";
         extraConfig = ''
-          ${if (node ? domain) then "" else "tls internal"}
+          tls internal
           ${
             if isDown then
               helpers.mkMaintPage name
