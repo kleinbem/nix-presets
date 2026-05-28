@@ -49,6 +49,13 @@ in
           };
         };
       };
+
+      systemd.services.atticd.serviceConfig = {
+        DynamicUser = lib.mkForce false;
+        User = lib.mkForce "root";
+        Group = lib.mkForce "root";
+      };
+
       networking.firewall.allowedTCPPorts = [ 8080 ];
     };
     bindMounts = {
