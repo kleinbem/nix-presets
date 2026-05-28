@@ -26,7 +26,7 @@ in
     };
     privateUsers = lib.mkOption {
       type = lib.types.str;
-      default = "pick";
+      default = "no";
     };
     autoStart = lib.mkOption {
       type = lib.types.bool;
