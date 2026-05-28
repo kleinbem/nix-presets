@@ -54,6 +54,33 @@ in
         DynamicUser = lib.mkForce false;
         User = lib.mkForce "root";
         Group = lib.mkForce "root";
+
+        # Disable all sandboxing/hardening that conflicts with the container runtime (seccomp/namespaces/etc)
+        CapabilityBoundingSet = lib.mkForce null;
+        DeviceAllow = lib.mkForce null;
+        DevicePolicy = lib.mkForce null;
+        LockPersonality = lib.mkForce false;
+        MemoryDenyWriteExecute = lib.mkForce false;
+        NoNewPrivileges = lib.mkForce false;
+        PrivateDevices = lib.mkForce false;
+        PrivateTmp = lib.mkForce false;
+        PrivateUsers = lib.mkForce false;
+        ProcSubset = lib.mkForce null;
+        ProtectClock = lib.mkForce false;
+        ProtectControlGroups = lib.mkForce false;
+        ProtectHome = lib.mkForce false;
+        ProtectHostname = lib.mkForce false;
+        ProtectKernelLogs = lib.mkForce false;
+        ProtectKernelModules = lib.mkForce false;
+        ProtectKernelTunables = lib.mkForce false;
+        ProtectProc = lib.mkForce "default";
+        ProtectSystem = lib.mkForce "no";
+        RestrictAddressFamilies = lib.mkForce null;
+        RestrictNamespaces = lib.mkForce false;
+        RestrictRealtime = lib.mkForce false;
+        RestrictSUIDSGID = lib.mkForce false;
+        SystemCallArchitectures = lib.mkForce null;
+        SystemCallFilter = lib.mkForce null;
       };
 
       networking.firewall.allowedTCPPorts = [ 8080 ];
