@@ -174,11 +174,12 @@ in
 
             system.stateVersion = mkDefault "25.11";
             nixpkgs.config = {
-              allowUnfree = mkDefault true;
-              allowUnfreePredicate = mkDefault (_: true);
+              allowUnfree = true;
+              allowUnfreePredicate = _: true;
               permittedInsecurePackages = [
                 "nodejs-20.20.2"
                 "nodejs-slim-20.20.2"
+                "openclaw-2026.5.7"
               ];
             };
           })

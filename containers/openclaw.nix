@@ -52,10 +52,10 @@ in
     inherit cfg;
     innerConfig = {
       # 1. Import the official OpenClaw NixOS module inside the container
-      imports = [ inputs.openclaw.nixosModules.default ];
+      imports = [ inputs.openclaw.nixosModules.openclaw-gateway ];
 
       # 2. Configure the agent
-      services.openclaw = {
+      services.openclaw-gateway = {
         enable = true;
         # Wait for the configuration to be added by the user
       };
