@@ -98,7 +98,9 @@ in
             {
               address = "10.0.0.0";
               prefixLength = 16;
-              via = "10.85.46.1"; # Route through the host's bridge IP
+              # Route through the host's bridge IP (per-host; was hard-coded to
+              # nixos-nvme's 10.85.46.1, which broke routing on core-pi).
+              via = config.my.network.hostAddress;
             }
           ];
         };
