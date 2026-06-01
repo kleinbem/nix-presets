@@ -90,10 +90,8 @@ in
 
       # -- Apps (Sandboxed via Firejail on host) --
       obsidian
-      logseq
       mpv
       google-chrome
-      bitwarden-desktop
       zathura
       imv # Image Viewer
       pkgs.rbw

@@ -137,7 +137,8 @@ in
       package = pkgs.firefox-beta;
       configPath = ".mozilla/firefox";
 
-      nativeMessagingHosts = [ pkgs.bitwarden-desktop ];
+      # bitwarden-desktop native messaging handled by the Flatpak install
+      nativeMessagingHosts = [ ];
 
       policies = {
         Certificates = {
