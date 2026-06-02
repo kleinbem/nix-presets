@@ -70,16 +70,8 @@ in
                 PageSize = "A4";
               };
             }
-            {
-              name = "Ricoh_SP_220Nw"; # New primary driverless entry
-              deviceUri = "ipp://10.0.5.10/ipp/print";
-              model = "everywhere";
-              ppdOptions = {
-                PageSize = "A4";
-              };
-            }
           ];
-          ensureDefaultPrinter = "Ricoh_SP_220Nw";
+          ensureDefaultPrinter = "Ricoh_SP_220Nw_Legacy";
         };
 
         networking = {
