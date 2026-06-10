@@ -42,6 +42,12 @@ in
       default = { };
       description = "Extra NixOS configuration to inject into the container.";
     };
+    memoryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "3G";
+      description = "systemd MemoryMax for the container (e.g. \"3G\"). null = unbounded.";
+    };
   };
 
   config = lib.mkIf cfg.enable (mkContainer {

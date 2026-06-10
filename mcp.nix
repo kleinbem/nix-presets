@@ -79,6 +79,22 @@
                 "${config.home.homeDirectory}/Develop"
               ];
             };
+
+            memory = {
+              command = "${pkgs.nodejs_22}/bin/npx";
+              args = [
+                "-y"
+                "@modelcontextprotocol/server-memory"
+              ];
+            };
+
+            "sequential-thinking" = {
+              command = "${pkgs.nodejs_22}/bin/npx";
+              args = [
+                "-y"
+                "@modelcontextprotocol/server-sequential-thinking"
+              ];
+            };
           };
         };
     };
@@ -136,18 +152,38 @@
                 "@google-cloud/cloud-run-mcp"
               ];
             };
+
+            memory = {
+              command = "${pkgs.nodejs_22}/bin/npx";
+              args = [
+                "-y"
+                "@modelcontextprotocol/server-memory"
+              ];
+            };
+
+            "sequential-thinking" = {
+              command = "${pkgs.nodejs_22}/bin/npx";
+              args = [
+                "-y"
+                "@modelcontextprotocol/server-sequential-thinking"
+              ];
+            };
           };
         };
         mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
       in
       lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         mkdir -p "${config.home.homeDirectory}/.gemini/antigravity"
+        mkdir -p "${config.home.homeDirectory}/.gemini/config"
         mkdir -p "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
         mkdir -p "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
         mkdir -p "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
 
         cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
         chmod 644 "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
+
+        cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
+        chmod 644 "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
 
         cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
         chmod 644 "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"

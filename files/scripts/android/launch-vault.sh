@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SOURCE OF TRUTH: nix-presets/files/scripts/android/launch-vault.sh
+# Mirror at nix-devshells/shells/scripts/launch-vault.sh — keep in sync (drift check: `just maintenance::check-script-mirrors`).
+
 
 # Vault Launcher - Persistent, secure Android environment
 # Usage: launch-vault [AVD_NAME] [EXTRA_FLAGS...]

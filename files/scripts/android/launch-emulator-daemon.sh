@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SOURCE OF TRUTH: nix-presets/files/scripts/android/launch-emulator-daemon.sh
+# Mirror at nix-devshells/shells/scripts/launch-emulator-daemon.sh — keep in sync (drift check: `just maintenance::check-script-mirrors`).
+
 
 # Emulator Daemon - running as Systemd Service
 # Usage: launch-emulator-daemon
