@@ -34,6 +34,11 @@ in
       default = 99;
       description = "Number of layers to offload to GPU.";
     };
+    memoryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "6G";
+      description = "systemd MemoryMax for the container (e.g. \"6G\"). null = unbounded.";
+    };
   }
   // tlsOpts;
 
@@ -91,10 +96,6 @@ in
           ProtectHome = true;
           NoNewPrivileges = true;
           CapabilityBoundingSet = ""; # No special caps needed
-
-          # Resource constraints for 8GB RAM
-          MemoryHigh = "6.5G";
-          MemoryMax = "7.2G";
         };
       };
 
