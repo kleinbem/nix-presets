@@ -108,7 +108,7 @@ in
         };
       };
 
-    bindMounts = lib.mkIf (cfg.hostDataDir != null) {
+    bindMounts = lib.optionalAttrs (cfg.hostDataDir != null) {
       "/var/lib/cups" = {
         hostPath = cfg.hostDataDir;
         isReadOnly = false;

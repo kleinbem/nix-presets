@@ -71,6 +71,8 @@ let
   mkFwRule = upstream: "ip daddr ${upstream.target} tcp dport 443 accept";
   fwUpstreamRules = lib.concatMapStringsSep "\n            " mkFwRule upstreams;
 
+  isStandalone = cfg.standaloneRunner or config.my.containers.standaloneRunner or false;
+
 in
 {
   containers.${name} = {
@@ -128,9 +130,9 @@ in
       ++ additionalCapabilities
       ++ (cfg.extraCapabilities or [ ]);
 
-    path = lib.mkIf (cfg.standaloneRunner or false) "/var/lib/machines/${name}/current";
+    path = lib.mkIf isStandalone (lib.mkForce "/var/lib/machines/${name}/current");
 
-    config = lib.mkIf (!(cfg.standaloneRunner or false)) (
+    config = lib.mkIf (!isStandalone) (
       { pkgs, ... }@args:
       {
         imports = [
@@ -218,6 +220,12 @@ in
 
     bindMounts =
       bindMounts
+      // (lib.optionalAttrs isStandalone {
+        "/var/lib/machines/${name}/current" = {
+          hostPath = "/var/lib/machines/${name}/current";
+          isReadOnly = true;
+        };
+      })
       // (lib.optionalAttrs hasTls {
         # Bind-mount PKI certificates into the container
         "/etc/pki/internal/ca.crt" = {
