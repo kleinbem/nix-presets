@@ -68,6 +68,7 @@ let
     clearurls
     consent-o-matic
     markdownload
+    tab-session-manager
   ];
 in
 {
@@ -93,7 +94,6 @@ in
   standardExtensions = commonExtensions ++ [
     pkgs.nur.repos.rycee.firefox-addons.localcdn
     pkgs.nur.repos.rycee.firefox-addons.auto-tab-discard
-    pkgs.nur.repos.rycee.firefox-addons.tab-session-manager
     pkgs.nur.repos.rycee.firefox-addons.tab-stash
     pkgs.nur.repos.rycee.firefox-addons.sponsorblock
     pkgs.nur.repos.rycee.firefox-addons.languagetool
