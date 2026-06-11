@@ -26,6 +26,10 @@ in
       default = true;
       description = "Enable Bluetooth passthrough.";
     };
+    memoryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "4G";
+    };
   };
 
   config = lib.mkIf cfg.enable (mkContainer {
