@@ -16,12 +16,12 @@ in
       default = "10.85.46.130/24";
     };
     passwordFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+      type = lib.types.unspecified;
       default = null;
       description = "Path to the Restic password file (from sops).";
     };
     rcloneConfigFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+      type = lib.types.unspecified;
       default = null;
       description = "Path to the rclone config file (from sops).";
     };
@@ -36,12 +36,12 @@ in
       description = "Map of container paths to host paths for read-only system backup.";
     };
     systemPasswordFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+      type = lib.types.unspecified;
       default = null;
       description = "Path to the system Restic password file (from sops).";
     };
     memoryLimit = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
+      type = lib.types.unspecified;
       default = "2G";
     };
   };
@@ -60,7 +60,8 @@ in
           initialize = true;
           user = "root"; # Run as root inside the container
           repository = "rclone:gdrive:backups/nixos";
-          passwordFile = if cfg.passwordFile != null then "/run/secrets/restic_password" else null;
+          passwordFile =
+            if cfg.passwordFile != null then "/run/secrets/restic_password" else "/run/secrets/dummy";
           rcloneConfigFile = if cfg.rcloneConfigFile != null then "/run/secrets/rclone_config" else null;
 
           extraOptions = [
@@ -110,7 +111,10 @@ in
           user = "root";
           repository = "rclone:gdrive:backups/nixos-system";
           passwordFile =
-            if cfg.systemPasswordFile != null then "/run/secrets/restic_system_password" else null;
+            if cfg.systemPasswordFile != null then
+              "/run/secrets/restic_system_password"
+            else
+              "/run/secrets/dummy";
           rcloneConfigFile = if cfg.rcloneConfigFile != null then "/run/secrets/rclone_config" else null;
 
           extraOptions = [
