@@ -71,7 +71,10 @@ let
   mkFwRule = upstream: "ip daddr ${upstream.target} tcp dport 443 accept";
   fwUpstreamRules = lib.concatMapStringsSep "\n            " mkFwRule upstreams;
 
-  isStandalone = cfg.standaloneRunner or config.my.containers.standaloneRunner or false;
+  updaterList = config.my.services.container-updater.containers or [ ];
+  isStandalone =
+    (builtins.elem name updaterList)
+    || (cfg.standaloneRunner or config.my.containers.standaloneRunner or false);
 
 in
 {
@@ -132,91 +135,98 @@ in
 
     path = lib.mkIf isStandalone (lib.mkForce "/var/lib/machines/${name}/current");
 
-    config = lib.mkIf (!isStandalone) (
-      { pkgs, ... }@args:
+    config = lib.mkMerge [
       {
-        imports = [
-          (_: {
-            networking = {
-              hostName = cfg.hostName or name;
-              defaultGateway = lib.mkForce config.my.network.hostAddress;
-              nameservers = lib.mkForce [ config.my.network.hostAddress ];
-              resolvconf.extraConfig = lib.mkForce ''
-                name_servers='${config.my.network.hostAddress}'
-                resolv_conf_local_only=NO
-              '';
-              firewall.enable = mkDefault true;
-              nftables.enable = mkDefault true;
-
-              # Zero Trust: restrict outbound to bridge subnet (defense-in-depth)
-              nftables.tables.zt-factory = {
-                family = "inet";
-                content = ''
-                  chain output {
-                    type filter hook output priority filter; policy accept;
-                    ct state { established, related } accept
-                    ip daddr 10.85.46.0/24 accept
-                    oifname "lo" accept
-                    ${fwUpstreamRules}
-                  }
-                '';
-              };
-            };
-
-            services.avahi = {
-              enable = true;
-              nssmdns4 = true;
-              publish = {
-                enable = true;
-                addresses = true;
-                workstation = true;
-              };
-              openFirewall = true;
-            };
-
-            system.stateVersion = mkDefault "25.11";
-            nixpkgs.config = {
-              allowUnfree = true;
-              allowUnfreePredicate = _: true;
-              permittedInsecurePackages = [
-                "nodejs-20.20.2"
-                "nodejs-slim-20.20.2"
-                "openclaw-2026.5.12"
-              ];
-            };
-          })
-
-          # mTLS Sidecar (only when there's inbound/outbound to proxy)
-          (mkIf (hasTls && (serverPort > 0 || upstreams != [ ])) {
-            networking.firewall.allowedTCPPorts = lib.mkIf (serverPort > 0) [
-              80
-              443
-            ];
-
-            environment.systemPackages = [ pkgs.caddy ];
-
-            systemd.services.mtls-sidecar = {
-              description = "mTLS Sidecar Proxy (Caddy)";
-              after = [ "network.target" ];
-              wantedBy = [ "multi-user.target" ];
-
-              serviceConfig = {
-                Type = "simple";
-                ExecStart = "${pkgs.caddy}/bin/caddy run --config /etc/caddy-sidecar/Caddyfile --adapter caddyfile";
-                Restart = "on-failure";
-                RestartSec = "5s";
-                AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
-              };
-            };
-
-            environment.etc."caddy-sidecar/Caddyfile".text = sidecarCaddyfile;
-          })
-
-          # Inject the user-provided config
-          (if builtins.isFunction innerConfig then innerConfig args else innerConfig)
-        ];
+        # Even if standalone, we must set stateVersion to avoid NixOS evaluation warnings
+        # when the module system evaluates the empty config.
+        system.stateVersion = mkDefault "25.11";
       }
-    );
+      (lib.mkIf (!isStandalone) (
+        { pkgs, ... }@args:
+        {
+          imports = [
+            (_: {
+              networking = {
+                hostName = cfg.hostName or name;
+                defaultGateway = lib.mkForce config.my.network.hostAddress;
+                nameservers = lib.mkForce [ config.my.network.hostAddress ];
+                resolvconf.extraConfig = lib.mkForce ''
+                  name_servers='${config.my.network.hostAddress}'
+                  resolv_conf_local_only=NO
+                '';
+                firewall.enable = mkDefault true;
+                nftables.enable = mkDefault true;
+
+                # Zero Trust: restrict outbound to bridge subnet (defense-in-depth)
+                nftables.tables.zt-factory = {
+                  family = "inet";
+                  content = ''
+                    chain output {
+                      type filter hook output priority filter; policy accept;
+                      ct state { established, related } accept
+                      ip daddr 10.85.46.0/24 accept
+                      oifname "lo" accept
+                      ${fwUpstreamRules}
+                    }
+                  '';
+                };
+              };
+
+              services.avahi = {
+                enable = true;
+                nssmdns4 = true;
+                publish = {
+                  enable = true;
+                  addresses = true;
+                  workstation = true;
+                };
+                openFirewall = true;
+              };
+
+              system.stateVersion = mkDefault "25.11";
+              nixpkgs.config = {
+                allowUnfree = true;
+                allowUnfreePredicate = _: true;
+                permittedInsecurePackages = [
+                  "nodejs-20.20.2"
+                  "nodejs-slim-20.20.2"
+                  "openclaw-2026.5.12"
+                ];
+              };
+            })
+
+            # mTLS Sidecar (only when there's inbound/outbound to proxy)
+            (mkIf (hasTls && (serverPort > 0 || upstreams != [ ])) {
+              networking.firewall.allowedTCPPorts = lib.mkIf (serverPort > 0) [
+                80
+                443
+              ];
+
+              environment.systemPackages = [ pkgs.caddy ];
+
+              systemd.services.mtls-sidecar = {
+                description = "mTLS Sidecar Proxy (Caddy)";
+                after = [ "network.target" ];
+                wantedBy = [ "multi-user.target" ];
+
+                serviceConfig = {
+                  Type = "simple";
+                  ExecStart = "${pkgs.caddy}/bin/caddy run --config /etc/caddy-sidecar/Caddyfile --adapter caddyfile";
+                  Restart = "on-failure";
+                  RestartSec = "5s";
+                  AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
+                };
+              };
+
+              environment.etc."caddy-sidecar/Caddyfile".text = sidecarCaddyfile;
+            })
+
+            # Inject the user-provided config
+            (if builtins.isFunction innerConfig then innerConfig args else innerConfig)
+          ];
+        }
+      ))
+    ];
 
     bindMounts =
       bindMounts
