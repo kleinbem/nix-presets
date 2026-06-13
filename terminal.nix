@@ -173,6 +173,9 @@
       enable = true;
       enableDefaultConfig = false;
       settings = {
+        "github.com" = {
+          IdentityAgent = "none";
+        };
         "*" = {
           AddKeysToAgent = "yes";
           ControlMaster = "auto";
