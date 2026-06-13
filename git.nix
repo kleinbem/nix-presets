@@ -60,9 +60,16 @@
           gl = "log --graph --pretty=format:'%C(yellow)%h%C(reset) %C(bold magenta)%G?%C(reset) -%C(red)%d%C(reset) %s %C(dim green)(%cr) %C(bold blue)<%an>%C(reset)'";
         };
         commit.gpgsign = true;
-        gpg.format = "ssh";
-
-        gpg.ssh.allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
+        gpg = {
+          format = "ssh";
+          ssh = {
+            # Bypass ssh-agent for signing to avoid FIDO2 PIN bugs, and allow native PIN prompts
+            program = "${pkgs.writeShellScript "git-ssh-sign-bypass" ''
+              env SSH_AUTH_SOCK= ssh-keygen -Y sign "$@"
+            ''}";
+            allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
+          };
+        };
 
         # Painless HTTPS Logins (Browser Pop-up instead of keys/passwords)
         # Replaces raw SSH pushing for standard repositories
