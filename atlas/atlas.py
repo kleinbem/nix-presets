@@ -77,6 +77,7 @@ class AtlasEngine:
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=5,
             )
             return result.stdout.strip()
         except Exception as e:
