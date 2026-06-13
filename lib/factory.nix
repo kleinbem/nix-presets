@@ -273,17 +273,22 @@ in
   ];
 
   # Inject resource limits into the systemd unit on the host
-  systemd.services."container@${name}".serviceConfig =
-    mkIf
-      (
-        (cfg ? memoryLimit && cfg.memoryLimit != null)
-        || (cfg ? memorySwapMax && cfg.memorySwapMax != null)
-        || (cfg ? cpuLimit && cfg.cpuLimit != null)
-      )
-      {
-        MemoryMax = mkIf (cfg ? memoryLimit && cfg.memoryLimit != null) (cfg.memoryLimit or null);
-        MemorySwapMax = mkIf (cfg ? memorySwapMax && cfg.memorySwapMax != null) (cfg.memorySwapMax or null);
-        CPUQuota = mkIf (cfg ? cpuLimit && cfg.cpuLimit != null) (cfg.cpuLimit or null);
-        TimeoutStartSec = mkDefault timeout;
-      };
+  systemd.services."container@${name}" = {
+    unitConfig = mkIf isStandalone {
+      ConditionPathExists = "/var/lib/machines/${name}/current";
+    };
+    serviceConfig =
+      mkIf
+        (
+          (cfg ? memoryLimit && cfg.memoryLimit != null)
+          || (cfg ? memorySwapMax && cfg.memorySwapMax != null)
+          || (cfg ? cpuLimit && cfg.cpuLimit != null)
+        )
+        {
+          MemoryMax = mkIf (cfg ? memoryLimit && cfg.memoryLimit != null) (cfg.memoryLimit or null);
+          MemorySwapMax = mkIf (cfg ? memorySwapMax && cfg.memorySwapMax != null) (cfg.memorySwapMax or null);
+          CPUQuota = mkIf (cfg ? cpuLimit && cfg.cpuLimit != null) (cfg.cpuLimit or null);
+          TimeoutStartSec = mkDefault timeout;
+        };
+  };
 }

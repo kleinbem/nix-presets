@@ -54,6 +54,17 @@ in
       # 1. Import the official OpenClaw NixOS module inside the container
       imports = [ inputs.openclaw.nixosModules.openclaw-gateway ];
 
+      # Core primitives for Pi's subtractive design (read, write, bash)
+      environment.systemPackages = with config.nixpkgs.pkgs; [
+        git
+        bash
+        curl
+        jq
+        python3
+        nodejs
+        nix
+      ];
+
       # 2. Configure the agent
       services.openclaw-gateway = {
         enable = true;
