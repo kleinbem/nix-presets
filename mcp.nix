@@ -58,6 +58,13 @@
             };
 
             # 2. GitHub (Secure, Short-Lived Tokens)
+            # TODO: @modelcontextprotocol/server-github is the deprecated TS
+            # implementation. The maintained successor is the Go binary
+            # `github-mcp-server` (already in nixpkgs at 1.1.2). Migrating
+            # requires changing the CLI invocation (`github-mcp-server stdio`)
+            # and verifying atlas's auth wiring still passes the right env
+            # vars. Tracked separately so it doesn't ride on the supply-chain
+            # hardening change.
             github = {
               command = "atlas";
               args = [
@@ -70,30 +77,21 @@
               ];
             };
 
-            # 3. Standard Servers
+            # 3. Standard Servers — pinned nixpkgs builds, no live `npx -y`
+            # supply-chain path. Bumps come in via the nightly maintain.yml.
             filesystem = {
-              command = "${pkgs.nodejs_22}/bin/npx";
-              args = [
-                "-y"
-                "@modelcontextprotocol/server-filesystem"
-                "${config.home.homeDirectory}/Develop"
-              ];
+              command = lib.getExe pkgs.mcp-server-filesystem;
+              args = [ "${config.home.homeDirectory}/Develop" ];
             };
 
             memory = {
-              command = "${pkgs.nodejs_22}/bin/npx";
-              args = [
-                "-y"
-                "@modelcontextprotocol/server-memory"
-              ];
+              command = lib.getExe pkgs.mcp-server-memory;
+              args = [ ];
             };
 
             "sequential-thinking" = {
-              command = "${pkgs.nodejs_22}/bin/npx";
-              args = [
-                "-y"
-                "@modelcontextprotocol/server-sequential-thinking"
-              ];
+              command = lib.getExe pkgs.mcp-server-sequential-thinking;
+              args = [ ];
             };
           };
         };
@@ -138,13 +136,14 @@
               ];
             };
             filesystem = {
-              command = "${pkgs.nodejs_22}/bin/npx";
-              args = [
-                "-y"
-                "@modelcontextprotocol/server-filesystem"
-                "${config.home.homeDirectory}/Develop"
-              ];
+              command = lib.getExe pkgs.mcp-server-filesystem;
+              args = [ "${config.home.homeDirectory}/Develop" ];
             };
+            # TODO: @google-cloud/cloud-run-mcp is not in nixpkgs yet. Live
+            # `npx -y` is the supply-chain risk we're trying to eliminate.
+            # Either: (a) write a buildNpmPackage derivation in nix-packages,
+            # (b) drop this server if Cloud Run access isn't load-bearing, or
+            # (c) accept the risk and pin to a specific version (@X.Y.Z).
             cloudrun = {
               command = "${pkgs.nodejs_22}/bin/npx";
               args = [
@@ -154,19 +153,13 @@
             };
 
             memory = {
-              command = "${pkgs.nodejs_22}/bin/npx";
-              args = [
-                "-y"
-                "@modelcontextprotocol/server-memory"
-              ];
+              command = lib.getExe pkgs.mcp-server-memory;
+              args = [ ];
             };
 
             "sequential-thinking" = {
-              command = "${pkgs.nodejs_22}/bin/npx";
-              args = [
-                "-y"
-                "@modelcontextprotocol/server-sequential-thinking"
-              ];
+              command = lib.getExe pkgs.mcp-server-sequential-thinking;
+              args = [ ];
             };
           };
         };
