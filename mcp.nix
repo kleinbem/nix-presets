@@ -57,23 +57,20 @@
               ];
             };
 
-            # 2. GitHub (Secure, Short-Lived Tokens)
-            # TODO: @modelcontextprotocol/server-github is the deprecated TS
-            # implementation. The maintained successor is the Go binary
-            # `github-mcp-server` (already in nixpkgs at 1.1.2). Migrating
-            # requires changing the CLI invocation (`github-mcp-server stdio`)
-            # and verifying atlas's auth wiring still passes the right env
-            # vars. Tracked separately so it doesn't ride on the supply-chain
-            # hardening change.
+            # 2. GitHub (Secure, Short-Lived Tokens via atlas)
+            # Atlas mints a 1h installation token from the App credentials
+            # and exports it as GITHUB_PERSONAL_ACCESS_TOKEN; the Go binary
+            # github-mcp-server (nixpkgs 1.1.2) reads the same env var. The
+            # deprecated TS package @modelcontextprotocol/server-github was
+            # retired here as part of the live-npx supply-chain cleanup.
             github = {
               command = "atlas";
               args = [
                 "mcp"
                 "launch"
                 "github"
-                "${pkgs.nodejs_22}/bin/npx"
-                "-y"
-                "@modelcontextprotocol/server-github"
+                (lib.getExe pkgs.github-mcp-server)
+                "stdio"
               ];
             };
 
@@ -130,9 +127,8 @@
                 "mcp"
                 "launch"
                 "github"
-                "${pkgs.nodejs_22}/bin/npx"
-                "-y"
-                "@modelcontextprotocol/server-github"
+                (lib.getExe pkgs.github-mcp-server)
+                "stdio"
               ];
             };
             filesystem = {
