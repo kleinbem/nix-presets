@@ -135,18 +135,6 @@
               command = lib.getExe pkgs.mcp-server-filesystem;
               args = [ "${config.home.homeDirectory}/Develop" ];
             };
-            # TODO: @google-cloud/cloud-run-mcp is not in nixpkgs yet. Live
-            # `npx -y` is the supply-chain risk we're trying to eliminate.
-            # Either: (a) write a buildNpmPackage derivation in nix-packages,
-            # (b) drop this server if Cloud Run access isn't load-bearing, or
-            # (c) accept the risk and pin to a specific version (@X.Y.Z).
-            cloudrun = {
-              command = "${pkgs.nodejs_22}/bin/npx";
-              args = [
-                "-y"
-                "@google-cloud/cloud-run-mcp"
-              ];
-            };
 
             memory = {
               command = lib.getExe pkgs.mcp-server-memory;
