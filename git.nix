@@ -63,17 +63,22 @@
         gpg = {
           format = "ssh";
           ssh = {
-            # Bypass ssh-agent for signing to avoid FIDO2 PIN bugs, and allow native PIN prompts.
-            # We also wrap any IDE-provided SSH_ASKPASS (like VS Code / Antigravity IDE)
-            # to strip trailing newlines, which breaks FIDO2 PIN inputs.
-            program = "${pkgs.writeShellScript "git-ssh-sign-bypass" ''
+            # Wrap any IDE-provided SSH_ASKPASS (VS Code / Antigravity IDE) to
+            # strip trailing newlines — those break FIDO2 PIN inputs.
+            #
+            # NOTE: do NOT unset SSH_AUTH_SOCK here. user.signingKey is set as
+            # `key::<inline blob>` in users/martin/home.nix, which causes git
+            # to invoke ssh-keygen with `-U` ("key resides in ssh-agent"). If
+            # the agent socket is stripped, ssh-keygen errors with "Couldn't
+            # get agent socket" and the commit fails. Let the agent through.
+            program = "${pkgs.writeShellScript "git-ssh-sign" ''
               if [ -n "$SSH_ASKPASS" ] && [ "$SSH_ASKPASS" != "ide-askpass-wrapper" ]; then
                 export REAL_ASKPASS="$SSH_ASKPASS"
                 export SSH_ASKPASS="${pkgs.writeShellScript "ide-askpass-wrapper" ''
                   "$REAL_ASKPASS" "$@" | tr -d '\n'
                 ''}"
               fi
-              env SSH_AUTH_SOCK= ssh-keygen -Y sign "$@"
+              ssh-keygen -Y sign "$@"
             ''}";
             allowedSignersFile = "${config.home.homeDirectory}/.ssh/allowed_signers";
           };
