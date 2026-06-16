@@ -193,6 +193,11 @@
         source = ./files/justfile;
         force = true;
       };
+      # Namespaced sub-modules imported by ~/.justfile via `mod ai`, etc.
+      ".just" = {
+        source = ./files/.just;
+        recursive = true;
+      };
     };
 
     sessionVariables = {

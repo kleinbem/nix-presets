@@ -1,163 +1,25 @@
-# System Control Center
+# System Control Center — personal/OS operations.
+#
+# Invoked as `os <namespace>::<recipe>` via the shell alias. Workspace
+# concerns (dev, deployment, jj) live in the meta-workspace justfile at
+# ~/Develop/github.com/kleinbem/nix.
+#
+# Recipes are organised into namespaces; modules live in ~/.just/.
 
-# Path to the configuration flake
-FLAKE_PATH := "~/Develop/github.com/kleinbem/nix/nix-config"
+mod ai      '.just/ai.just'
+mod cleanup '.just/cleanup.just'
+mod diag    '.just/diag.just'
+mod dx      '.just/dx.just'
+mod fix     '.just/fix.just'
+mod logs    '.just/logs.just'
+mod notes   '.just/notes.just'
+mod service '.just/service.just'
+mod system  '.just/system.just'
 
+# List all available recipes (including namespaced ones).
 default:
     @just --list --justfile ~/.justfile
 
-# --- AI Services ---
-
-# Start AI stack (Ollama, WebUI, n8n)
-ai-up:
-    sudo systemctl start ollama.service container@litellm.service podman-comfyui.service podman-langflow.service container@langfuse.service container@langfuse-db.service container@open-webui.service container@n8n.service
-
-# Stop AI stack
-ai-down:
-    sudo systemctl stop ollama.service container@litellm.service podman-comfyui.service podman-langflow.service container@langfuse.service container@langfuse-db.service container@open-webui.service container@n8n.service
-
-# Check AI status
-ai-status:
-    systemctl status ollama.service container@litellm.service podman-comfyui.service podman-langflow.service container@langfuse.service container@langfuse-db.service container@open-webui.service container@n8n.service
-
-# Follow AI logs
-ai-logs:
-    journalctl -u ollama.service -u container@litellm.service -u podman-comfyui.service -u podman-langflow.service -u container@langfuse.service -u container@langfuse-db.service -u container@open-webui.service -u container@n8n.service -f
-
-# --- System ---
-
-# --- Generic Service Control ---
-
-# Start a system service
-start service:
-    sudo systemctl start {{service}}
-
-# Stop a system service
-stop service:
-    sudo systemctl stop {{service}}
-
-# Restart a system service
-restart service:
-    sudo systemctl restart {{service}}
-
-# Check service status
-status service:
-    systemctl status {{service}}
-
-# --- System Management ---
-
-# Rebuild system (Apply changes)
+# `os rebuild` — top-level shortcut for the most-frequent operation.
 rebuild:
-    @if [ -d ~/Develop/github.com/kleinbem/nix ]; then \
-        echo "🔄 Workspace found! Running unified switch..."; \
-        just --justfile ~/Develop/github.com/kleinbem/nix/justfile switch; \
-    else \
-        nh os switch --ask --diff always {{FLAKE_PATH}}; \
-    fi
-
-# Smart Rebuild (Checks build count first)
-rebuild-smart:
-    @if [ -d ~/Develop/github.com/kleinbem/nix ]; then \
-        echo "🔄 Workspace found! Running smart switch..."; \
-        ~/Develop/github.com/kleinbem/nix/nix-config/scripts/smart-switch.sh ~/Develop/github.com/kleinbem/nix/nix-config; \
-    else \
-        ./scripts/smart-switch.sh {{FLAKE_PATH}}; \
-    fi
-
-# Rollback to previous generation
-rollback:
-    nh os switch --rollback {{FLAKE_PATH}}
-
-# Show generation history
-history:
-    nix profile history --profile /nix/var/nix/profiles/system
-
-# Show what changed between generations
-changelogs:
-    nix store diff-closures /run/booted-system /run/current-system
-
-# Reboot into BIOS/UEFI
-bios:
-    systemctl reboot --firmware-setup
-
-# Verify store integrity
-verify-store:
-    nix-store --verify --check-contents
-
-
-
-# Garbage Collect (Free space)
-clean:
-    @echo "🧹 Cleaning Nix Store (keeping 3 generations)..."
-    nh clean all --keep 3
-    @echo "🔄 Optimizing Nix store..."
-    nix-store --optimise
-    @echo "🧹 Pruning Host Podman Cache..."
-    podman system prune -f
-    @if systemctl is-active --quiet container@langfuse.service; then \
-        echo "🧹 Pruning Nested Langfuse Podman Cache..."; \
-        sudo machinectl shell langfuse /run/current-system/sw/bin/podman system prune -f; \
-    fi
-    @echo "🧹 Cleaning Old System Generations..."
-    sudo nix-collect-garbage --delete-older-than 3d
-
-# System Logs
-logs:
-    @just --justfile ~/.justfile --list | grep logs-
-
-# Show all messages from this boot
-logs-this-boot:
-    journalctl -b 0 --no-hostname
-
-# Show all messages from last boot
-logs-last-boot:
-    journalctl -b -1 --no-hostname
-
-# --- System Diagnostics (Bluefin style) ---
-
-# Run a one minute system benchmark
-benchmark:
-    @echo "🚀 Running a 1 minute system benchmark..."
-    stress-ng --matrix 0 -t 1m --times
-
-# Show BIOS/Hardware info
-bios-info:
-    @echo "🖥️  Hardware Information:"
-    @sudo bash -c 'echo "Manufacturer: $(dmidecode -s baseboard-manufacturer)"; echo "Product Name: $(dmidecode -s baseboard-product-name)"; echo "Version: $(dmidecode -s bios-version)"; echo "Release Date: $(dmidecode -s bios-release-date)"'
-
-# --- Fixes ---
-
-# Fix YubiKey/Smartcard issues (Restart PCSCD & Agents)
-fix-yubikey:
-    pkill lxqt-openssh-askpass || true
-    gpgconf --kill gpg-agent || true
-    sudo systemctl restart pcscd
-
-# Fix Chrome (Restart Panel & YubiKey & Chrome)
-fix-chrome:
-    pkill cosmic-panel || true
-    pkill -f google-chrome || true
-    just fix-yubikey
-    google-chrome-stable > /dev/null 2>&1 &
-
-# --- Developer Experience (DX) ---
-
-# Create a standard Fedora development distrobox
-dx-create-fedora name="fedora-dev":
-    distrobox create --image registry.fedoraproject.org/fedora:40 --name {{name}}
-
-# Create a standard Ubuntu development distrobox
-dx-create-ubuntu name="ubuntu-dev":
-    distrobox create --image ubuntu:24.04 --name {{name}}
-
-# Enter a distrobox
-dx-enter name="fedora-dev":
-    distrobox enter {{name}}
-
-# List all distroboxes
-dx-list:
-    distrobox list
-
-# Update all distroboxes
-dx-update:
-    distrobox upgrade --all
+    @just system::rebuild
