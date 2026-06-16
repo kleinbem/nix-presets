@@ -178,6 +178,7 @@
           dashboard-homer = import ./containers/dashboard/homer { inherit self; };
           dashboard-homepage = import ./containers/dashboard/homepage { inherit self; };
           qdrant = import ./containers/qdrant.nix { inherit self; };
+          stalwart = import ./containers/stalwart.nix { inherit self; };
           playground = import ./containers/playground.nix { inherit self; };
           frigate = import ./containers/frigate.nix { inherit self; };
           comfyui = import ./containers/comfyui.nix { inherit self; };
