@@ -1,0 +1,57 @@
+name: Maintain Flake
+on:
+  workflow_dispatch:
+  schedule:
+    # 02:30 UTC — layer 3 (depends on nix-devshells + nix-packages,
+    # both of which run earlier in the same window).
+    - cron: '30 2 * * *'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint GitHub App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6.0.2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: cachix/install-nix-action@v31.10.6
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            access-tokens = github.com=${{ steps.app-token.outputs.token }}
+
+      - name: Update flake inputs
+        run: nix flake update
+
+      - name: Validate flake (eval-only — blocks a bad lock from landing)
+        run: nix flake check --no-build
+
+      - name: Commit lockfile changes via GitHub API (verified signature)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          if git diff --quiet flake.lock; then
+            echo "flake.lock unchanged — nothing to commit."
+            exit 0
+          fi
+
+          CURRENT_SHA=$(gh api "repos/${GH_REPO}/contents/flake.lock?ref=${BRANCH}" --jq .sha)
+
+          base64 -w0 flake.lock > /tmp/flake-lock.b64
+          jq -n \
+            --arg msg "chore: update flake.lock (auto)" \
+            --arg branch "${BRANCH}" \
+            --arg sha "${CURRENT_SHA}" \
+            --rawfile content /tmp/flake-lock.b64 \
+            '{message: $msg, branch: $branch, sha: $sha, content: $content}' \
+          | gh api --method PUT "repos/${GH_REPO}/contents/flake.lock" --input -
