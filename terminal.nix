@@ -188,17 +188,10 @@
   };
 
   home = {
-    file = {
-      ".justfile" = {
-        source = ./files/justfile;
-        force = true;
-      };
-      # Namespaced sub-modules imported by ~/.justfile via `mod ai`, etc.
-      ".just" = {
-        source = ./files/.just;
-        recursive = true;
-      };
-    };
+    # The `os = "just --justfile ~/.justfile"` alias above is generic.
+    # The ~/.justfile + ~/.just/ contents themselves are per-user and
+    # live under nix-config/users/<name>/files/ — each user's home.nix
+    # declares its own home.file entries pointing there.
 
     sessionVariables = {
       TERMINAL = "ptyxis";
