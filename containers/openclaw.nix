@@ -2,6 +2,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -55,7 +56,7 @@ in
       imports = [ inputs.openclaw.nixosModules.openclaw-gateway ];
 
       # Core primitives for Pi's subtractive design (read, write, bash)
-      environment.systemPackages = with config.nixpkgs.pkgs; [
+      environment.systemPackages = with pkgs; [
         git
         bash
         curl
