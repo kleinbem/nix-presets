@@ -40,6 +40,12 @@ in
       default = null;
     };
 
+    authorizedKeys = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "SSH public keys allowed to root@ inside the container (human-in-the-loop access). Pass `config.users.users.<name>.openssh.authorizedKeys.keys` from the host.";
+    };
+
     # Team Configuration
     agents = lib.mkOption {
       type = lib.types.attrsOf (
@@ -219,8 +225,7 @@ in
 
       # Facilitate Human-in-the-Loop via SSH/Exec into the container
       services.openssh.enable = true;
-      users.users.root.openssh.authorizedKeys.keys =
-        config.users.users.martin.openssh.authorizedKeys.keys;
+      users.users.root.openssh.authorizedKeys.keys = cfg.authorizedKeys;
 
       networking.firewall.allowedTCPPorts = [
         8000
