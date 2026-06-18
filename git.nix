@@ -37,7 +37,11 @@
           inherit (my.git) name email;
         };
         signing = {
-          sign-all = true;
+          # jj 0.42+ renamed `sign-all = true` to `behavior = "own"`. With this
+          # set, `jj describe` signs every commit at creation time — the
+          # `sign-unsigned` recipe becomes a backstop only, not a routine step.
+          # Works touchlessly with the V2 SSH-FIDO key (no-touch-required).
+          behavior = "own";
           backend = "ssh";
         };
       };
