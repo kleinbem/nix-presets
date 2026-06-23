@@ -45,19 +45,21 @@ in
     #     index    = "TEAM.html";          # default file served at /
     #   };
     staticSites = lib.mkOption {
-      type = lib.types.attrsOf (lib.types.submodule {
-        options = {
-          hostPath = lib.mkOption {
-            type = lib.types.str;
-            description = "Absolute host path bind-mounted into the container at /var/www/<domain>/.";
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            hostPath = lib.mkOption {
+              type = lib.types.str;
+              description = "Absolute host path bind-mounted into the container at /var/www/<domain>/.";
+            };
+            index = lib.mkOption {
+              type = lib.types.str;
+              default = "index.html";
+              description = "Default file served when the URL ends in /.";
+            };
           };
-          index = lib.mkOption {
-            type = lib.types.str;
-            default = "index.html";
-            description = "Default file served when the URL ends in /.";
-          };
-        };
-      });
+        }
+      );
       default = { };
       description = "Map of domain → static-site config. Produces one Caddy vhost per entry, serving files via file_server (no reverse-proxy).";
     };
@@ -86,24 +88,29 @@ in
             globalConfig = "debug";
 
             # Restore the full generative logic with proven fixes
-            virtualHosts = (h.genVHosts {
-              inherit proxyTargets;
-              inherit (cfg) hostIP;
-              isGlobalMaint = myInventory.globalMaintenance or false;
-              helpers = h;
-            }) // (
-              # Static-site vhosts (file_server). Each entry in
-              # cfg.staticSites becomes one vhost.
-              lib.mapAttrs' (domain: site: lib.nameValuePair domain {
-                logFormat = "output stderr";
-                extraConfig = ''
-                  tls internal
-                  root * /var/www/${domain}
-                  try_files {path} {path}/${site.index}
-                  file_server
-                '';
-              }) cfg.staticSites
-            );
+            virtualHosts =
+              (h.genVHosts {
+                inherit proxyTargets;
+                inherit (cfg) hostIP;
+                isGlobalMaint = myInventory.globalMaintenance or false;
+                helpers = h;
+              })
+              // (
+                # Static-site vhosts (file_server). Each entry in
+                # cfg.staticSites becomes one vhost.
+                lib.mapAttrs' (
+                  domain: site:
+                  lib.nameValuePair domain {
+                    logFormat = "output stderr";
+                    extraConfig = ''
+                      tls internal
+                      root * /var/www/${domain}
+                      try_files {path} {path}/${site.index}
+                      file_server
+                    '';
+                  }
+                ) cfg.staticSites
+              );
           };
 
           systemd.services.caddy.serviceConfig.AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
@@ -140,10 +147,13 @@ in
             };
           }
           # One bind-mount per static-site entry, read-only.
-          // (lib.mapAttrs' (domain: site: lib.nameValuePair "/var/www/${domain}" {
-            hostPath = site.hostPath;
-            isReadOnly = true;
-          }) cfg.staticSites);
+          // (lib.mapAttrs' (
+            domain: site:
+            lib.nameValuePair "/var/www/${domain}" {
+              inherit (site) hostPath;
+              isReadOnly = true;
+            }
+          ) cfg.staticSites);
       })
       {
         systemd.tmpfiles.rules = lib.mkIf (cfg.hostDataDir != null) [
