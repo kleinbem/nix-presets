@@ -2,7 +2,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 let
@@ -90,21 +89,25 @@ in
         script = ''
           umask 077
           {
-            ${lib.optionalString (cfg.secretKeyFile != null)
-              ''printf "AUTHENTIK_SECRET_KEY=%s\n" "$(cat ${cfg.secretKeyFile})"''}
-            ${lib.optionalString (cfg.postgresPasswordFile != null)
-              ''printf "AUTHENTIK_POSTGRESQL__PASSWORD=%s\n" "$(cat ${cfg.postgresPasswordFile})"''}
-            ${lib.optionalString (cfg.bootstrapAdminPasswordFile != null)
-              ''printf "AUTHENTIK_BOOTSTRAP_PASSWORD=%s\n" "$(cat ${cfg.bootstrapAdminPasswordFile})"''}
-            ${lib.optionalString (cfg.bootstrapApiTokenFile != null)
-              ''printf "AUTHENTIK_BOOTSTRAP_TOKEN=%s\n" "$(cat ${cfg.bootstrapApiTokenFile})"''}
+            ${lib.optionalString (
+              cfg.secretKeyFile != null
+            ) ''printf "AUTHENTIK_SECRET_KEY=%s\n" "$(cat ${cfg.secretKeyFile})"''}
+            ${lib.optionalString (
+              cfg.postgresPasswordFile != null
+            ) ''printf "AUTHENTIK_POSTGRESQL__PASSWORD=%s\n" "$(cat ${cfg.postgresPasswordFile})"''}
+            ${lib.optionalString (
+              cfg.bootstrapAdminPasswordFile != null
+            ) ''printf "AUTHENTIK_BOOTSTRAP_PASSWORD=%s\n" "$(cat ${cfg.bootstrapAdminPasswordFile})"''}
+            ${lib.optionalString (
+              cfg.bootstrapApiTokenFile != null
+            ) ''printf "AUTHENTIK_BOOTSTRAP_TOKEN=%s\n" "$(cat ${cfg.bootstrapApiTokenFile})"''}
           } > /run/authentik.env
         '';
       };
 
       networking.firewall.allowedTCPPorts = [
-        9000  # HTTP
-        9443  # HTTPS (used internally; Caddy fronts publicly)
+        9000 # HTTP
+        9443 # HTTPS (used internally; Caddy fronts publicly)
       ];
     };
 
