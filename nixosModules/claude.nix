@@ -1,10 +1,17 @@
-{ config, lib, pkgs, inputs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}:
 
 let
   cfg = config.my.desktop.claude;
 
   claude-heytcass = inputs.claude-for-linux.packages.${pkgs.system}.claude-desktop;
-in {
+in
+{
   options.my.desktop.claude = {
     enable = lib.mkEnableOption "Community Claude Desktop App (heytcass)";
   };

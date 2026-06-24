@@ -2,7 +2,6 @@
 # SOURCE OF TRUTH: nix-presets/files/scripts/android/launch-android-desktop.sh
 # Mirror at nix-devshells/shells/scripts/launch-android-desktop.sh — keep in sync (drift check: `just maintenance::check-script-mirrors`).
 
-
 # --- Android Launcher V6.6 (Input Stack Restoration) ---
 set -euo pipefail
 

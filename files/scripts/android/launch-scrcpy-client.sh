@@ -2,7 +2,6 @@
 # SOURCE OF TRUTH: nix-presets/files/scripts/android/launch-scrcpy-client.sh
 # Mirror at nix-devshells/shells/scripts/launch-scrcpy-client.sh — keep in sync (drift check: `just maintenance::check-script-mirrors`).
 
-
 # Scrcpy Client - Connects to the running Daemon
 # Usage: launch-scrcpy-client
 

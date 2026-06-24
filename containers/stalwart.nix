@@ -112,15 +112,13 @@ in
           # the directive list below regenerates from it.
           directory.internal = {
             type = "memory";
-            principals = lib.imap0
-              (i: p: {
-                name = p.email;
-                description = p.full-name;
-                class = "individual";
-                # On first start, the user sets their own password via
-                # the admin CLI; the manifest just declares existence.
-              })
-              personaList;
+            principals = lib.imap0 (_i: p: {
+              name = p.email;
+              description = p.full-name;
+              class = "individual";
+              # On first start, the user sets their own password via
+              # the admin CLI; the manifest just declares existence.
+            }) personaList;
           };
 
           # DKIM signing — Stalwart generates per-domain keys at first
