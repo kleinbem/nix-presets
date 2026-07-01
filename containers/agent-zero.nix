@@ -46,7 +46,7 @@ in
         oci-containers.backend = "podman";
         podman.enable = true;
         oci-containers.containers.agent-zero = {
-          image = "frdelv/agent-zero:latest";
+          image = "frdel/agent-zero:latest";
           ports = [ "50001:50001" ];
           environment = {
             A0_SET_CHAT_MODEL_PROVIDER = if cfg.vllmUrl != "" then "openai" else "ollama";

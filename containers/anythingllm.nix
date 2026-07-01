@@ -43,7 +43,7 @@ in
       virtualisation.oci-containers = {
         backend = "podman";
         containers.anythingllm = {
-          image = "mintplexlabs/anything-llm:latest";
+          image = "mintplexlabs/anythingllm:latest";
           ports = [ "3001:3001" ];
           volumes = [
             "/var/lib/anythingllm:/app/server/storage"
