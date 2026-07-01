@@ -55,7 +55,7 @@ in
         enable = true;
         host = "0.0.0.0";
         port = 8080;
-        environmentFile = "/run/secrets/openwebui.env";
+        environmentFile = lib.mkIf (cfg.secretsFile != null) "/run/secrets/openwebui.env";
         environment = {
           OLLAMA_BASE_URL = cfg.ollamaUrl;
           OPENAI_API_BASE_URL = "https://litellm.internal"; # Use the new "Pro" gateway
