@@ -69,7 +69,39 @@ in
       # 2. Configure the agent
       services.openclaw-gateway = {
         enable = true;
-        # Wait for the configuration to be added by the user
+      };
+
+      systemd.services.openclaw-gateway = {
+        preStart = lib.mkBefore ''
+          # Automatically create necessary directories
+          mkdir -p /var/lib/openclaw/workspace
+          mkdir -p /var/lib/openclaw/agents/main/sessions
+          chown -R openclaw:openclaw /var/lib/openclaw
+
+          # Automatically generate the default configuration if it doesn't exist
+          if [ ! -f /var/lib/openclaw/openclaw.json ]; then
+            cat << 'EOF' > /var/lib/openclaw/openclaw.json
+          {
+            "agents": {
+              "defaults": {
+                "workspace": "/var/lib/openclaw/workspace"
+              }
+            },
+            "gateway": {
+              "mode": "local"
+            }
+          }
+          EOF
+            chown openclaw:openclaw /var/lib/openclaw/openclaw.json
+          fi
+        '';
+
+        # Override environment to point to the mutable config file in the state directory
+        # (instead of /etc/openclaw/openclaw.json, which is often read-only in NixOS)
+        environment = {
+          OPENCLAW_CONFIG_PATH = lib.mkForce "/var/lib/openclaw/openclaw.json";
+          CLAWDBOT_CONFIG_PATH = lib.mkForce "/var/lib/openclaw/openclaw.json";
+        };
       };
 
       # 3. Restrict networking so it cannot be reached from the outside
