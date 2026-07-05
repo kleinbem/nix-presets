@@ -100,10 +100,7 @@
                           nixpkgs.config = {
                             allowUnfree = true;
                             android_sdk.accept_license = true;
-                            permittedInsecurePackages = [
-                              "nodejs-20.20.2"
-                              "nodejs-slim-20.20.2"
-                            ];
+
                           };
                           # Mock sops if used
                           sops.templates = lib.mkOptionDefault { };
