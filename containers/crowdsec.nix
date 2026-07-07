@@ -40,11 +40,11 @@ in
               acquisitions = [
                 {
                   source = "journalctl";
-                  journalctl_args = [
+                  journalctl_filter = [
                     "-D"
                     "/var/log/journal_host"
+                    "_SYSTEMD_UNIT=container@caddy.service"
                   ];
-                  journalctl_filter = [ "_SYSTEMD_UNIT=container@caddy.service" ];
                   labels = {
                     type = "caddy";
                   };
