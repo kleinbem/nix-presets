@@ -265,9 +265,16 @@ in
       });
   };
 
-  # Automatically create hostDataDir if defined
+  # Automatically create hostDataDir if defined. Ownership defaults to
+  # 1000:100 (martin:users — matches how most container services access
+  # their bind-mounted state). A preset whose inner unit cannot rely on
+  # CAP_DAC_OVERRIDE (e.g. crowdsec: upstream module strips ALL capabilities,
+  # so even User=root obeys plain permission bits) must own the dir instead —
+  # pass dataDirOwner/dataDirGroup in cfg.
   systemd.tmpfiles.rules = mkIf (cfg ? hostDataDir && cfg.hostDataDir != null) [
-    "d ${cfg.hostDataDir} 0755 1000 100 - -"
+    "d ${cfg.hostDataDir} 0755 ${toString (cfg.dataDirOwner or 1000)} ${
+      toString (cfg.dataDirGroup or 100)
+    } - -"
   ];
 
   # Inject resource limits into the systemd unit on the host
