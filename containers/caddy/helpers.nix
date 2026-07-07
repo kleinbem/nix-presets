@@ -55,7 +55,7 @@ in
               if node.externalPort == 443 then
                 if (node ? domain) then "" else "${hostIP}, "
               else
-                ":${toString node.externalPort}, ";
+                "${hostIP}:${toString node.externalPort}, :${toString node.externalPort}, ";
             customDomain =
               if (node ? domain) then
                 ", ${if (node.insecure or false) then "http://" else ""}${node.domain}"
@@ -69,7 +69,7 @@ in
       nameValuePair vhostName {
         logFormat = "output stderr";
         extraConfig = ''
-          ${if (node.insecure or false) then "" else "tls internal { on_demand }"}
+          ${if (node.insecure or false) then "" else "tls internal"}
           ${
             if isDown then
               helpers.mkMaintPage name
