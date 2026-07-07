@@ -55,7 +55,7 @@ in
               if node.externalPort == 443 then
                 if (node ? domain) then "" else "${hostIP}, "
               else
-                "${hostIP}:${toString node.externalPort}, ";
+                ":${toString node.externalPort}, ";
             customDomain =
               if (node ? domain) then
                 ", ${if (node.insecure or false) then "http://" else ""}${node.domain}"
