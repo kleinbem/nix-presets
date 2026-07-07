@@ -38,13 +38,15 @@ in
           inherit (homepageConfig) services widgets settings;
           customCSS = builtins.readFile ./custom.css;
           # Allow access from any host (fixes "Host validation failed")
-          allowedHosts = "*,10.85.46.103,10.85.46.103:8082,0.0.0.0,0.0.0.0:8082";
+          allowedHosts = "*,${inv.nodes.dashboard.ip},${inv.nodes.dashboard.ip}:8082,0.0.0.0,0.0.0.0:8082";
         };
 
         systemd.services.homepage-dashboard.environment = {
           # Disable Host header check (Next.js specific)
           "NEXT_PUBLIC_DISABLE_HOST_CHECK" = "true";
           "HOSTNAME" = "0.0.0.0";
+          # Disable TLS verification so health pings succeed against internal Caddy CA
+          "NODE_TLS_REJECT_UNAUTHORIZED" = "0";
         };
 
         systemd.services.homepage-dashboard.serviceConfig.EnvironmentFile = "/run/secrets/homepage.env";
