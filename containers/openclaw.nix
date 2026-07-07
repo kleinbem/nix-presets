@@ -101,6 +101,7 @@ in
         environment = {
           OPENCLAW_CONFIG_PATH = lib.mkForce "/var/lib/openclaw/openclaw.json";
           CLAWDBOT_CONFIG_PATH = lib.mkForce "/var/lib/openclaw/openclaw.json";
+          CACHE_BUSTER = "1";
         };
       };
 
