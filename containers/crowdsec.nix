@@ -51,11 +51,11 @@ in
                 }
                 {
                   source = "journalctl";
-                  journalctl_args = [
+                  journalctl_filter = [
                     "-D"
                     "/var/log/journal_host"
+                    "_SYSTEMD_UNIT=sshd.service"
                   ];
-                  journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
                   labels = {
                     type = "syslog";
                   };
