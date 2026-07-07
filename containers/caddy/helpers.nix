@@ -44,6 +44,7 @@ in
       hostIP,
       isGlobalMaint,
       helpers,
+      authUrl ? "https://authelia.local/",
     }:
     mapAttrs' (
       name: node:
@@ -80,7 +81,7 @@ in
                   if (node.auth or false) then
                     ''
                       forward_auth 10.85.48.123:9091 {
-                        uri /api/verify?rd=https://authelia.local/
+                        uri /api/verify?rd=${authUrl}
                         copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
                       }
                     ''
