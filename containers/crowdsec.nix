@@ -22,27 +22,18 @@ in
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
-      {
-        # The inner crowdsec unit keeps the upstream module's EMPTY
-        # CapabilityBoundingSet: even with User=root forced below it has no
-        # CAP_DAC_OVERRIDE, so it obeys plain permission bits and everything
-        # under the bind-mounted data dir MUST be root-owned. The dir itself
-        # is handled by dataDirOwner below; this recursive Z repairs contents
-        # created under the old 1000:100 default (core-pi's agent could never
-        # start after the move — found 2026-07-07).
-        systemd.tmpfiles.rules = [ "Z ${cfg.hostDataDir} - root root - -" ];
-      }
       (mkContainer {
         inherit config;
         name = "crowdsec";
         cfg = cfg // {
           privateUsers = "no";
-          # See tmpfiles note above: the capability-stripped root unit needs
-          # to actually own its state.
+          # The host directory is created as root, but the container's tmpfiles
+          # will recursively chown it to crowdsec:crowdsec.
           dataDirOwner = "root";
           dataDirGroup = "root";
         };
         innerConfig = {
+          systemd.tmpfiles.rules = [ "Z /var/lib/crowdsec - crowdsec crowdsec - -" ];
           services.crowdsec = {
             enable = true;
             localConfig = {
@@ -82,31 +73,13 @@ in
             };
           };
 
-          systemd.services.crowdsec.serviceConfig = {
-            DynamicUser = lib.mkForce false;
-            User = lib.mkForce "root";
-            Group = lib.mkForce "root";
-            PrivateUsers = lib.mkForce false;
-            ProtectSystem = lib.mkForce "no";
-            ProtectHome = lib.mkForce false;
-            PrivateTmp = lib.mkForce false;
-            PrivateDevices = lib.mkForce false;
-            ProtectHostname = lib.mkForce false;
-            ProtectClock = lib.mkForce false;
-            ProtectKernelTunables = lib.mkForce false;
-            ProtectKernelModules = lib.mkForce false;
-            ProtectControlGroups = lib.mkForce false;
-            ProtectProc = lib.mkForce "default";
-            RestrictAddressFamilies = lib.mkForce [ ];
-            RestrictNamespaces = lib.mkForce false;
-            RestrictRealtime = lib.mkForce false;
-            RestrictSUIDSGID = lib.mkForce false;
-            SystemCallFilter = lib.mkForce [ ];
-            NoNewPrivileges = lib.mkForce false;
-            ExecStartPre = [
-              "${pkgs.bash}/bin/bash -c '${pkgs.crowdsec}/bin/cscli collections install crowdsecurity/caddy crowdsecurity/sshd crowdsecurity/linux || true'"
-              "${pkgs.bash}/bin/bash -c '${pkgs.crowdsec}/bin/cscli bouncers add firewall -k $(cat /var/lib/crowdsec/bouncer-key) 2>/dev/null || true'"
-            ];
+          systemd.services.crowdsec = {
+            serviceConfig = {
+              ExecStartPre = [
+                "${pkgs.bash}/bin/bash -c '${pkgs.crowdsec}/bin/cscli collections install crowdsecurity/caddy crowdsecurity/sshd crowdsecurity/linux || true'"
+                "${pkgs.bash}/bin/bash -c '${pkgs.crowdsec}/bin/cscli bouncers add firewall -k $(cat /var/lib/crowdsec/bouncer-key) 2>/dev/null || true'"
+              ];
+            };
           };
 
           networking.firewall.allowedTCPPorts = [ 8080 ];
