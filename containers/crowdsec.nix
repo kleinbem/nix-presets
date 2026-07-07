@@ -63,9 +63,11 @@ in
               ];
             };
             settings = {
+              lapi.credentialsFile = "/var/lib/crowdsec/local_api_credentials.yaml";
               general = {
                 api = {
                   server = {
+                    enable = true;
                     listen_uri = "0.0.0.0:8080";
                   };
                 };
