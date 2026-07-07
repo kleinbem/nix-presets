@@ -22,6 +22,24 @@ in
       type = lib.types.str;
       default = "local";
     };
+    # Host paths bind-mounted into the container. Defaults resolve via sops-nix,
+    # so hosts without the sops module (container-factory) must override them —
+    # they are host-level bind mounts and never part of the container closure.
+    jwtSecretFile = lib.mkOption {
+      type = lib.types.str;
+      default = config.sops.secrets.authelia_jwt_secret.path;
+      defaultText = lib.literalExpression "config.sops.secrets.authelia_jwt_secret.path";
+    };
+    sessionSecretFile = lib.mkOption {
+      type = lib.types.str;
+      default = config.sops.secrets.authelia_session_secret.path;
+      defaultText = lib.literalExpression "config.sops.secrets.authelia_session_secret.path";
+    };
+    storageEncryptionKeyFile = lib.mkOption {
+      type = lib.types.str;
+      default = config.sops.secrets.authelia_storage_encryption_key.path;
+      defaultText = lib.literalExpression "config.sops.secrets.authelia_storage_encryption_key.path";
+    };
   };
 
   config = lib.mkIf cfg.enable (mkContainer {
@@ -116,15 +134,15 @@ in
         isReadOnly = false;
       };
       "/run/secrets/authelia_jwt_secret_host" = {
-        hostPath = config.sops.secrets.authelia_jwt_secret.path;
+        hostPath = cfg.jwtSecretFile;
         isReadOnly = true;
       };
       "/run/secrets/authelia_session_secret_host" = {
-        hostPath = config.sops.secrets.authelia_session_secret.path;
+        hostPath = cfg.sessionSecretFile;
         isReadOnly = true;
       };
       "/run/secrets/authelia_storage_encryption_key_host" = {
-        hostPath = config.sops.secrets.authelia_storage_encryption_key.path;
+        hostPath = cfg.storageEncryptionKeyFile;
         isReadOnly = true;
       };
     };
