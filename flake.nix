@@ -178,6 +178,7 @@
               dashboard-homer = import ./containers/dashboard/homer { inherit self; };
               dashboard-homepage = import ./containers/dashboard/homepage { inherit self; };
               qdrant = import ./containers/qdrant.nix { inherit self; };
+              ntfy = import ./containers/ntfy.nix { inherit self; };
               stalwart = import ./containers/stalwart.nix { inherit self; };
               authentik = import ./containers/authentik.nix { inherit self; };
               odoo = import ./containers/odoo.nix { inherit self; };
