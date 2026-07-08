@@ -94,6 +94,12 @@
           "oauth"
           "cache --timeout 3600"
         ];
+
+        # Route github.com SSH remotes over HTTPS so raw git network ops
+        # (fetch, ls-remote, push from IDEs/agents) use the oauth helper
+        # instead of demanding a FIDO2 touch on id_ed25519_sk. The just
+        # recipes already push via HTTPS+gh; this makes ad-hoc git match.
+        url."https://github.com/".insteadOf = "git@github.com:";
       };
 
       # ==========================================
