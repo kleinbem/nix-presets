@@ -90,12 +90,17 @@ in
             # Restore the full generative logic with proven fixes
             virtualHosts =
               let
-                authNode = inv.nodes.authelia or {};
+                authNode = inv.nodes.authelia or { };
                 authDomain = authNode.domain or "";
-                authUrl = 
-                  if authDomain != "" then "https://${authDomain}/"
-                  else if myInventory.hosts.${config.networking.hostName} ? netbirdIp then "https://${myInventory.hosts.${config.networking.hostName}.netbirdIp}:${toString (authNode.externalPort or 9091)}/"
-                  else "https://authelia.local/";
+                authUrl =
+                  if authDomain != "" then
+                    "https://${authDomain}/"
+                  else if myInventory.hosts.${config.networking.hostName} ? netbirdIp then
+                    "https://${myInventory.hosts.${config.networking.hostName}.netbirdIp}:${
+                      toString (authNode.externalPort or 9091)
+                    }/"
+                  else
+                    "https://authelia.local/";
               in
               (h.genVHosts {
                 inherit proxyTargets authUrl;
