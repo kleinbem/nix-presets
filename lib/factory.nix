@@ -188,7 +188,10 @@ in
                 allowUnfree = true;
                 allowUnfreePredicate = _: true;
                 permittedInsecurePackages = [
-                  "openclaw-2026.6.5"
+                  # Advisory marking (prompt injection by design), not a CVE;
+                  # the factory builds it as an isolated container. Pinned on
+                  # purpose: every version bump forces this re-ack.
+                  "openclaw-2026.6.11"
                 ];
               };
             })
