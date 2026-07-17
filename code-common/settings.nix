@@ -8,24 +8,17 @@
     "files.autoSave" = "afterDelay";
 
     # --- Nix Integration ---
+    # nil, not nixd: nixd's option providers eval the full system + HM config
+    # (multi-GB per restart, retriggered by autoSave) and can thrash the host.
     "nix.enableLanguageServer" = true;
-    "nix.serverPath" = "nixd";
+    "nix.serverPath" = "nil";
     "nix.formatterPath" = "nixfmt";
     "direnv.restart.automatic" = true;
 
     "nix.serverSettings" = {
-      "nixd" = {
+      "nil" = {
         "formatting" = {
           "command" = [ "nixfmt" ];
-        };
-        "options" = {
-          "nixos" = {
-            "expr" = "(builtins.getFlake \"\${workspaceFolder}\").nixosConfigurations.nixos-nvme.options";
-          };
-          "home-manager" = {
-            "expr" =
-              "(builtins.getFlake \"\${workspaceFolder}\").homeConfigurations.\"martin@nixos-nvme\".options";
-          };
         };
       };
     };

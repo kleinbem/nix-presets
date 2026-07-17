@@ -9,12 +9,10 @@ let
 
   # The Unified "Code Family" — bundles are built and synced independently
   # via `just extensions::sync`, not as part of nixos-rebuild.
+  # Antigravity is NOT in this family: the 2.0 IDE is self-vendored in
+  # nix-packages (google-antigravity-ide, launches memory-capped) and uses
+  # ~/.antigravity-ide, which this wrapper/config layout never reached.
   codeFamily = [
-    {
-      name = "Antigravity";
-      configDir = ".config/antigravity";
-      extDir = ".config/antigravity/extensions";
-    }
     {
       name = "Cursor";
       configDir = ".config/cursor";
@@ -38,22 +36,10 @@ let
     app:
     let
       # Use the exact package names confirmed from search.nixos.org
-      pkg =
-        if app.name == "Windsurf" then
-          pkgs.windsurf
-        else if app.name == "Cursor" then
-          pkgs.code-cursor-fhs
-        else
-          pkgs.antigravity-fhs;
+      pkg = if app.name == "Windsurf" then pkgs.windsurf else pkgs.code-cursor-fhs;
 
       # Correct binary names for the FHS wrappers
-      binName =
-        if app.name == "Cursor" then
-          "cursor"
-        else if app.name == "Antigravity" then
-          "antigravity"
-        else
-          "windsurf";
+      binName = if app.name == "Cursor" then "cursor" else "windsurf";
     in
     pkgs.writeShellScriptBin (lib.toLower app.name) ''
       exec ${pkg}/bin/${binName} \
@@ -71,9 +57,8 @@ in
   home = {
     packages = with pkgs; [
       # Unified Code Platform Editors (Isolated Wrappers)
-      (mkIsolatedEditor (builtins.elemAt codeFamily 0)) # Antigravity
-      (mkIsolatedEditor (builtins.elemAt codeFamily 1)) # Cursor
-      (mkIsolatedEditor (builtins.elemAt codeFamily 2)) # Windsurf
+      (mkIsolatedEditor (builtins.elemAt codeFamily 0)) # Cursor
+      (mkIsolatedEditor (builtins.elemAt codeFamily 1)) # Windsurf
 
       warp-terminal
       pavucontrol
