@@ -36,10 +36,11 @@ let
     app:
     let
       # Use the exact package names confirmed from search.nixos.org
-      pkg = if app.name == "Windsurf" then pkgs.windsurf else pkgs.code-cursor-fhs;
+      # (windsurf was rebranded upstream: package + binary are now devin-desktop)
+      pkg = if app.name == "Windsurf" then pkgs.devin-desktop else pkgs.code-cursor-fhs;
 
       # Correct binary names for the FHS wrappers
-      binName = if app.name == "Cursor" then "cursor" else "windsurf";
+      binName = if app.name == "Cursor" then "cursor" else "devin-desktop";
     in
     pkgs.writeShellScriptBin (lib.toLower app.name) ''
       exec ${pkg}/bin/${binName} \
@@ -122,7 +123,7 @@ in
 
   qt = {
     enable = true;
-    platformTheme.name = "gtk";
+    platformTheme.name = "gtk3";
   };
 
   xdg.mimeApps = {

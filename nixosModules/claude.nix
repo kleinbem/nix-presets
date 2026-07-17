@@ -9,7 +9,8 @@
 let
   cfg = config.my.desktop.claude;
 
-  claude-heytcass = inputs.claude-for-linux.packages.${pkgs.system}.claude-desktop;
+  claude-heytcass =
+    inputs.claude-for-linux.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop;
 in
 {
   options.my.desktop.claude = {
