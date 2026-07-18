@@ -137,8 +137,25 @@ in
       package = pkgs.firefox-beta;
       configPath = ".mozilla/firefox";
 
-      # bitwarden-desktop native messaging handled by the Flatpak install
-      nativeMessagingHosts = [ ];
+      # Bitwarden desktop ↔ browser bridge (desktop-app / biometric unlock of
+      # the extension). The desktop app (installed system-wide on the GNOME
+      # host) bakes this proxy path into its binary at build time; Firefox execs
+      # desktop_proxy, which relays to the running app over its IPC socket under
+      # ~/.mozilla/native-messaging-hosts/. desktop_proxy is a small standalone
+      # binary — NOT the firejail-wrapped Electron app — so it doesn't trip
+      # firejail's no-nesting rule. One-time step: enable "Browser Integration"
+      # in the Bitwarden desktop app's settings to activate the link.
+      nativeMessagingHosts = [
+        (pkgs.writeTextDir "lib/mozilla/native-messaging-hosts/com.8bit.bitwarden.json" (
+          builtins.toJSON {
+            name = "com.8bit.bitwarden";
+            description = "Bitwarden desktop <-> browser bridge";
+            path = "${pkgs.bitwarden-desktop}/libexec/desktop_proxy";
+            type = "stdio";
+            allowed_extensions = [ "{446900e4-71c2-419f-a6a7-df9c091e268b}" ];
+          }
+        ))
+      ];
 
       policies = {
         Certificates = {
