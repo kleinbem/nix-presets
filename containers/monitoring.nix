@@ -102,9 +102,12 @@ in
                     url = "http://10.85.46.116:3100";
                   }
                 ];
-                dashboards.settings.providers = lib.mkIf cfg.githubMetrics.enable [
+                # Always provision the dashboards dir (was gated on githubMetrics;
+                # ungated so the network/router dashboard shows regardless — the
+                # github-actions panels just read empty when that's disabled).
+                dashboards.settings.providers = [
                   {
-                    name = "github-actions";
+                    name = "dashboards";
                     options.path = ./grafana-dashboards;
                   }
                 ];
@@ -227,6 +230,36 @@ in
                       annotations:
                         summary: "High disk usage on {{ $labels.instance }}"
                         description: "Disk space on / has fallen below 15% for more than 5 minutes."
+                - name: network-edge
+                  # Router-relevant health. Metric names follow node_exporter;
+                  # the OpenWrt node-exporter-lua aims for compatibility —
+                  # verify against a live router (a wrong name = silent no-data,
+                  # not an error). Fires to Alertmanager → ntfy.
+                  rules:
+                    - alert: HighTemperature
+                      expr: 'node_hwmon_temp_celsius > 85'
+                      for: 5m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "High temperature on {{ $labels.instance }}"
+                        description: "SoC/sensor temperature above 85°C for 5 minutes (BPI-R4 runs hot — check the fan)."
+                    - alert: ConntrackNearLimit
+                      expr: 'node_nf_conntrack_entries / node_nf_conntrack_entries_limit > 0.85'
+                      for: 5m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Conntrack table filling on {{ $labels.instance }}"
+                        description: "Connection-tracking table above 85% — a device may be flooding connections."
+                    - alert: HighLoad
+                      expr: 'node_load1 > 6'
+                      for: 10m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "High load on {{ $labels.instance }}"
+                        description: "1-min load above 6 for 10 minutes."
             '';
           };
 
