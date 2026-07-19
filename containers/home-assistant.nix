@@ -40,6 +40,24 @@ in
     additionalCapabilities = lib.optional cfg.enableBluetooth "CAP_NET_ADMIN"; # Bluetooth needs this
 
     innerConfig = {
+      # Upstream workaround: paho-mqtt 2.1.0's test suite fails under Python 3.14
+      # (callback-registration assertion, on_unsubscribe/on_disconnect), which
+      # breaks the whole home-assistant closure — and thus the container-factory
+      # aarch64 build — from source. paho-mqtt is a pure transitive dep here, so
+      # skip its check phase until nixpkgs ships the fix. Scoped to this
+      # container's nixpkgs only. REMOVE once paho-mqtt builds green upstream.
+      nixpkgs.overlays = [
+        (_final: prev: {
+          pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
+            (_pyfinal: pyprev: {
+              paho-mqtt = pyprev.paho-mqtt.overridePythonAttrs (_: {
+                doCheck = false;
+              });
+            })
+          ];
+        })
+      ];
+
       services.home-assistant = {
         enable = true;
         extraComponents = [
