@@ -72,7 +72,14 @@ in
 
           minio = {
             image = "minio/minio";
-            cmd = [ "server" "/data" "--address" ":3200" "--console-address" ":3201" ];
+            cmd = [
+              "server"
+              "/data"
+              "--address"
+              ":3200"
+              "--console-address"
+              ":3201"
+            ];
             volumes = [
               "/var/lib/ente/minio:/data"
             ];
@@ -85,7 +92,10 @@ in
           museum = {
             image = "ghcr.io/ente-io/server:latest";
             ports = [ "8080:8080" ];
-            dependsOn = [ "postgres" "minio" ];
+            dependsOn = [
+              "postgres"
+              "minio"
+            ];
             volumes = [
               "/var/lib/ente/data:/data"
               "/etc/museum.yaml:/museum.yaml:ro"
@@ -105,7 +115,7 @@ in
         "d /var/lib/ente/data 0755 root root - -"
       ];
     };
-    
+
     bindMounts = {
       "/var/lib/ente" = {
         hostPath = cfg.hostDataDir;

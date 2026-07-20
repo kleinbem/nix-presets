@@ -163,6 +163,7 @@
           let
             presets = {
               # Generic Modules
+              attic-push = ./attic-push.nix;
               container-common = import ./containers/common.nix;
               github-runner = import ./containers/github-runner.nix { inherit self; };
               cups = import ./containers/cups.nix { inherit self; };
