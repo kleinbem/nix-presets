@@ -42,10 +42,18 @@ in
             path = "/var/lib/atticd/storage";
           };
           chunking = {
-            nar-size-threshold = 65536;
-            min-size = 16384;
-            avg-size = 65536;
-            max-size = 262144;
+            # Much larger chunks than atticd's defaults (was avg 64 KiB / max
+            # 256 KiB). core-pi is an RPi5: chunking a 300–750 MiB *unfree* app
+            # (chrome, vscode, electron — not on cache.nixos.org, so they must be
+            # pushed here) into ~12k tiny FastCDC/BLAKE3 chunks saturates its CPU,
+            # the upload request stalls, and the client times out (os error 110).
+            # ~64× bigger chunks = hundreds per NAR, not thousands → ingestible.
+            # Costs some cross-path dedup, negligible here (each app is unique;
+            # this is a sparse overlay, not a general cache).
+            nar-size-threshold = 1048576; # 1 MiB: store smaller NARs whole
+            min-size = 1048576; # 1 MiB
+            avg-size = 4194304; # 4 MiB
+            max-size = 16777216; # 16 MiB
           };
 
           # Retention policy. This cache is a SPARSE OVERLAY on cache.nixos.org:

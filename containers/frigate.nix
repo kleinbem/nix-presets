@@ -18,10 +18,13 @@ let
   # so non-Jetson hosts (and the x86 container-factory) never see these.
   jetsonBinds = lib.optionalAttrs cfg.jetson (
     lib.listToAttrs (
-      map (d: lib.nameValuePair d {
-        hostPath = d;
-        isReadOnly = false;
-      }) cfg.jetsonDevices
+      map (
+        d:
+        lib.nameValuePair d {
+          hostPath = d;
+          isReadOnly = false;
+        }
+      ) cfg.jetsonDevices
     )
   );
 in
