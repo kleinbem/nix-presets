@@ -103,6 +103,18 @@ in
       example = "3G";
       description = "systemd MemoryMax for the container (e.g. \"3G\"). null = unbounded.";
     };
+    environmentFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "/run/secrets/frigate_rtsp_env";
+      description = ''
+        Host path to an env-file (KEY=value lines) bind-mounted read-only into the
+        container at the same path and set as the Frigate service's
+        EnvironmentFile. Frigate substitutes {VAR} in its config from these — use
+        it for camera RTSP credentials sourced from a sops secret, never inline in
+        the config. null = no env-file.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable (mkContainer {
@@ -156,6 +168,11 @@ in
             8555
           ];
           networking.firewall.allowedUDPPorts = [ 8555 ];
+          # Camera RTSP creds (and any other {VAR}s) come from the host env-file
+          # bound in below — Frigate does {VAR} substitution from its environment.
+          systemd.services.frigate.serviceConfig.EnvironmentFile = lib.mkIf (
+            cfg.environmentFile != null
+          ) cfg.environmentFile;
         }
         cfg.innerConfig
       ];
@@ -174,6 +191,14 @@ in
         isReadOnly = false;
       };
     }
-    // jetsonBinds;
+    // jetsonBinds
+    # Bind the host env-file (e.g. a sops-decrypted /run/secrets/…) into the
+    # container at the same path so EnvironmentFile above can read it.
+    // lib.optionalAttrs (cfg.environmentFile != null) {
+      ${cfg.environmentFile} = {
+        hostPath = cfg.environmentFile;
+        isReadOnly = true;
+      };
+    };
   });
 }
