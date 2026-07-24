@@ -70,7 +70,18 @@ in
             # tidy without thrashing.
             interval = "12 hours";
 
-            # Finite retention: 90 days. This is SAFE for the "devices must never
+            # Finite retention: 14 days (tightened from 90d on 2026-07-24). A DB
+            # audit that day proved storage (37G / 41.7 GiB uncompressed) is ~100%
+            # genuine overlay — 0 paths signed by cache.nixos.org, 2 by cachix; the
+            # rest is unfree AI-tool apps + custom kernel + Android SDK, SEVERAL
+            # VERSIONS each (openclaw/lmstudio/vscode/cursor keep old versions).
+            # Attic has no "keep N versions" knob, so the retention window IS the
+            # version-count lever: 14d evicts each superseded version ~2x faster
+            # than 30d once it goes idle. Safe to tighten because the PUSH side
+            # only uploads non-upstream paths (CI `--skip-cached` + the local
+            # `push-cache` signature filter), so nothing a public cache has is at
+            # risk — clients fetch those from cache.nixos.org anyway. This is SAFE
+            # for the "devices must never
             # build" requirement because of a self-healing loop, not in spite of
             # it. The pieces:
             #
@@ -78,7 +89,7 @@ in
             #      last_accessed_at are older than the window (server/src/gc.rs),
             #      so anything actively pulled renews itself and never ages out.
             #   2. If GC DOES evict a still-needed non-upstream path (e.g. the
-            #      stable linux-rpi kernel, untouched for 90d), the next build-all
+            #      stable linux-rpi kernel, untouched for 14d), the next build-all
             #      rebuilds it (its `--skip-cached` finds it cached NOWHERE) and
             #      re-pushes it — refilling the current closure on CI, never on a
             #      device.
@@ -89,18 +100,32 @@ in
             #      instead of reaching a device as an on-device build.
             #
             # Net trade for bounded, automated disk: devices still never build;
-            # the costs are (a) an occasional aarch64 kernel recompile in CI when
-            # a cold path ages out (~quarterly at worst), and (b) a rollback gap —
-            # rolling `production` back to a closure whose unique paths are >90d
-            # old and already evicted would make that host build. If you ever roll
-            # back further than 90d, widen this first.
+            # the costs are (a) a somewhat more frequent aarch64 kernel recompile
+            # in CI when a cold path ages out, and (b) a rollback gap — rolling
+            # `production` back to a closure whose unique paths are >14d old and
+            # already evicted would make that host build. If you ever roll back
+            # further than 14d, widen this first.
             #
-            # Knobs: widen to "180 days"/"1 year" to cut recompiles + close the
+            # Knobs: widen to "90 days"/"1 year" to cut recompiles + close the
             # rollback gap at the cost of disk; set "0" to disable age-based GC
             # entirely (keep-forever — unbounded disk, manual `just nixos::attic-gc`
             # only sweeps orphans then). Per-cache override: `attic cache configure
             # system --retention-period <dur>`.
-            default-retention-period = "90 days";
+            #
+            # UPSTREAM FILTER (imperative — no declarative atticd knob exists):
+            # atticd's server-side push filter skips paths signed by an upstream
+            # cache's key. It defaults to cache.nixos.org-1 only; the four cachix
+            # keys this flake trusts were added on 2026-07-24 via
+            #   attic cache configure system \
+            #     --upstream-cache-key-name cache.nixos.org-1 \
+            #     --upstream-cache-key-name nix-community.cachix.org-1 \
+            #     --upstream-cache-key-name devenv.cachix.org-1 \
+            #     --upstream-cache-key-name cuda-maintainers.cachix.org-1 \
+            #     --upstream-cache-key-name anduril.cachix.org-1
+            # This is PER-CACHE DB state, NOT captured by this module — if the
+            # cache DB is ever recreated, re-run the above (keep it in sync with
+            # trusted-public-keys in nix-config/modules/nixos/core.nix).
+            default-retention-period = "14 days";
           };
         };
       };
