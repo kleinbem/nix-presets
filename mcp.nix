@@ -10,10 +10,30 @@
     enable = lib.mkEnableOption "MCP Servers for AI Tools";
   };
 
-  config = lib.mkIf config.modules.mcp.enable {
-    # Ensure Atlas and Python with MCP are available in the home environment
+  config = lib.mkIf config.modules.mcp.enable (
+    let
+      freecad-mcp-src = pkgs.fetchFromGitHub {
+        owner = "neka-nat";
+        repo = "freecad-mcp";
+        rev = "4c3f2eff96f22f179946a1ecaf46bb50f2ac87ae";
+        sha256 = "0gx43xdvamk654d9xw0gq86pq0j059aw0gfj72yzxyqs755585x2";
+      };
+
+      freecadMcpPkg = pkgs.python3.pkgs.buildPythonPackage {
+        pname = "freecad-mcp";
+        version = "0.1.19";
+        pyproject = true;
+        src = freecad-mcp-src;
+        nativeBuildInputs = [ pkgs.python3.pkgs.hatchling ];
+        propagatedBuildInputs = with pkgs.python3.pkgs; [ mcp validators ];
+        meta.mainProgram = "freecad-mcp";
+      };
+    in
+    {
+      # Ensure Atlas and Python with MCP are available in the home environment
     home.packages = [
       (pkgs.callPackage ./atlas/default.nix { })
+      freecadMcpPkg
       (pkgs.python3.withPackages (
         ps: with ps; [
           mcp
@@ -28,6 +48,9 @@
       ))
     ];
 
+    # Install FreeCAD MCP Addon declaratively
+    home.file.".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecad-mcp-src}/addon/FreeCADMCP";
+    
     # Secure Claude Config
     sops.templates."Claude/claude_desktop_config.json" = {
       path = "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json";
@@ -90,6 +113,11 @@
               command = lib.getExe pkgs.mcp-server-sequential-thinking;
               args = [ ];
             };
+
+            freecad = {
+              command = lib.getExe freecadMcpPkg;
+              args = [ ];
+            };
           };
         };
     };
@@ -145,6 +173,11 @@
               command = lib.getExe pkgs.mcp-server-sequential-thinking;
               args = [ ];
             };
+
+            freecad = {
+              command = lib.getExe freecadMcpPkg;
+              args = [ ];
+            };
           };
         };
         mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
@@ -174,5 +207,5 @@
         cp -f "${mcpJson}" "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.mcp.json"
         chmod 644 "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.mcp.json"
       '';
-  };
+  });
 }
