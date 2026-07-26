@@ -205,6 +205,7 @@
       rclone
       lxqt.lxqt-openssh-askpass
       btop # Essential for monitoring n8n/Ollama resources
+      systemctl-tui # Essential for monitoring systemd services
       usbutils # lsusb
       pciutils # lspci
       devenv # Added for advanced direnv integration
