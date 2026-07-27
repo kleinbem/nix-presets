@@ -187,12 +187,14 @@ in
               nixpkgs.config = {
                 allowUnfree = true;
                 allowUnfreePredicate = _: true;
-                allowInsecurePredicate = pkg: builtins.elem (lib.getName pkg) [
-                  # Advisory marking (prompt injection by design), not a CVE;
-                  # the factory builds it as an isolated container. 
-                  # Using predicate to allow automatic updates across version bumps.
-                  "openclaw"
-                ];
+                allowInsecurePredicate =
+                  pkg:
+                  builtins.elem (lib.getName pkg) [
+                    # Advisory marking (prompt injection by design), not a CVE;
+                    # the factory builds it as an isolated container.
+                    # Using predicate to allow automatic updates across version bumps.
+                    "openclaw"
+                  ];
               };
             })
 

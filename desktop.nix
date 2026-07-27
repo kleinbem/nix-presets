@@ -86,12 +86,6 @@ in
       pkgs.cliphist # Clipboard history
       pkgs.wl-clipboard # Required for cliphist
 
-      # -- Volatile tools moved to DevShells --
-      # Run: just pentest    (Wireshark, Chromium, Metasploit, etc.)
-      # Run: just ai-dev     (claude-code, lmstudio, fabric-ai, etc.)
-      # Run: just math       (octaveFull, typst, tinymist)
-      # Run: just media      (obs-studio)
-
       nixd # Nix Language Server
     ];
 
