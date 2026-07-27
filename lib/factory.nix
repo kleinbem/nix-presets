@@ -187,11 +187,11 @@ in
               nixpkgs.config = {
                 allowUnfree = true;
                 allowUnfreePredicate = _: true;
-                permittedInsecurePackages = [
+                allowInsecurePredicate = pkg: builtins.elem (lib.getName pkg) [
                   # Advisory marking (prompt injection by design), not a CVE;
-                  # the factory builds it as an isolated container. Pinned on
-                  # purpose: every version bump forces this re-ack.
-                  "openclaw-2026.6.11"
+                  # the factory builds it as an isolated container. 
+                  # Using predicate to allow automatic updates across version bumps.
+                  "openclaw"
                 ];
               };
             })
