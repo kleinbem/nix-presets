@@ -8,7 +8,8 @@ let
   cfg = config.my.pwa;
 
   pwaType = lib.types.submodule (
-    { name, ... }: {
+    { name, ... }:
+    {
       options = {
         enable = lib.mkOption {
           type = lib.types.bool;
@@ -33,6 +34,11 @@ let
           default = "pwa-${name}";
           description = "StartupWMClass for taskbar grouping and window identification.";
         };
+        extraFlags = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Individual Chromium CLI flags specifically for this PWA.";
+        };
         categories = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [
@@ -53,6 +59,18 @@ in
       default = pkgs.chromium;
       description = "Chromium package to use as the PWA engine.";
     };
+    defaultFlags = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "--no-first-run"
+        "--no-default-browser-check"
+        "--enable-features=UseOzonePlatform"
+        "--ozone-platform=wayland"
+        "--enable-gpu-rasterization"
+        "--enable-zero-copy"
+      ];
+      description = "Global Chromium CLI flags applied to all PWAs.";
+    };
     apps = lib.mkOption {
       type = lib.types.attrsOf pwaType;
       default = {
@@ -61,6 +79,7 @@ in
           url = "https://www.netflix.com";
           icon = "netflix";
           wmClass = "pwa-netflix";
+          extraFlags = [ "--enable-features=VaapiVideoDecoder" ];
           categories = [
             "AudioVideo"
             "Video"
@@ -72,6 +91,7 @@ in
           url = "https://www.disneyplus.com";
           icon = "disneyplus";
           wmClass = "pwa-disneyplus";
+          extraFlags = [ "--enable-features=VaapiVideoDecoder" ];
           categories = [
             "AudioVideo"
             "Video"
@@ -101,11 +121,16 @@ in
       lib.mapAttrsToList (
         id: pwa:
         if pwa.enable then
+          let
+            allFlags = cfg.defaultFlags ++ pwa.extraFlags;
+            flagsStr = lib.concatStringsSep " \\\n  " (map (f: "\"${f}\"") allFlags);
+          in
           pkgs.writeShellScriptBin "pwa-${id}" ''
             exec ${cfg.package}/bin/chromium \
               --app="${pwa.url}" \
               --user-data-dir="$HOME/.local/share/pwa/${id}" \
               --class="${pwa.wmClass}" \
+              ${flagsStr} \
               "$@"
           ''
         else
