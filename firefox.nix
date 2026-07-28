@@ -64,7 +64,7 @@ in
         name = "Firefox";
         genericName = "Web Browser";
         exec = "firefox -P standard --name firefox-standard %u";
-        icon = "firefox";
+        icon = "${pkgs.firefox-beta}/share/icons/hicolor/128x128/apps/firefox-beta.png";
         terminal = false;
         categories = [
           "Network"
@@ -87,7 +87,7 @@ in
         name = "Firefox Developer Edition";
         genericName = "Developer Web Browser";
         exec = "firefox-devedition -P laboratory --name firefox-developer %u";
-        icon = "firefox-devedition";
+        icon = "${pkgs.firefox-devedition}/share/icons/hicolor/128x128/apps/firefox-devedition.png";
         terminal = false;
         categories = [
           "Network"
@@ -111,7 +111,7 @@ in
         name = "Firefox Temp";
         genericName = "Ephemeral Browser (Beta)";
         exec = "firefox -P temp --name firefox-temp %u";
-        icon = "${pkgs.adwaita-icon-theme}/share/icons/Adwaita/symbolic/status/weather-windy-symbolic.svg";
+        icon = "${pkgs.firefox-beta}/share/icons/hicolor/128x128/apps/firefox-beta.png";
         terminal = false;
         categories = [
           "Network"
