@@ -7,41 +7,43 @@
 let
   cfg = config.my.pwa;
 
-  pwaType = lib.types.submodule ({ name, ... }: {
-    options = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Whether to enable this PWA launcher.";
+  pwaType = lib.types.submodule (
+    { name, ... }: {
+      options = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Whether to enable this PWA launcher.";
+        };
+        name = lib.mkOption {
+          type = lib.types.str;
+          default = name;
+          description = "Display name of the application.";
+        };
+        url = lib.mkOption {
+          type = lib.types.str;
+          description = "Target URL for the PWA.";
+        };
+        icon = lib.mkOption {
+          type = lib.types.str;
+          description = "Icon name or path for the desktop launcher.";
+        };
+        wmClass = lib.mkOption {
+          type = lib.types.str;
+          default = "pwa-${name}";
+          description = "StartupWMClass for taskbar grouping and window identification.";
+        };
+        categories = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [
+            "Network"
+            "WebBrowser"
+          ];
+          description = "Desktop categories for app launcher menu.";
+        };
       };
-      name = lib.mkOption {
-        type = lib.types.str;
-        default = name;
-        description = "Display name of the application.";
-      };
-      url = lib.mkOption {
-        type = lib.types.str;
-        description = "Target URL for the PWA.";
-      };
-      icon = lib.mkOption {
-        type = lib.types.str;
-        description = "Icon name or path for the desktop launcher.";
-      };
-      wmClass = lib.mkOption {
-        type = lib.types.str;
-        default = "pwa-${name}";
-        description = "StartupWMClass for taskbar grouping and window identification.";
-      };
-      categories = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = [
-          "Network"
-          "WebBrowser"
-        ];
-        description = "Desktop categories for app launcher menu.";
-      };
-    };
-  });
+    }
+  );
 in
 {
   options.my.pwa = {
@@ -92,27 +94,34 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = [ cfg.package ] ++ (builtins.filter (x: x != null) (lib.mapAttrsToList (id: pwa:
-      if pwa.enable then
-        pkgs.writeShellScriptBin "pwa-${id}" ''
-          exec ${cfg.package}/bin/chromium \
-            --app="${pwa.url}" \
-            --user-data-dir="$HOME/.local/share/pwa/${id}" \
-            --class="${pwa.wmClass}" \
-            "$@"
-        ''
-      else
-        null
-    ) cfg.apps));
+    home.packages = [
+      cfg.package
+    ]
+    ++ (builtins.filter (x: x != null) (
+      lib.mapAttrsToList (
+        id: pwa:
+        if pwa.enable then
+          pkgs.writeShellScriptBin "pwa-${id}" ''
+            exec ${cfg.package}/bin/chromium \
+              --app="${pwa.url}" \
+              --user-data-dir="$HOME/.local/share/pwa/${id}" \
+              --class="${pwa.wmClass}" \
+              "$@"
+          ''
+        else
+          null
+      ) cfg.apps
+    ));
 
-    xdg.desktopEntries = lib.mapAttrs' (id: pwa:
+    xdg.desktopEntries = lib.mapAttrs' (
+      id: pwa:
       lib.nameValuePair "pwa-${id}" {
         name = "${pwa.name} (PWA)";
         genericName = "${pwa.name} Web App";
         exec = "pwa-${id} %u";
-        icon = pwa.icon;
+        inherit (pwa) icon;
         terminal = false;
-        categories = pwa.categories;
+        inherit (pwa) categories;
         settings = {
           StartupNotify = "true";
           StartupWMClass = pwa.wmClass;
