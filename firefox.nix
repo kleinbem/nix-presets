@@ -63,7 +63,7 @@ in
       firefox-standard = {
         name = "Firefox";
         genericName = "Web Browser";
-        exec = "firefox -P standard --name firefox-standard %u";
+        exec = "env MOZ_APP_LAUNCHER=firefox-standard firefox -P standard --name firefox-standard --class firefox-standard %u";
         icon = "${pkgs.firefox-beta}/share/icons/hicolor/128x128/apps/firefox-beta.png";
         terminal = false;
         categories = [
@@ -86,7 +86,7 @@ in
       firefox-developer = {
         name = "Firefox Developer Edition";
         genericName = "Developer Web Browser";
-        exec = "firefox-devedition -P laboratory --name firefox-developer %u";
+        exec = "env MOZ_APP_LAUNCHER=firefox-developer firefox-devedition -P laboratory --name firefox-developer --class firefox-developer %u";
         icon = "${pkgs.firefox-devedition}/share/icons/hicolor/128x128/apps/firefox-devedition.png";
         terminal = false;
         categories = [
@@ -110,7 +110,7 @@ in
       firefox-temp = {
         name = "Firefox Temp";
         genericName = "Ephemeral Browser (Beta)";
-        exec = "firefox -P temp --name firefox-temp %u";
+        exec = "env MOZ_APP_LAUNCHER=firefox-temp firefox -P temp --name firefox-temp --class firefox-temp %u";
         icon = "${pkgs.firefox-beta}/share/icons/hicolor/128x128/apps/firefox-beta.png";
         terminal = false;
         categories = [
