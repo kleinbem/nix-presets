@@ -64,10 +64,11 @@ in
       default = [
         "--no-first-run"
         "--no-default-browser-check"
-        "--enable-features=UseOzonePlatform"
+        "--enable-features=UseOzonePlatform,WaylandWindowDecorations,AudioServiceOutOfProcess"
         "--ozone-platform=wayland"
         "--enable-gpu-rasterization"
         "--enable-zero-copy"
+        "--enable-blink-features=MiddleClickAutoscroll"
       ];
       description = "Global Chromium CLI flags applied to all PWAs.";
     };
@@ -79,7 +80,10 @@ in
           url = "https://www.netflix.com";
           icon = "netflix";
           wmClass = "pwa-netflix";
-          extraFlags = [ "--enable-features=VaapiVideoDecoder" ];
+          extraFlags = [
+            "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder"
+            "--ignore-gpu-blocklist"
+          ];
           categories = [
             "AudioVideo"
             "Video"
@@ -91,7 +95,10 @@ in
           url = "https://www.disneyplus.com";
           icon = "disneyplus";
           wmClass = "pwa-disneyplus";
-          extraFlags = [ "--enable-features=VaapiVideoDecoder" ];
+          extraFlags = [
+            "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder"
+            "--ignore-gpu-blocklist"
+          ];
           categories = [
             "AudioVideo"
             "Video"
@@ -103,6 +110,7 @@ in
           url = "https://github.com";
           icon = "github";
           wmClass = "pwa-github";
+          extraFlags = [ "--enable-features=DesktopPWAsLaunchHandler" ];
           categories = [
             "Development"
             "Network"
