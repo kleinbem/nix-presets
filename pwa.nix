@@ -147,15 +147,15 @@ in
     programs.chromium = {
       enable = true;
       inherit (cfg) package;
-      extraOpts = {
+    };
+
+    # Generate managed Chromium policies (disable default browser prompts)
+    # and vector SVG icon files under ~/.local/share/icons/hicolor/scalable/apps/
+    home.file = {
+      ".config/chromium/policies/managed/default_policy.json".text = builtins.toJSON {
         "DefaultBrowserSettingEnabled" = false;
         "FirstRunTabsEnabled" = false;
       };
-    };
-
-    # Generate vector SVG icon files under ~/.local/share/icons/hicolor/scalable/apps/
-    # and link the main Chromium app icon so launchers find it.
-    home.file = {
       ".local/share/icons/hicolor/128x128/apps/chromium.png".source =
         "${cfg.package}/share/icons/hicolor/128x128/apps/chromium.png";
     }
