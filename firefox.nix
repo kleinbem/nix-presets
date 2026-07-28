@@ -164,6 +164,15 @@ in
             "/nix/persist/pki/internal/ca.crt"
           ];
         };
+        InstallAddonsPermission = {
+          Default = false;
+        };
+        ExtensionSettings = {
+          "*" = {
+            installation_mode = "blocked";
+            blocked_install_message = "Extension installations are managed declaratively via Nix.";
+          };
+        };
       };
 
       profiles = {
