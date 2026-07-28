@@ -68,7 +68,6 @@ in
         "--ozone-platform=wayland"
         "--enable-gpu-rasterization"
         "--enable-zero-copy"
-        "--enable-blink-features=MiddleClickAutoscroll"
       ];
       description = "Global Chromium CLI flags applied to all PWAs.";
     };
