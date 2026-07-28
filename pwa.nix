@@ -27,7 +27,13 @@ let
         };
         icon = lib.mkOption {
           type = lib.types.str;
+          default = "pwa-${name}";
           description = "Icon name or path for the desktop launcher.";
+        };
+        svg = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Raw SVG content to generate a dedicated desktop icon file.";
         };
         wmClass = lib.mkOption {
           type = lib.types.str;
@@ -77,8 +83,14 @@ in
         netflix = {
           name = "Netflix";
           url = "https://www.netflix.com";
-          icon = "netflix";
           wmClass = "pwa-netflix";
+          svg = ''
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+              <rect width="512" height="512" rx="96" fill="#000000"/>
+              <path fill="#E50914" d="M128 64h72l74 210V64h72v384h-72l-74-210v210h-72V64z"/>
+              <path fill="#B81D24" d="M274 274l74 174h72V64h-72v210z" opacity="0.4"/>
+            </svg>
+          '';
           extraFlags = [
             "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder"
             "--ignore-gpu-blocklist"
@@ -92,8 +104,14 @@ in
         disneyplus = {
           name = "Disney+";
           url = "https://www.disneyplus.com";
-          icon = "disneyplus";
           wmClass = "pwa-disneyplus";
+          svg = ''
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+              <rect width="512" height="512" rx="96" fill="#040e29"/>
+              <path fill="#00d6fe" d="M256 64 C 150 64, 80 150, 80 256 C 80 362, 150 448, 256 448 C 340 448, 410 390, 428 300 H 350 C 336 340, 298 376, 256 376 C 188 376, 148 322, 148 256 C 148 190, 188 136, 256 136 C 300 136, 338 174, 350 216 H 428 C 410 126, 340 64, 256 64 Z"/>
+              <path fill="#ffffff" d="M230 200 h 60 v 112 h -60 z"/>
+            </svg>
+          '';
           extraFlags = [
             "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder"
             "--ignore-gpu-blocklist"
@@ -107,8 +125,13 @@ in
         github = {
           name = "GitHub";
           url = "https://github.com";
-          icon = "github";
           wmClass = "pwa-github";
+          svg = ''
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="512" height="512">
+              <rect width="24" height="24" rx="5" fill="#181717"/>
+              <path fill="#ffffff" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+            </svg>
+          '';
           extraFlags = [ "--enable-features=DesktopPWAsLaunchHandler" ];
           categories = [
             "Development"
@@ -121,6 +144,14 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Generate vector SVG icon files under ~/.local/share/icons/hicolor/scalable/apps/
+    home.file = lib.mapAttrs' (
+      id: pwa:
+      lib.nameValuePair ".local/share/icons/hicolor/scalable/apps/pwa-${id}.svg" {
+        text = pwa.svg;
+      }
+    ) (lib.filterAttrs (_: pwa: pwa.enable && pwa.svg != null) cfg.apps);
+
     home.packages = [
       cfg.package
     ]
@@ -147,11 +178,14 @@ in
 
     xdg.desktopEntries = lib.mapAttrs' (
       id: pwa:
+      let
+        iconName = if pwa.svg != null then "pwa-${id}" else pwa.icon;
+      in
       lib.nameValuePair "pwa-${id}" {
         name = "${pwa.name} (PWA)";
         genericName = "${pwa.name} Web App";
         exec = "pwa-${id} %u";
-        inherit (pwa) icon;
+        icon = iconName;
         terminal = false;
         inherit (pwa) categories;
         settings = {
