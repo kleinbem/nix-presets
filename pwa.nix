@@ -144,6 +144,15 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    programs.chromium = {
+      enable = true;
+      inherit (cfg) package;
+      extraOpts = {
+        "DefaultBrowserSettingEnabled" = false;
+        "FirstRunTabsEnabled" = false;
+      };
+    };
+
     # Generate vector SVG icon files under ~/.local/share/icons/hicolor/scalable/apps/
     home.file = lib.mapAttrs' (
       id: pwa:
