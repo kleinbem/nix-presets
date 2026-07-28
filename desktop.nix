@@ -68,7 +68,8 @@ in
       pavucontrol
       nwg-look
       mission-center # System Monitor (Task Manager)
-      xpad # Sticky Notes App
+      sticky # Modern GTK4 Wayland Sticky Notes App
+      xpad # Classic GTK3 Sticky Notes App
       p7zip # Archives
       rclone-browser # GUI for Rclone
       restic-browser # GUI for Restic Backups
