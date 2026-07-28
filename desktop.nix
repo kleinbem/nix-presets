@@ -69,6 +69,7 @@ in
       nwg-look
       mission-center # System Monitor (Task Manager)
       sticky # Modern GTK4 Wayland Sticky Notes App
+      hicolor-icon-theme # Base XDG icon theme index for GTK apps
       p7zip # Archives
       rclone-browser # GUI for Rclone
       restic-browser # GUI for Restic Backups
