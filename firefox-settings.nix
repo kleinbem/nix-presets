@@ -64,17 +64,28 @@ let
     "sidebar.main.width" = 220;
   };
 
-  commonExtensions = with pkgs.nur.repos.rycee.firefox-addons; [
-    bitwarden
-    ublock-origin
-    privacy-badger
-    darkreader
-    multi-account-containers
-    clearurls
-    consent-o-matic
-    markdownload
-    tab-session-manager
-  ];
+  obsidianWebClipper = pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+    pname = "obsidian-web-clipper";
+    version = "1.7.1";
+    addonId = "clipper@obsidian.md";
+    url = "https://addons.mozilla.org/firefox/downloads/latest/obsidian-web-clipper/latest.xpi";
+    sha256 = "1zigp63n8dg0vb3vbpmzjzinihgvxfmxcg1xnjvlw9nqlnl8k83r";
+    meta = { };
+  };
+
+  commonExtensions =
+    (with pkgs.nur.repos.rycee.firefox-addons; [
+      bitwarden
+      ublock-origin
+      privacy-badger
+      darkreader
+      multi-account-containers
+      clearurls
+      consent-o-matic
+      markdownload
+      tab-session-manager
+    ])
+    ++ [ obsidianWebClipper ];
 in
 {
   # --- Level 1: Standard (Hardened Daily Driver) ---

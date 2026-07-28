@@ -155,7 +155,53 @@ in
       ".config/chromium/policies/managed/default_policy.json".text = builtins.toJSON {
         "DefaultBrowserSettingEnabled" = false;
         "FirstRunTabsEnabled" = false;
+        "SystemTheme" = 1;
+        "UseSystemTitleBar" = true;
       };
+      ".local/share/icons/hicolor/index.theme".text = ''
+        [Icon Theme]
+        Name=Hicolor
+        Comment=Fallback icon theme
+        Hidden=true
+        Directories=16x16/apps,32x32/apps,48x48/apps,128x128/apps,256x256/apps,512x512/apps,scalable/apps
+
+        [16x16/apps]
+        Size=16
+        Context=Applications
+        Type=Threshold
+
+        [32x32/apps]
+        Size=32
+        Context=Applications
+        Type=Threshold
+
+        [48x48/apps]
+        Size=48
+        Context=Applications
+        Type=Threshold
+
+        [128x128/apps]
+        Size=128
+        Context=Applications
+        Type=Threshold
+
+        [256x256/apps]
+        Size=256
+        Context=Applications
+        Type=Threshold
+
+        [512x512/apps]
+        Size=512
+        Context=Applications
+        Type=Threshold
+
+        [scalable/apps]
+        Size=128
+        Context=Applications
+        Type=Scalable
+        MinSize=16
+        MaxSize=512
+      '';
       ".local/share/icons/hicolor/128x128/apps/chromium.png".source =
         "${cfg.package}/share/icons/hicolor/128x128/apps/chromium.png";
     }
