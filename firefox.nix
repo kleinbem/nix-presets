@@ -40,7 +40,7 @@ in
 
     # Unify Developer Edition and Firefox profile directories declaratively
     home.file.".mozilla/firefox-dev-edition".source =
-      config.lib.file.mkOutOfStoreSymlink "/home/${config.home.username}/.mozilla/firefox";
+      config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.mozilla/firefox";
 
     xdg.desktopEntries = {
       # --- Hide default package launchers to avoid menu clutter ---
@@ -183,17 +183,6 @@ in
           isDefault = true;
           extensions.packages = browserSettings.standardExtensions;
           settings = browserSettings.standardSettings;
-          userChrome = ''
-            /* High-visibility active tab highlight (Top Bar) */
-            .tabbrowser-tab[selected="true"] {
-              background-color: rgba(255, 255, 255, 0.1) !important;
-            }
-            .tab-background[selected="true"] {
-              outline: 2px solid #00ddff !important;
-              outline-offset: -2px !important;
-            }
-
-          '';
           search = commonSearch;
         };
 
@@ -203,17 +192,6 @@ in
           name = "laboratory";
           extensions.packages = browserSettings.laboratoryExtensions;
           settings = browserSettings.laboratorySettings;
-          userChrome = ''
-            /* High-visibility active tab highlight (Top Bar) */
-            .tabbrowser-tab[selected="true"] {
-              background-color: rgba(255, 255, 255, 0.1) !important;
-            }
-            .tab-background[selected="true"] {
-              outline: 2px solid #ff00ff !important; /* Magenta accent for Laboratory */
-              outline-offset: -2px !important;
-            }
-
-          '';
           search = commonSearch;
         };
 

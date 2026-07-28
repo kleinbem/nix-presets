@@ -95,19 +95,17 @@ in
     # Generate declarative config files for all agents
     file = lib.mkMerge (map mkConfigs codeFamily);
 
-    # Create cloud mount directories for rclone
-    activation.createCloudMounts = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      $DRY_RUN_CMD mkdir -p $HOME/GoogleDrive $HOME/OneDrive
-    '';
-
-    # Prepare extension directories — extensions are synced separately via `just extensions::sync`.
-    activation.syncCodeFamily = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${lib.concatMapStrings (app: ''
-        mkdir -p $HOME/${app.extDir}
-        mkdir -p $HOME/${app.configDir}/data
-      '') codeFamily}
-    '';
   };
+
+  # Declaratively ensure user directories exist via systemd tmpfiles rules
+  systemd.user.tmpfiles.rules = [
+    "d %h/GoogleDrive 0755 - - -"
+    "d %h/OneDrive 0755 - - -"
+    "d %h/.config/cursor/data 0755 - - -"
+    "d %h/.config/cursor/extensions 0755 - - -"
+    "d %h/.config/windsurf/data 0755 - - -"
+    "d %h/.config/windsurf/extensions 0755 - - -"
+  ];
 
   # Force Qt apps to use GTK theme (fixes rclone-browser dark mode)
   gtk = {
