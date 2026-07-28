@@ -116,28 +116,12 @@ in
       name = "Adwaita-dark";
       package = pkgs.gnome-themes-extra;
     };
-    gtk3.extraCss = ''
-      /* Distinct 1.5px window border for GTK3 / CSD windows in dark mode */
-      window, window.solid-csd, window.csd, .window-frame {
-        border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 8px 24px rgba(0, 0, 0, 0.7) !important;
-      }
-      /* Bright blue accent outline on the focused active window */
-      window:focus-within, window:focus {
-        border: 1.5px solid #3584e4 !important;
-      }
-    '';
-    gtk4.extraCss = ''
-      /* Distinct 1.5px window border for GTK4 / Libadwaita windows in dark mode */
-      window, window.solid-csd, window.csd, .window-frame {
-        border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 8px 24px rgba(0, 0, 0, 0.7) !important;
-      }
-      /* Bright blue accent outline on the focused active window */
-      window:focus-within, window:focus {
-        border: 1.5px solid #3584e4 !important;
-      }
-    '';
+  };
+
+  # Native GNOME setting to enable crisp window borders and contrast
+  dconf.settings."org/gnome/desktop/interface" = {
+    color-scheme = "prefer-dark";
+    high-contrast = true;
   };
 
   qt = {
