@@ -68,6 +68,7 @@ in
       pavucontrol
       nwg-look
       mission-center # System Monitor (Task Manager)
+      xpad # Sticky Notes App
       p7zip # Archives
       rclone-browser # GUI for Rclone
       restic-browser # GUI for Restic Backups
