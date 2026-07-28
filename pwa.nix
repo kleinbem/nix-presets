@@ -154,12 +154,17 @@ in
     };
 
     # Generate vector SVG icon files under ~/.local/share/icons/hicolor/scalable/apps/
-    home.file = lib.mapAttrs' (
+    # and link the main Chromium app icon so launchers find it.
+    home.file = {
+      ".local/share/icons/hicolor/128x128/apps/chromium.png".source =
+        "${cfg.package}/share/icons/hicolor/128x128/apps/chromium.png";
+    }
+    // (lib.mapAttrs' (
       id: pwa:
       lib.nameValuePair ".local/share/icons/hicolor/scalable/apps/pwa-${id}.svg" {
         text = pwa.svg;
       }
-    ) (lib.filterAttrs (_: pwa: pwa.enable && pwa.svg != null) cfg.apps);
+    ) (lib.filterAttrs (_: pwa: pwa.enable && pwa.svg != null) cfg.apps));
 
     home.packages = [
       cfg.package
