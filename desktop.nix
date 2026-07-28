@@ -53,7 +53,10 @@ in
 {
   imports = [
     ./mcp.nix
+    ./pwa.nix
   ];
+
+  my.pwa.enable = true;
 
   home = {
     packages = with pkgs; [
