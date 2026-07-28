@@ -12,7 +12,7 @@ let
     "browser.startup.page" = 3; # Restore previous session
     "browser.sessionstore.interval" = 5000; # Save session every 5 seconds (default is 15s)
     "browser.sessionstore.warnOnQuit" = true; # Warn before quitting to prevent accidental state loss
-    "identity.fxaccounts.enabled" = false;
+    "identity.fxaccounts.enabled" = true;
     "security.enterprise_roots.enabled" = true; # Trust system CA store
     "network.dns.disableIPv6" = true;
     "security.webauth.webauthn" = true;
