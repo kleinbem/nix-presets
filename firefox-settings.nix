@@ -53,6 +53,11 @@ let
     # --- UI Customization ---
     "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
 
+    # --- Dark Theme ---
+    "extensions.activeThemeID" = "firefox-compact-dark@mozilla.org";
+    "ui.systemUsesDarkTheme" = 1;
+    "layout.css.prefers-color-scheme.content-override" = 0; # 0 = dark, 1 = light, 2 = system
+
     # --- Native Vertical Tabs (Input from Heise/Archive) ---
     "sidebar.revamp" = true;
     "sidebar.verticalTabs" = true;
