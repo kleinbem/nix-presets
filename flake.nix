@@ -17,6 +17,10 @@
       url = "github:openclaw/nix-openclaw";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hermes = {
+      url = "github:NousResearch/hermes-agent";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nix-devshells = {
       url = "github:kleinbem/nix-devshells";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -191,6 +195,7 @@
               langflow = import ./containers/langflow.nix { inherit self; };
               vllm = import ./containers/vllm.nix { inherit self; };
               openclaw = import ./containers/openclaw.nix { inherit self inputs; };
+              hermes = import ./containers/hermes.nix { inherit self inputs; };
               monitoring = import ./containers/monitoring.nix { inherit self; };
               monitoring-node = import ./nixosModules/monitoring-node.nix;
               agent-zero = import ./containers/agent-zero.nix { inherit self; };
@@ -235,6 +240,7 @@
           git = import ./git.nix;
           desktop = import ./desktop.nix;
           dx = import ./dx.nix;
+          herdr = import ./herdr.nix;
           firefox-browser =
             { ... }:
             {

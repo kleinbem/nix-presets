@@ -16,9 +16,11 @@
     gh # GitHub CLI
     lazygit # TUI for Git
     lazyjj # TUI for jj (jujutsu)
+    jjui # Alternative jj TUI — log graph, interactive rebase/split/bookmarks
     lazydocker # TUI for Podman/Docker
     gum # Charmbracelet's TUI toolkit — drives `just jj::*` table/spin/style
     delta # Syntax-highlighted diff viewer (pipe `jj diff` through it)
+    difftastic # Structural diff tool — wired as jj's ui.diff.tool in git.nix
     glow # Markdown renderer in terminal
     tldr # Modern, simplified man pages
     dmidecode # For 'just bios-info'

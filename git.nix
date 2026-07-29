@@ -36,6 +36,12 @@
         user = {
           inherit (my.git) name email;
         };
+        ui.diff.tool = [
+          "difft"
+          "--color=always"
+          "$left"
+          "$right"
+        ];
         signing = {
           # jj 0.42+ renamed `sign-all = true` to `behavior = "own"`. With this
           # set, `jj describe` signs every commit at creation time — the
