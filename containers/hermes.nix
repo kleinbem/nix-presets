@@ -114,37 +114,48 @@ in
 
             environmentFiles = lib.optional (cfg.secretsFile != null) "/run/secrets/hermes.env";
 
-            settings =
-              lib.optionalAttrs (cfg.ollamaUrl != "" || cfg.vllmUrl != "") {
-                model = {
-                  provider = "custom";
-                  base_url = if cfg.ollamaUrl != "" then cfg.ollamaUrl else cfg.vllmUrl;
-                  # No `default` model set — first run: `/model custom` inside
-                  # a session auto-detects it if exactly one model is loaded,
-                  # or run `hermes model` to pick explicitly.
-                };
-              }
-              // lib.optionalAttrs cfg.discord.enable {
-                gateway.platforms.discord.enabled = true;
+            settings = {
+              # The embedded kanban/task-board dispatcher is on by default
+              # upstream but currently broken in the packaged build — it
+              # throws "ModuleNotFoundError: No module named
+              # 'hermes_state_common'" on every tick (the file exists in
+              # hermes-agent's source but isn't included in this package
+              # build). We don't use the kanban/multi-agent-board feature,
+              # so disable the dispatcher outright rather than patch the
+              # nix packaging around a module that's not otherwise needed.
+              kanban.dispatch_in_gateway = false;
+            }
+            // lib.optionalAttrs (cfg.ollamaUrl != "" || cfg.vllmUrl != "") {
+              model = {
+                provider = "custom";
+                base_url = if cfg.ollamaUrl != "" then cfg.ollamaUrl else cfg.vllmUrl;
+                # No `default` model set — first run: `/model custom` inside
+                # a session auto-detects it if exactly one model is loaded,
+                # or run `hermes model` to pick explicitly.
               };
+            }
+            // lib.optionalAttrs cfg.discord.enable {
+              gateway.platforms.discord.enabled = true;
+            };
           };
 
           networking.firewall.enable = true;
         };
-        bindMounts = (lib.optionalAttrs (cfg.secretsFile != null) {
-          "/run/secrets/hermes.env" = {
-            hostPath = cfg.secretsFile;
-            isReadOnly = true;
+        bindMounts =
+          (lib.optionalAttrs (cfg.secretsFile != null) {
+            "/run/secrets/hermes.env" = {
+              hostPath = cfg.secretsFile;
+              isReadOnly = true;
+            };
+          })
+          // {
+            # Container rootfs is ephemeral (recreated on rebuild) — state
+            # (memory, sessions, skills, cron) must live on the host.
+            "/var/lib/hermes" = {
+              hostPath = cfg.hostDataDir;
+              isReadOnly = false;
+            };
           };
-        })
-        // {
-          # Container rootfs is ephemeral (recreated on rebuild) — state
-          # (memory, sessions, skills, cron) must live on the host.
-          "/var/lib/hermes" = {
-            hostPath = cfg.hostDataDir;
-            isReadOnly = false;
-          };
-        };
       })
     ]
   );
