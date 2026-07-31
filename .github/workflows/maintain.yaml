@@ -33,25 +33,68 @@ jobs:
       - name: Validate flake (eval-only — blocks a bad lock from landing)
         run: nix flake check --no-build
 
-      - name: Commit lockfile changes via GitHub API (verified signature)
+      - name: Check pinned Firefox addon versions
+        # Extensions from pkgs.nur.repos.rycee update via the flake.lock bump
+        # above (rycee's repo regenerates hashes from AMO on its own
+        # schedule). A few addons (Obsidian Web Clipper, Tab Manager Plus)
+        # aren't in that set and are pinned by hand in firefox-settings.nix,
+        # so this is their equivalent — looked up by guid, not by a guessed
+        # AMO slug (slugs aren't unique per addon).
+        run: python3 .github/scripts/check-pinned-firefox-addons.py
+
+      - name: Validate flake after addon bump
+        run: nix flake check --no-build
+
+      - name: Open PR for flake.lock updates (auto-merges once Check Flake is green)
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GH_REPO: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
         run: |
           if git diff --quiet flake.lock; then
-            echo "flake.lock unchanged — nothing to commit."
+            echo "flake.lock unchanged — nothing to do."
             exit 0
           fi
 
-          CURRENT_SHA=$(gh api "repos/${GH_REPO}/contents/flake.lock?ref=${BRANCH}" --jq .sha)
+          BRANCH_NAME="update-flake-lock"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          git checkout -b "$BRANCH_NAME"
+          git add flake.lock
+          git commit -m "chore: update flake.lock (auto)"
+          git push -f origin "$BRANCH_NAME"
 
-          base64 -w0 flake.lock > /tmp/flake-lock.b64
-          jq -n \
-            --arg msg "chore: update flake.lock (auto)" \
-            --arg branch "${BRANCH}" \
-            --arg sha "${CURRENT_SHA}" \
-            --rawfile content /tmp/flake-lock.b64 \
-            '{message: $msg, branch: $branch, sha: $sha, content: $content}' \
-          | gh api --method PUT "repos/${GH_REPO}/contents/flake.lock" --input -
+          gh pr create \
+            --title "chore: update flake.lock" \
+            --body "Automated lockfile update. Check Flake re-validates the new inputs on this PR; auto-merge is enabled and lands this once it's green." \
+            --head "$BRANCH_NAME" \
+            --base main || true
+
+          gh pr merge "$BRANCH_NAME" --auto --squash || true
+
+      - name: Open PR for pinned Firefox addon updates (auto-merges once Check Flake is green)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          if git diff --quiet firefox-settings.nix; then
+            echo "firefox-settings.nix unchanged — nothing to do."
+            exit 0
+          fi
+
+          BRANCH_NAME="update-pinned-firefox-addons"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          git checkout -b "$BRANCH_NAME"
+          git add firefox-settings.nix
+          git commit -m "chore: bump pinned Firefox addon versions (auto)"
+          git push -f origin "$BRANCH_NAME"
+
+          gh pr create \
+            --title "chore: bump pinned Firefox addon versions" \
+            --body "Automated version bump for manually-pinned Firefox addons (matched by guid against AMO, not by slug — slugs aren't unique per addon). This job already confirmed the new pin evaluates and builds; the Check Flake workflow re-validates the same thing on this PR. Neither check reviews what the addon actually does, just that the hash/build is internally consistent — auto-merge is enabled and lands this once Check Flake is green." \
+            --head "$BRANCH_NAME" \
+            --base main || true
+
+          gh pr merge "$BRANCH_NAME" --auto --squash || true

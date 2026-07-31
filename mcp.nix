@@ -69,34 +69,12 @@
       };
     in
     {
-      # Ensure Atlas and Python with MCP are available in the home environment
-      home.packages = [
-        (pkgs.callPackage ./atlas/default.nix { })
-        freecadMcpPkg
-        (pkgs.python3.withPackages (
-          ps: with ps; [
-            mcp
-            pydantic
-            pydantic-core
-            google-auth
-            google-auth-oauthlib
-            google-api-python-client
-            requests
-            psutil
-          ]
-        ))
-      ];
-
-      # Install FreeCAD MCP Addon declaratively
-      home.file.".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecad-mcp-src}/addon/FreeCADMCP";
-
-      # ---------------------------------------------------------
-      # Editor & AI Assistant (Claude, Antigravity, Roo-Cline, etc.) Integration
-      # ---------------------------------------------------------
-      # This automatically registers the MCP servers in your editors and standalone clients
-      home.activation.setupMcpConfigs =
-        let
-          pythonWithMcp = pkgs.python3.withPackages (
+      home = {
+        # Ensure Atlas and Python with MCP are available in the home environment
+        packages = [
+          (pkgs.callPackage ./atlas/default.nix { })
+          freecadMcpPkg
+          (pkgs.python3.withPackages (
             ps: with ps; [
               mcp
               pydantic
@@ -107,112 +85,136 @@
               requests
               psutil
             ]
-          );
-          mcpConfig = {
-            mcpServers = {
-              workspace-atlas = {
-                command = "${pythonWithMcp}/bin/python3";
-                args = [
-                  "-u"
-                  "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/tools/workspace-mcp.py"
-                ];
-              };
-              github = {
-                command = "atlas";
-                args = [
-                  "mcp"
-                  "launch"
-                  "github"
-                  (lib.getExe pkgs.github-mcp-server)
-                  "stdio"
-                ];
-              };
-              filesystem = {
-                command = lib.getExe pkgs.mcp-server-filesystem;
-                args = [ "${config.home.homeDirectory}/Develop" ];
-              };
+          ))
+        ];
 
-              memory = {
-                command = lib.getExe pkgs.mcp-server-memory;
-                args = [ ];
-              };
+        # Install FreeCAD MCP Addon declaratively
+        file.".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecad-mcp-src}/addon/FreeCADMCP";
 
-              "sequential-thinking" = {
-                command = lib.getExe pkgs.mcp-server-sequential-thinking;
-                args = [ ];
-              };
-
-              freecad = {
-                command = lib.getExe freecadMcpPkg;
-                args = [ ];
-              };
-            }
-            // (lib.optionalAttrs config.modules.mcp.bambu.enable {
-              bambu-printer = {
-                command = "${pkgs.nodejs_22}/bin/npx";
-                args = [
-                  "-y"
-                  "@griches/bambu-mcp"
-                ];
-                env = {
-                  BAMBU_PRINTER_IP = config.modules.mcp.bambu.printerIp;
-                  BAMBU_SERIAL = config.modules.mcp.bambu.serialNumber;
-                  BAMBU_ACCESS_CODE = config.modules.mcp.bambu.accessCode;
+        # ---------------------------------------------------------
+        # Editor & AI Assistant (Claude, Antigravity, Roo-Cline, etc.) Integration
+        # ---------------------------------------------------------
+        # This automatically registers the MCP servers in your editors and standalone clients
+        activation.setupMcpConfigs =
+          let
+            pythonWithMcp = pkgs.python3.withPackages (
+              ps: with ps; [
+                mcp
+                pydantic
+                pydantic-core
+                google-auth
+                google-auth-oauthlib
+                google-api-python-client
+                requests
+                psutil
+              ]
+            );
+            mcpConfig = {
+              mcpServers = {
+                workspace-atlas = {
+                  command = "${pythonWithMcp}/bin/python3";
+                  args = [
+                    "-u"
+                    "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/tools/workspace-mcp.py"
+                  ];
                 };
-              };
-            })
-            // (lib.optionalAttrs config.modules.mcp.blender.enable {
-              blender = {
-                command = "${pkgs.nodejs_22}/bin/npx";
-                args = [
-                  "-y"
-                  "blender-mcp"
-                ];
-              };
-            })
-            // (lib.optionalAttrs config.modules.mcp.openscad.enable {
-              openscad = {
-                command = "${pkgs.nodejs_22}/bin/npx";
-                args = [
-                  "-y"
-                  "openscad-mcp-server"
-                ];
-              };
-            });
-          };
-          mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
-        in
-        lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          mkdir -p "${config.home.homeDirectory}/.gemini/antigravity"
-          mkdir -p "${config.home.homeDirectory}/.gemini/config"
-          mkdir -p "${config.home.homeDirectory}/.config/Claude"
-          mkdir -p "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
-          mkdir -p "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
-          mkdir -p "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+                github = {
+                  command = "atlas";
+                  args = [
+                    "mcp"
+                    "launch"
+                    "github"
+                    (lib.getExe pkgs.github-mcp-server)
+                    "stdio"
+                  ];
+                };
+                filesystem = {
+                  command = lib.getExe pkgs.mcp-server-filesystem;
+                  args = [ "${config.home.homeDirectory}/Develop" ];
+                };
 
-          cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
-          chmod 644 "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
+                memory = {
+                  command = lib.getExe pkgs.mcp-server-memory;
+                  args = [ ];
+                };
 
-          cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
-          chmod 644 "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
+                "sequential-thinking" = {
+                  command = lib.getExe pkgs.mcp-server-sequential-thinking;
+                  args = [ ];
+                };
 
-          # Remove dangling symlink if sops previously owned it
-          rm -f "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
-          cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
-          chmod 644 "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
+                freecad = {
+                  command = lib.getExe freecadMcpPkg;
+                  args = [ ];
+                };
+              }
+              // (lib.optionalAttrs config.modules.mcp.bambu.enable {
+                bambu-printer = {
+                  command = "${pkgs.nodejs_22}/bin/npx";
+                  args = [
+                    "-y"
+                    "@griches/bambu-mcp"
+                  ];
+                  env = {
+                    BAMBU_PRINTER_IP = config.modules.mcp.bambu.printerIp;
+                    BAMBU_SERIAL = config.modules.mcp.bambu.serialNumber;
+                    BAMBU_ACCESS_CODE = config.modules.mcp.bambu.accessCode;
+                  };
+                };
+              })
+              // (lib.optionalAttrs config.modules.mcp.blender.enable {
+                blender = {
+                  command = "${pkgs.nodejs_22}/bin/npx";
+                  args = [
+                    "-y"
+                    "blender-mcp"
+                  ];
+                };
+              })
+              // (lib.optionalAttrs config.modules.mcp.openscad.enable {
+                openscad = {
+                  command = "${pkgs.nodejs_22}/bin/npx";
+                  args = [
+                    "-y"
+                    "openscad-mcp-server"
+                  ];
+                };
+              });
+            };
+            mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
+          in
+          lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+            mkdir -p "${config.home.homeDirectory}/.gemini/antigravity"
+            mkdir -p "${config.home.homeDirectory}/.gemini/config"
+            mkdir -p "${config.home.homeDirectory}/.config/Claude"
+            mkdir -p "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+            mkdir -p "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+            mkdir -p "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
 
-          cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-          chmod 644 "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
+            chmod 644 "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
 
-          cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-          chmod 644 "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
+            chmod 644 "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
 
-          cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-          chmod 644 "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            # Remove dangling symlink if sops previously owned it
+            rm -f "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
+            chmod 644 "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
 
-          cp -f "${mcpJson}" "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.mcp.json"
-          chmod 644 "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.mcp.json"
-        '';
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            chmod 644 "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            chmod 644 "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            chmod 644 "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.mcp.json"
+            chmod 644 "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.mcp.json"
+          '';
+      };
     }
   );
 }

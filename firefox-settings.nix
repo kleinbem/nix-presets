@@ -68,8 +68,21 @@ let
     pname = "obsidian-web-clipper";
     version = "1.7.1";
     addonId = "clipper@obsidian.md";
-    url = "https://addons.mozilla.org/firefox/downloads/latest/obsidian-web-clipper/latest.xpi";
-    sha256 = "1zigp63n8dg0vb3vbpmzjzinihgvxfmxcg1xnjvlw9nqlnl8k83r";
+    # AMO's download-URL slug ("web-clipper-obsidian") differs from its
+    # detail-page slug ("obsidian-web-clipper", which resolves to an
+    # unrelated addon) — verified against current_version.file.url for this
+    # guid before pinning.
+    url = "https://addons.mozilla.org/firefox/downloads/latest/web-clipper-obsidian/latest.xpi";
+    sha256 = "e11043d5219bc690903996bf4577da2ef2f69691446fa31184d75b7050cbb1aa";
+    meta = { };
+  };
+
+  tabManagerPlus = pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+    pname = "tab-manager-plus-for-firefox";
+    version = "5.2.4";
+    addonId = "{45f2dc53-96cd-4c41-91f6-f4a73a8fb2b0}";
+    url = "https://addons.mozilla.org/firefox/downloads/latest/tab-manager-plus-for-firefox/latest.xpi";
+    sha256 = "d2cc2d0863f91e459017a19346ffd682c5d516cca7f212b9276bd358c200af8f";
     meta = { };
   };
 
@@ -85,7 +98,10 @@ let
       markdownload
       tab-session-manager
     ])
-    ++ [ obsidianWebClipper ];
+    ++ [
+      obsidianWebClipper
+      tabManagerPlus
+    ];
 in
 {
   # --- Level 1: Standard (Hardened Daily Driver) ---
