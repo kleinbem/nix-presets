@@ -100,6 +100,18 @@ in
         innerConfig = {
           imports = [ inputs.hermes.nixosModules.default ];
 
+          # Observed with a stray nixos-nvme-subnet address (10.85.46.1) in
+          # this container's resolv.conf on hass-pi despite the host's own
+          # config.my.network.hostAddress correctly being 10.85.49.1 and
+          # hass-pi's own /etc/resolv.conf not containing it either —
+          # mechanism unclear, but it broke Discord's DNS lookup
+          # (aiohttp.ClientConnectorDNSError). Forcing known-good public
+          # resolvers directly sidesteps whatever's injecting that entry.
+          networking.nameservers = lib.mkForce [
+            "1.1.1.1"
+            "8.8.8.8"
+          ];
+
           services.hermes-agent = {
             enable = true;
             # "messaging" variant ships discord.py/python-telegram-bot/slack-sdk
