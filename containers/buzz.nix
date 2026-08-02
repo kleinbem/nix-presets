@@ -1,12 +1,20 @@
 # Buzz (Block/Jack Dorsey) — Nostr-based team chat + git + AI-agent
 # workspace, self-hosted natively (no Docker/Podman): the relay binary is
-# built from source (pkgs/buzz-relay.nix) and Postgres/Redis/Typesense/MinIO
+# built from source (pkgs/buzz-relay.nix) and Postgres/Redis/Typesense/Garage
 # all run as ordinary NixOS services inside this one container. Deliberately
 # NOT using enableNesting + Podman's dockerCompat the way langfuse/anythingllm/
 # ente do — Buzz is ~10 days old at time of writing (2026-07-31) and pulling
 # in upstream's own Docker images on top of that immaturity was judged not
 # worth it; building from source keeps the whole stack auditable and
 # consistent with how openclaw/hermes/most of this fleet already runs.
+#
+# S3-compatible storage is Garage, not MinIO — nixpkgs marked minio insecure
+# and abandoned (2026-08-02: CVE-2026-40344 among others, upstream stopped
+# fixing issues), and MinIO was already rejected fleet-wide on 2026-06-27 in
+# favor of Garage (see hosts/nixos-nvme/garage.nix for the host-level
+# instance backing restic/tofu-state; this is a SEPARATE single-node Garage
+# instance private to the buzz container, not that one — self-containment is
+# the same rationale as Postgres/Redis/Typesense above).
 { self }:
 {
   config,
@@ -27,7 +35,7 @@ in
     hostDataDir = lib.mkOption { type = lib.types.str; };
     memoryLimit = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
-      default = "3G"; # relay + postgres + redis + typesense + minio
+      default = "3G"; # relay + postgres + redis + typesense + garage
     };
     secretsFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
@@ -35,10 +43,12 @@ in
       description = ''
         Host path to an EnvironmentFile= (KEY=VALUE lines) bind-mounted for
         every service that reads secrets that way: BUZZ_RELAY_PRIVATE_KEY
-        (32-byte hex Nostr key), MINIO_ROOT_USER, MINIO_ROOT_PASSWORD,
-        BUZZ_S3_ACCESS_KEY, BUZZ_S3_SECRET_KEY (the last two are the same
-        values as the MINIO_ROOT_* pair, just under the name the relay reads
-        them as — duplicate the value under both keys in the file).
+        (32-byte hex Nostr key), GARAGE_RPC_SECRET (32-byte hex, `openssl
+        rand -hex 32`), GARAGE_ADMIN_TOKEN (opaque, `openssl rand -base64
+        32`), BUZZ_S3_ACCESS_KEY, BUZZ_S3_SECRET_KEY (a Garage S3 API key —
+        NOT derived from the RPC/admin values; created via the one-time
+        `garage key create`/`import` init documented at the bottom of this
+        file, after which its Key ID/Secret go here).
       '';
     };
     typesenseApiKeyFile = lib.mkOption {
@@ -145,30 +155,46 @@ in
             };
           };
 
-          # ── MinIO (S3-compatible object storage) ─────────────────────────
-          services.minio = {
-            enable = true;
-            listenAddress = "127.0.0.1:9000";
-            consoleAddress = "127.0.0.1:9001";
-            rootCredentialsFile = "/run/secrets/buzz.env"; # MINIO_ROOT_USER/PASSWORD
+          # ── Garage (S3-compatible object storage) ────────────────────────
+          # Single-node, private to this container — same package/settings
+          # shape as hosts/nixos-nvme/garage.nix but scoped to buzz's own
+          # data dir. Static user (not the module's DynamicUser) so the
+          # bind-mounted data dir has stable ownership across restarts.
+          users.users.garage = {
+            isSystemUser = true;
+            group = "garage";
           };
-          # Bucket doesn't exist on first boot — create it idempotently once
-          # MinIO is actually accepting connections.
-          systemd.services.buzz-minio-bucket = {
-            description = "Ensure the buzz-media bucket exists in MinIO";
-            after = [ "minio.service" ];
-            requires = [ "minio.service" ];
-            wantedBy = [ "multi-user.target" ];
-            serviceConfig = {
-              Type = "oneshot";
-              RemainAfterExit = true;
-              EnvironmentFile = "/run/secrets/buzz.env";
+          users.groups.garage = { };
+
+          services.garage = {
+            enable = true;
+            package = pkgs.garage_2; # matches hosts/nixos-nvme/garage.nix (v2.3.0)
+            environmentFile = "/run/secrets/buzz.env"; # GARAGE_RPC_SECRET/ADMIN_TOKEN
+
+            settings = {
+              metadata_dir = "/var/lib/garage/meta";
+              data_dir = "/var/lib/garage/data";
+              db_engine = "sqlite";
+              replication_factor = 1; # single node
+
+              rpc_bind_addr = "127.0.0.1:3901";
+              rpc_public_addr = "127.0.0.1:3901";
+
+              s3_api = {
+                s3_region = "us-east-1"; # matches BUZZ_S3_REGION below
+                api_bind_addr = "127.0.0.1:9000"; # same port the relay already expects
+                # No root_domain — the relay uses path-style addressing
+                # (BUZZ_S3_ADDRESSING_STYLE below), so vhost-style routing
+                # isn't needed here.
+              };
+
+              admin.api_bind_addr = "127.0.0.1:3903"; # token via GARAGE_ADMIN_TOKEN env
             };
-            path = [ pkgs.minio-client ];
-            script = ''
-              mc alias set buzzlocal http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
-              mc mb --ignore-existing buzzlocal/buzz-media
-            '';
+          };
+          systemd.services.garage.serviceConfig = {
+            DynamicUser = lib.mkForce false;
+            User = "garage";
+            Group = "garage";
           };
 
           # ── The relay itself ──────────────────────────────────────────────
@@ -181,6 +207,9 @@ in
           systemd.tmpfiles.rules = [
             "d /var/lib/buzz-relay 0750 buzz-relay buzz-relay - -"
             "d /var/lib/buzz-relay/repos 0750 buzz-relay buzz-relay - -"
+            "d /var/lib/garage 0750 garage garage - -"
+            "d /var/lib/garage/meta 0750 garage garage - -"
+            "d /var/lib/garage/data 0750 garage garage - -"
           ];
 
           systemd.services.buzz-relay = {
@@ -190,13 +219,13 @@ in
               "postgresql.service"
               "redis-buzz.service"
               "typesense.service"
-              "buzz-minio-bucket.service"
+              "garage.service"
             ];
             requires = [
               "postgresql.service"
               "redis-buzz.service"
               "typesense.service"
-              "buzz-minio-bucket.service"
+              "garage.service"
             ];
             wantedBy = [ "multi-user.target" ];
             # The relay shells out to git for repo hydrate/receive-pack/upload-pack.
@@ -258,8 +287,8 @@ in
               hostPath = "${cfg.hostDataDir}/typesense";
               isReadOnly = false;
             };
-            "/var/lib/minio" = {
-              hostPath = "${cfg.hostDataDir}/minio";
+            "/var/lib/garage" = {
+              hostPath = "${cfg.hostDataDir}/garage";
               isReadOnly = false;
             };
             "/var/lib/buzz-relay" = {
@@ -271,3 +300,22 @@ in
     ]
   );
 }
+# --- ONE-TIME INIT after first apply (imperative; run against the buzz
+# container — e.g. `nixos-container run buzz -- garage ...` or a root shell
+# via `machinectl shell buzz`) ------------------------------------------------
+# Mirrors hosts/nixos-nvme/garage.nix's own one-time init. garage.service
+# comes up fine with no layout/bucket/key yet (buzz-relay will start too, but
+# its S3 calls will fail until this is done):
+#
+#   # 1. give this (only) node storage capacity and apply the layout:
+#   garage layout assign -z buzz -c 10G "$(garage node id -q | cut -d@ -f1)"
+#   garage layout apply --version 1
+#
+#   # 2. create the bucket + a scoped key for the relay:
+#   garage bucket create buzz-media
+#   garage key create buzz-relay-key
+#   garage bucket allow --read --write buzz-media --key buzz-relay-key
+#   # → note the Key ID + Secret (shown once): put them into kleinbem-secrets
+#     as buzz_s3_access_key / buzz_s3_secret_key (see hosts/nixos-nvme/secrets.nix's
+#     "buzz.env" template), `sops updatekeys`, then `just apply` + restart
+#     buzz-relay so it picks up real S3 credentials.
