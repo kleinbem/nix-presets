@@ -118,148 +118,163 @@ in
         name = "buzz";
         inherit cfg;
         innerConfig = {
-          networking.firewall.enable = true;
-
-          # ── Postgres 17, local-only, peer auth (no password to manage) ──
-          services.postgresql = {
+          networking.firewall = {
             enable = true;
-            package = pkgs.postgresql_17;
-            ensureDatabases = [ "buzz" ];
-            ensureUsers = [
-              {
-                name = "buzz";
-                ensureDBOwnership = true;
-              }
-            ];
-          };
-          users.users.buzz = {
-            isSystemUser = true;
-            group = "buzz";
-          };
-          users.groups.buzz = { };
-
-          # ── Redis, local-only ────────────────────────────────────────────
-          services.redis.servers.buzz = {
-            enable = true;
-            port = 6379;
-            bind = "127.0.0.1";
+            allowedTCPPorts = [ 3000 ];
           };
 
-          # ── Typesense (search) ───────────────────────────────────────────
-          services.typesense = {
-            enable = true;
-            apiKeyFile = "/run/secrets/buzz-typesense-api-key"; # raw value, no KEY=VALUE
-            settings.server = {
-              api-address = "127.0.0.1";
-              api-port = 8108;
+          users = {
+            users = {
+              buzz = {
+                isSystemUser = true;
+                group = "buzz";
+              };
+              # Static user (not the module's DynamicUser) so the
+              # bind-mounted data dir has stable ownership across restarts —
+              # see the services.garage comment below.
+              garage = {
+                isSystemUser = true;
+                group = "garage";
+              };
+              buzz-relay = {
+                isSystemUser = true;
+                group = "buzz-relay";
+              };
+            };
+            groups = {
+              buzz = { };
+              garage = { };
+              buzz-relay = { };
             };
           };
 
-          # ── Garage (S3-compatible object storage) ────────────────────────
-          # Single-node, private to this container — same package/settings
-          # shape as hosts/nixos-nvme/garage.nix but scoped to buzz's own
-          # data dir. Static user (not the module's DynamicUser) so the
-          # bind-mounted data dir has stable ownership across restarts.
-          users.users.garage = {
-            isSystemUser = true;
-            group = "garage";
+          services = {
+            # ── Postgres 17, local-only, peer auth (no password to manage) ──
+            postgresql = {
+              enable = true;
+              package = pkgs.postgresql_17;
+              ensureDatabases = [ "buzz" ];
+              ensureUsers = [
+                {
+                  name = "buzz";
+                  ensureDBOwnership = true;
+                }
+              ];
+            };
+
+            # ── Redis, local-only ────────────────────────────────────────────
+            redis.servers.buzz = {
+              enable = true;
+              port = 6379;
+              bind = "127.0.0.1";
+            };
+
+            # ── Typesense (search) ───────────────────────────────────────────
+            typesense = {
+              enable = true;
+              apiKeyFile = "/run/secrets/buzz-typesense-api-key"; # raw value, no KEY=VALUE
+              settings.server = {
+                api-address = "127.0.0.1";
+                api-port = 8108;
+              };
+            };
+
+            # ── Garage (S3-compatible object storage) ────────────────────────
+            # Single-node, private to this container — same package/settings
+            # shape as hosts/nixos-nvme/garage.nix but scoped to buzz's own
+            # data dir.
+            garage = {
+              enable = true;
+              package = pkgs.garage_2; # matches hosts/nixos-nvme/garage.nix (v2.3.0)
+              environmentFile = "/run/secrets/buzz.env"; # GARAGE_RPC_SECRET/ADMIN_TOKEN
+
+              settings = {
+                metadata_dir = "/var/lib/garage/meta";
+                data_dir = "/var/lib/garage/data";
+                db_engine = "sqlite";
+                replication_factor = 1; # single node
+
+                rpc_bind_addr = "127.0.0.1:3901";
+                rpc_public_addr = "127.0.0.1:3901";
+
+                s3_api = {
+                  s3_region = "us-east-1"; # matches BUZZ_S3_REGION below
+                  api_bind_addr = "127.0.0.1:9000"; # same port the relay already expects
+                  # No root_domain — the relay uses path-style addressing
+                  # (BUZZ_S3_ADDRESSING_STYLE below), so vhost-style routing
+                  # isn't needed here.
+                };
+
+                admin.api_bind_addr = "127.0.0.1:3903"; # token via GARAGE_ADMIN_TOKEN env
+              };
+            };
           };
-          users.groups.garage = { };
 
-          services.garage = {
-            enable = true;
-            package = pkgs.garage_2; # matches hosts/nixos-nvme/garage.nix (v2.3.0)
-            environmentFile = "/run/secrets/buzz.env"; # GARAGE_RPC_SECRET/ADMIN_TOKEN
-
-            settings = {
-              metadata_dir = "/var/lib/garage/meta";
-              data_dir = "/var/lib/garage/data";
-              db_engine = "sqlite";
-              replication_factor = 1; # single node
-
-              rpc_bind_addr = "127.0.0.1:3901";
-              rpc_public_addr = "127.0.0.1:3901";
-
-              s3_api = {
-                s3_region = "us-east-1"; # matches BUZZ_S3_REGION below
-                api_bind_addr = "127.0.0.1:9000"; # same port the relay already expects
-                # No root_domain — the relay uses path-style addressing
-                # (BUZZ_S3_ADDRESSING_STYLE below), so vhost-style routing
-                # isn't needed here.
+          systemd = {
+            services = {
+              garage.serviceConfig = {
+                DynamicUser = lib.mkForce false;
+                User = "garage";
+                Group = "garage";
               };
 
-              admin.api_bind_addr = "127.0.0.1:3903"; # token via GARAGE_ADMIN_TOKEN env
+              # ── The relay itself ──────────────────────────────────────────
+              buzz-relay = {
+                description = "Buzz WebSocket relay";
+                after = [
+                  "network.target"
+                  "postgresql.service"
+                  "redis-buzz.service"
+                  "typesense.service"
+                  "garage.service"
+                ];
+                requires = [
+                  "postgresql.service"
+                  "redis-buzz.service"
+                  "typesense.service"
+                  "garage.service"
+                ];
+                wantedBy = [ "multi-user.target" ];
+                # The relay shells out to git for repo hydrate/receive-pack/upload-pack.
+                path = [ pkgs.git ];
+                environment = {
+                  DATABASE_URL = "postgres:///buzz?host=/run/postgresql";
+                  PGHOST = "/run/postgresql";
+                  PGUSER = "buzz";
+                  PGDATABASE = "buzz";
+                  REDIS_URL = "redis://127.0.0.1:6379";
+                  TYPESENSE_URL = "http://127.0.0.1:8108";
+                  BUZZ_S3_ENDPOINT = "http://127.0.0.1:9000";
+                  BUZZ_S3_BUCKET = "buzz-media";
+                  BUZZ_S3_REGION = "us-east-1";
+                  BUZZ_S3_ADDRESSING_STYLE = "path";
+                  BUZZ_BIND_ADDR = "0.0.0.0:3000";
+                  RELAY_URL = cfg.relayUrl;
+                  BUZZ_GIT_REPO_PATH = "/var/lib/buzz-relay/repos";
+                  RUST_LOG = "buzz_relay=info,buzz_datastore=info,buzz_db=info,buzz_auth=info,buzz_pubsub=info";
+                };
+                # BUZZ_RELAY_PRIVATE_KEY, BUZZ_S3_ACCESS_KEY/SECRET_KEY (same
+                # values as MINIO_ROOT_USER/PASSWORD, duplicated under the name
+                # the relay reads) all come from secretsFile — see its option doc.
+                serviceConfig = {
+                  EnvironmentFile = "/run/secrets/buzz.env";
+                  ExecStart = "${buzzRelay}/bin/buzz-relay";
+                  User = "buzz-relay";
+                  Group = "buzz-relay";
+                  Restart = "always";
+                  RestartSec = 5;
+                };
+              };
             };
-          };
-          systemd.services.garage.serviceConfig = {
-            DynamicUser = lib.mkForce false;
-            User = "garage";
-            Group = "garage";
-          };
 
-          # ── The relay itself ──────────────────────────────────────────────
-          users.users.buzz-relay = {
-            isSystemUser = true;
-            group = "buzz-relay";
-          };
-          users.groups.buzz-relay = { };
-
-          systemd.tmpfiles.rules = [
-            "d /var/lib/buzz-relay 0750 buzz-relay buzz-relay - -"
-            "d /var/lib/buzz-relay/repos 0750 buzz-relay buzz-relay - -"
-            "d /var/lib/garage 0750 garage garage - -"
-            "d /var/lib/garage/meta 0750 garage garage - -"
-            "d /var/lib/garage/data 0750 garage garage - -"
-          ];
-
-          systemd.services.buzz-relay = {
-            description = "Buzz WebSocket relay";
-            after = [
-              "network.target"
-              "postgresql.service"
-              "redis-buzz.service"
-              "typesense.service"
-              "garage.service"
+            tmpfiles.rules = [
+              "d /var/lib/buzz-relay 0750 buzz-relay buzz-relay - -"
+              "d /var/lib/buzz-relay/repos 0750 buzz-relay buzz-relay - -"
+              "d /var/lib/garage 0750 garage garage - -"
+              "d /var/lib/garage/meta 0750 garage garage - -"
+              "d /var/lib/garage/data 0750 garage garage - -"
             ];
-            requires = [
-              "postgresql.service"
-              "redis-buzz.service"
-              "typesense.service"
-              "garage.service"
-            ];
-            wantedBy = [ "multi-user.target" ];
-            # The relay shells out to git for repo hydrate/receive-pack/upload-pack.
-            path = [ pkgs.git ];
-            environment = {
-              DATABASE_URL = "postgres:///buzz?host=/run/postgresql";
-              PGHOST = "/run/postgresql";
-              PGUSER = "buzz";
-              PGDATABASE = "buzz";
-              REDIS_URL = "redis://127.0.0.1:6379";
-              TYPESENSE_URL = "http://127.0.0.1:8108";
-              BUZZ_S3_ENDPOINT = "http://127.0.0.1:9000";
-              BUZZ_S3_BUCKET = "buzz-media";
-              BUZZ_S3_REGION = "us-east-1";
-              BUZZ_S3_ADDRESSING_STYLE = "path";
-              BUZZ_BIND_ADDR = "0.0.0.0:3000";
-              RELAY_URL = cfg.relayUrl;
-              BUZZ_GIT_REPO_PATH = "/var/lib/buzz-relay/repos";
-              RUST_LOG = "buzz_relay=info,buzz_datastore=info,buzz_db=info,buzz_auth=info,buzz_pubsub=info";
-            };
-            # BUZZ_RELAY_PRIVATE_KEY, BUZZ_S3_ACCESS_KEY/SECRET_KEY (same
-            # values as MINIO_ROOT_USER/PASSWORD, duplicated under the name
-            # the relay reads) all come from secretsFile — see its option doc.
-            serviceConfig = {
-              EnvironmentFile = "/run/secrets/buzz.env";
-              ExecStart = "${buzzRelay}/bin/buzz-relay";
-              User = "buzz-relay";
-              Group = "buzz-relay";
-              Restart = "always";
-              RestartSec = 5;
-            };
           };
-
-          networking.firewall.allowedTCPPorts = [ 3000 ];
         };
         bindMounts =
           (lib.optionalAttrs (cfg.secretsFile != null) {
