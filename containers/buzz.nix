@@ -149,7 +149,7 @@ in
           services.typesense = {
             enable = true;
             apiKeyFile = "/run/secrets/buzz-typesense-api-key"; # raw value, no KEY=VALUE
-            settings = {
+            settings.server = {
               api-address = "127.0.0.1";
               api-port = 8108;
             };
