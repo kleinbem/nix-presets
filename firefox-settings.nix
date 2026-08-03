@@ -86,6 +86,15 @@ let
     meta = { };
   };
 
+  sessionAlive = pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+    pname = "session-alive";
+    version = "2.4";
+    addonId = "{15060491-2b35-49f4-9f01-f35b127bebcc}";
+    url = "https://addons.mozilla.org/firefox/downloads/latest/keep-session-alive/latest.xpi";
+    sha256 = "808db3e1f7e4dff05bf27261a1ed3d56d2a75497b5f753d9705e827411787b62";
+    meta = { };
+  };
+
   commonExtensions =
     (with pkgs.nur.repos.rycee.firefox-addons; [
       bitwarden
@@ -101,6 +110,7 @@ let
     ++ [
       obsidianWebClipper
       tabManagerPlus
+      sessionAlive
     ];
 in
 {
