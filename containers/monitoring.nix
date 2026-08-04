@@ -83,6 +83,15 @@ in
             grafana = {
               enable = true;
               settings = {
+                # NixOS's grafana module defaults http_addr to 127.0.0.1
+                # (loopback-only, secure-by-default) — without this, Grafana
+                # is unreachable from outside the container entirely,
+                # including via Caddy's reverse proxy on the host. Confirmed
+                # live 2026-08-04 moving this container to a new host: every
+                # other service here (victoriametrics, alertmanager) has no
+                # such default and was already reachable on the bridge IP,
+                # only grafana silently wasn't.
+                server.http_addr = "0.0.0.0";
                 server.http_port = 3000;
                 security.secret_key = "antigravity-monitoring-key-2026";
               };
