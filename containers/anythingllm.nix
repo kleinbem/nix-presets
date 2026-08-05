@@ -33,6 +33,12 @@ in
     inherit config;
     name = "anythingllm";
     inherit cfg;
+    # Default 90s TimeoutStartSec kills the container mid-pull before its
+    # (large, multi-hundred-MB) docker image finishes downloading —
+    # confirmed live 2026-08-05: repeated restarts in a row, never
+    # converging. Same fix monitoring.nix already needed for its own
+    # (native, not podman-pulled) heavier startup.
+    timeout = "15m";
     enableNesting = true; # Required for OCI-in-LXC
     innerConfig = {
       virtualisation.podman = {

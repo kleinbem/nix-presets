@@ -85,6 +85,14 @@ in
     hostBridge = cfg.hostBridge or config.my.network.bridge;
     localAddress = cfg.ip;
     privateUsers = if (cfg ? privateUsers) then cfg.privateUsers else "no";
+    # THE actual extension point nixpkgs reads (nixos-containers.nix:
+    # "TimeoutStartSec = cfg.timeoutStartSec;", a plain non-priority
+    # assignment) — NOT systemd.services."container@${name}"
+    # .serviceConfig.TimeoutStartSec below, which turned out to never
+    # actually win against it regardless of mkDefault/mkForce. Confirmed
+    # live 2026-08-05 after that override silently did nothing for every
+    # container using this factory, including monitoring.nix's "5m".
+    timeoutStartSec = timeout;
 
     # Conditionally allow hardware device pass-through
     allowedDevices =
@@ -311,7 +319,6 @@ in
           MemoryMax = mkIf (cfg ? memoryLimit && cfg.memoryLimit != null) (cfg.memoryLimit or null);
           MemorySwapMax = mkIf (cfg ? memorySwapMax && cfg.memorySwapMax != null) (cfg.memorySwapMax or null);
           CPUQuota = mkIf (cfg ? cpuLimit && cfg.cpuLimit != null) (cfg.cpuLimit or null);
-          TimeoutStartSec = mkDefault timeout;
         };
   };
 }
