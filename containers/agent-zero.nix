@@ -47,6 +47,12 @@ in
     # Same fix monitoring.nix already needed for its own (native, not
     # podman-pulled) heavier startup.
     timeout = "15m";
+    # Required for its nested podman to actually run containers (grants
+    # CAP_SYS_ADMIN/CAP_MKNOD/CAP_SETFCAP/CAP_BPF + /dev/fuse) — was
+    # missing entirely despite this container needing OCI-in-nspawn just
+    # like anythingllm.nix already has. Confirmed live 2026-08-05: without
+    # it, crun fails with "bpf create \`\`: Operation not permitted".
+    enableNesting = true;
     innerConfig = {
       virtualisation = {
         oci-containers.backend = "podman";

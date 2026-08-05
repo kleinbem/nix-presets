@@ -137,6 +137,14 @@ in
         "CAP_SYS_ADMIN"
         "CAP_MKNOD"
         "CAP_SETFCAP"
+        # crun's cgroup-v2 device management uses eBPF by default in
+        # modern podman/crun — CAP_SYS_ADMIN alone doesn't cover it on
+        # current kernels (that grant was folded into CAP_BPF as
+        # capabilities got split out). Without it: "crun: bpf create ``:
+        # Operation not permitted: OCI permission denied", confirmed live
+        # 2026-08-05 on agent-zero/anythingllm (both enableNesting-style
+        # nested-podman containers).
+        "CAP_BPF"
       ])
       ++ additionalCapabilities
       ++ (cfg.extraCapabilities or [ ]);
