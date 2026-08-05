@@ -149,9 +149,22 @@ in
               networking = {
                 hostName = cfg.hostName or name;
                 defaultGateway = lib.mkForce config.my.network.hostAddress;
-                nameservers = lib.mkForce [ config.my.network.hostAddress ];
+                # NOT config.my.network.hostAddress: nothing on ANY host in
+                # the fleet actually answers DNS on the container-bridge
+                # gateway address (systemd-resolved only binds loopback +
+                # the NetBird interface) — every container's fallback
+                # nameserver has been silently pointing at a dead end.
+                # Routing/NAT/egress through the host all work fine
+                # (confirmed live 2026-08-05: a container reaches the
+                # internet over IP without issue) — only DNS specifically
+                # was broken, so query public resolvers directly instead of
+                # relying on the host to forward.
+                nameservers = lib.mkForce [
+                  "1.1.1.1"
+                  "8.8.8.8"
+                ];
                 resolvconf.extraConfig = lib.mkForce ''
-                  name_servers='${config.my.network.hostAddress}'
+                  name_servers='1.1.1.1 8.8.8.8'
                   resolv_conf_local_only=NO
                 '';
                 firewall.enable = mkDefault true;
