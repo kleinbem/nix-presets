@@ -1,0 +1,119 @@
+name: "Update freecad-mcp"
+
+# Bumps the pinned neka-nat/freecad-mcp source in mcp.nix to the latest git
+# tag and opens a PR. No upstream flake/PyPI package — vendored via
+# fetchFromGitHub, so this discovers the tag, re-derives the source hash,
+# and rebuilds the actual Python package standalone to verify.
+
+on:
+  schedule:
+    # Tuesdays 05:00 UTC — same slot family as the other update-* workflows,
+    # different day/repo.
+    - cron: '0 5 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    name: "Bump mcp.nix & open PR"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint GitHub App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6.0.2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+
+      - uses: cachix/install-nix-action@v31.10.6
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            access-tokens = github.com=${{ steps.app-token.outputs.token }}
+
+      - name: Run updater
+        id: update
+        run: |
+          chmod +x scripts/update-freecad-mcp.sh
+          ./scripts/update-freecad-mcp.sh
+          if git diff --quiet -- mcp.nix; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            VER=$(grep -oP 'version = "\K[^"]+' mcp.nix | head -1)
+            echo "version=$VER" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open PR
+        id: cpr
+        if: steps.update.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          BRANCH_NAME="auto-update/freecad-mcp"
+          REPO="${{ github.repository }}"
+          MAIN_SHA=$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)
+
+          if gh api "repos/$REPO/git/ref/heads/$BRANCH_NAME" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPO/git/refs/heads/$BRANCH_NAME" -f sha="$MAIN_SHA" -F force=true >/dev/null
+          else
+            gh api "repos/$REPO/git/refs" -f ref="refs/heads/$BRANCH_NAME" -f sha="$MAIN_SHA" >/dev/null
+          fi
+
+          jq -n \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH_NAME" \
+            --arg sha "$MAIN_SHA" \
+            --arg headline "chore: update freecad-mcp to ${{ steps.update.outputs.version }}" \
+            --arg content "$(base64 -w0 mcp.nix)" \
+            --arg query 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }' \
+            '{query: $query, variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+                message: {headline: $headline},
+                expectedHeadOid: $sha,
+                fileChanges: {additions: [{path: "mcp.nix", contents: $content}]}
+            }}}' | gh api graphql --input -
+
+          BODY_FILE=$(mktemp)
+          cat > "$BODY_FILE" <<'EOF'
+          ## freecad-mcp update
+
+          Bumps the pinned `neka-nat/freecad-mcp` source in `mcp.nix` to the
+          latest git tag: **${{ steps.update.outputs.version }}**. The
+          source hash was re-derived from that tag's GitHub archive tarball.
+
+          ✅ The actual `buildPythonPackage` output was rebuilt standalone
+          (not just the source fetch) to catch real packaging breakage, not
+          just a bad hash.
+
+          ---
+          🤖 Opened automatically by the update-freecad-mcp workflow.
+          EOF
+
+          gh pr create \
+            --title "chore: update freecad-mcp to ${{ steps.update.outputs.version }}" \
+            --body-file "$BODY_FILE" \
+            --head "$BRANCH_NAME" \
+            --base main \
+            --label dependencies || true
+
+          echo "pull-request-number=$(gh pr view "$BRANCH_NAME" --json number --jq .number)" >> "$GITHUB_OUTPUT"
+
+      # Fully hands-off: update-freecad-mcp.sh's own full-package rebuild is
+      # the gate, so squash-merge immediately.
+      - name: Auto-merge
+        if: steps.update.outputs.changed == 'true' && steps.cpr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR: ${{ steps.cpr.outputs.pull-request-number }}
+        run: |
+          gh pr merge "$PR" --squash --delete-branch --auto \
+            || gh pr merge "$PR" --squash --delete-branch
