@@ -98,7 +98,10 @@ in
           ];
 
           cmd = [
-            "python"
+            # NOT "python": the image only ships /usr/bin/python3 (no
+            # unversioned symlink) — confirmed live 2026-08-05, this
+            # container had never actually started before.
+            "python3"
             "run_ui.py"
             "--port"
             "50001"
