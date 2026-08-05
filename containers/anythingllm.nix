@@ -40,6 +40,17 @@ in
         dockerCompat = true;
       };
 
+      # Podman inside this nspawn container has its own registries.conf,
+      # separate from whatever the outer host configures — without this, a
+      # short/unqualified image name like "mintplexlabs/anythingllm:latest"
+      # (below) fails to pull outright ("no unqualified-search registries
+      # are defined"). Confirmed live 2026-08-05: this had never actually
+      # worked on any host before, 0 bytes of ever-persisted state proved
+      # it.
+      virtualisation.containers.registries.settings.unqualified-search-registries = [
+        "docker.io"
+      ];
+
       virtualisation.oci-containers = {
         backend = "podman";
         containers.anythingllm = {
