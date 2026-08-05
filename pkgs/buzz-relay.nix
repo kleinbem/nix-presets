@@ -7,10 +7,21 @@
 # --bin buzz-relay) — only the relay binary, not buzz-admin/buzz-pair-relay/
 # CLI/desktop/web, which we don't need for a headless self-hosted relay.
 #
-# Update by bumping `rev`/`hash` to a newer commit and re-deriving the two
-# `outputHashes` (git dependencies: mesh-llm, and a Block fork of rust-s3) the
-# standard way — set to lib.fakeHash, build, take the "got:" hash from the
-# mismatch error.
+# cargoLock.lockFile points at a vendored copy (./buzz-Cargo.lock), NOT
+# "${src}/Cargo.lock". Pointing at the fetched src forces Nix to realize the
+# fetchFromGitHub derivation at EVAL time (IFD) so it can read the file — and
+# that derivation is pinned to the evaluating pkgs' system, which breaks
+# cross-arch eval (e.g. nix-config's container-manifest promote job evaluates
+# an x86_64-linux container-factory from an aarch64-linux runner with no
+# foreign builder configured: "platform mismatch", confirmed 2026-08-02). A
+# plain repo-relative path is read directly, no IFD, no arch pinning.
+#
+# Update by bumping `rev`/`hash` to a newer commit, re-fetching
+# buzz-Cargo.lock from that same rev (it MUST match the source tree's actual
+# Cargo.lock — a stale copy fails the build's own lock check), and
+# re-deriving the two `outputHashes` (git dependencies: mesh-llm, and a Block
+# fork of rust-s3) the standard way — set to lib.fakeHash, build, take the
+# "got:" hash from the mismatch error.
 {
   lib,
   rustPlatform,
@@ -31,7 +42,7 @@ rustPlatform.buildRustPackage rec {
   };
 
   cargoLock = {
-    lockFile = "${src}/Cargo.lock";
+    lockFile = ./buzz-Cargo.lock;
     outputHashes = {
       # All mesh-llm-* crates share one git source; any single package from
       # it identifies the fetch for importCargoLock.
