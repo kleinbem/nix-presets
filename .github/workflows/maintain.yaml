@@ -56,13 +56,31 @@ jobs:
           fi
 
           BRANCH_NAME="update-flake-lock"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout main
-          git checkout -b "$BRANCH_NAME"
-          git add flake.lock
-          git commit -m "chore: update flake.lock (auto)"
-          git push -f origin "$BRANCH_NAME"
+          REPO="${{ github.repository }}"
+          MAIN_SHA=$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)
+
+          # Reset (or create) the branch to point at current main, then commit
+          # via GraphQL createCommitOnBranch — GitHub signs these commits
+          # automatically ("Verified", committer=GitHub), satisfying the
+          # required_signatures ruleset without any key material in CI.
+          if gh api "repos/$REPO/git/ref/heads/$BRANCH_NAME" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPO/git/refs/heads/$BRANCH_NAME" -f sha="$MAIN_SHA" -F force=true >/dev/null
+          else
+            gh api "repos/$REPO/git/refs" -f ref="refs/heads/$BRANCH_NAME" -f sha="$MAIN_SHA" >/dev/null
+          fi
+
+          jq -n \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH_NAME" \
+            --arg sha "$MAIN_SHA" \
+            --arg content "$(base64 -w0 flake.lock)" \
+            --arg query 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }' \
+            '{query: $query, variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+                message: {headline: "chore: update flake.lock (auto)"},
+                expectedHeadOid: $sha,
+                fileChanges: {additions: [{path: "flake.lock", contents: $content}]}
+            }}}' | gh api graphql --input -
 
           gh pr create \
             --title "chore: update flake.lock" \
@@ -83,13 +101,31 @@ jobs:
           fi
 
           BRANCH_NAME="update-pinned-firefox-addons"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout main
-          git checkout -b "$BRANCH_NAME"
-          git add firefox-settings.nix
-          git commit -m "chore: bump pinned Firefox addon versions (auto)"
-          git push -f origin "$BRANCH_NAME"
+          REPO="${{ github.repository }}"
+          MAIN_SHA=$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)
+
+          # Reset (or create) the branch to point at current main, then commit
+          # via GraphQL createCommitOnBranch — GitHub signs these commits
+          # automatically ("Verified", committer=GitHub), satisfying the
+          # required_signatures ruleset without any key material in CI.
+          if gh api "repos/$REPO/git/ref/heads/$BRANCH_NAME" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPO/git/refs/heads/$BRANCH_NAME" -f sha="$MAIN_SHA" -F force=true >/dev/null
+          else
+            gh api "repos/$REPO/git/refs" -f ref="refs/heads/$BRANCH_NAME" -f sha="$MAIN_SHA" >/dev/null
+          fi
+
+          jq -n \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH_NAME" \
+            --arg sha "$MAIN_SHA" \
+            --arg content "$(base64 -w0 firefox-settings.nix)" \
+            --arg query 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }' \
+            '{query: $query, variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+                message: {headline: "chore: bump pinned Firefox addon versions (auto)"},
+                expectedHeadOid: $sha,
+                fileChanges: {additions: [{path: "firefox-settings.nix", contents: $content}]}
+            }}}' | gh api graphql --input -
 
           gh pr create \
             --title "chore: bump pinned Firefox addon versions" \
