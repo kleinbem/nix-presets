@@ -62,8 +62,8 @@ in
     enable = lib.mkEnableOption "Declarative Chromium PWAs";
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.chromium;
-      description = "Chromium package to use as the PWA engine.";
+      default = pkgs.chromium.override { enableWideVine = true; };
+      description = "Chromium package to use as the PWA engine. Widevine is enabled by default so DRM-gated apps (Prime Video, Netflix, Disney+) can actually play video.";
     };
     defaultFlags = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -110,6 +110,28 @@ in
               <rect width="512" height="512" rx="96" fill="#040e29"/>
               <path fill="#00d6fe" d="M256 64 C 150 64, 80 150, 80 256 C 80 362, 150 448, 256 448 C 340 448, 410 390, 428 300 H 350 C 336 340, 298 376, 256 376 C 188 376, 148 322, 148 256 C 148 190, 188 136, 256 136 C 300 136, 338 174, 350 216 H 428 C 410 126, 340 64, 256 64 Z"/>
               <path fill="#ffffff" d="M230 200 h 60 v 112 h -60 z"/>
+            </svg>
+          '';
+          extraFlags = [
+            "--enable-features=VaapiVideoDecoder,VaapiVideoEncoder"
+            "--ignore-gpu-blocklist"
+          ];
+          categories = [
+            "AudioVideo"
+            "Video"
+            "Network"
+          ];
+        };
+        primevideo = {
+          name = "Prime Video";
+          url = "https://www.primevideo.com";
+          wmClass = "pwa-primevideo";
+          svg = ''
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+              <rect width="512" height="512" rx="96" fill="#0F171E"/>
+              <path fill="#ffffff" d="M208 152 L208 360 L360 256 Z"/>
+              <path fill="#00A8E1" d="M120 400 C 200 448, 312 448, 392 400 C 396 397, 392 391, 387 393 C 308 424, 204 424, 125 393 C 119 391, 116 397, 120 400 Z"/>
+              <path fill="#00A8E1" d="M370 386 C 386 380, 402 384, 402 392 C 402 402, 384 410, 366 406 C 362 405, 362 399, 366 396 C 372 393, 374 390, 370 386 Z"/>
             </svg>
           '';
           extraFlags = [
