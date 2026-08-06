@@ -171,7 +171,8 @@ in
             --dir-cache-time 1000h \
             --log-level INFO
         '';
-        ExecStop = "/run/wrappers/bin/fusermount3 -u %h/GoogleDrive";
+        ExecStop = "/run/wrappers/bin/fusermount3 -uz %h/GoogleDrive";
+        TimeoutStopSec = "10s";
         Restart = "on-failure";
         RestartSec = "10s";
       };
@@ -203,7 +204,8 @@ in
             --dir-cache-time 1000h \
             --log-level INFO
         '';
-        ExecStop = "/run/wrappers/bin/fusermount3 -u %h/OneDrive";
+        ExecStop = "/run/wrappers/bin/fusermount3 -uz %h/OneDrive";
+        TimeoutStopSec = "10s";
         Restart = "on-failure";
         RestartSec = "10s";
       };
