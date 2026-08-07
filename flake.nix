@@ -197,6 +197,7 @@
               vllm = import ./containers/vllm.nix { inherit self; };
               openclaw = import ./containers/openclaw.nix { inherit self inputs; };
               hermes = import ./containers/hermes.nix { inherit self inputs; };
+              hermes-juan = import ./containers/hermes-juan.nix { inherit self inputs; };
               buzz = import ./containers/buzz.nix { inherit self; };
               monitoring = import ./containers/monitoring.nix { inherit self; };
               monitoring-node = import ./nixosModules/monitoring-node.nix;
