@@ -29,7 +29,11 @@ let
     # --- Hardware Authentication & Linux Integration ---
     "security.webauth.u2f" = true;
     "security.webauth.webauthn_enable_usbtoken" = true;
-    "widget.use-xdg-desktop-portal.file-picker" = 1; # Native Linux file picker
+    # 0 (not 1): keeps the Save/Open dialog running inside firejail's own
+    # sandbox instead of the unsandboxed portal, so it can only browse/select
+    # firejail-whitelisted folders — picking a non-whitelisted one used to
+    # silently no-op the save instead of erroring.
+    "widget.use-xdg-desktop-portal.file-picker" = 0;
     "widget.use-xdg-desktop-portal.mime-handler" = 1;
     "widget.use-xdg-desktop-portal.settings" = 1;
 
