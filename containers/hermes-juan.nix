@@ -28,15 +28,21 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "4G";
     };
-    ollamaUrl = lib.mkOption {
+    model = lib.mkOption {
       type = lib.types.str;
-      default = "";
-      description = "OpenAI-compatible base URL for a local Ollama instance, e.g. http://10.85.46.32:11434/v1";
+      default = "gemini/gemini-2.5-pro";
+      description = ''
+        litellm-style provider/model string, matching juan's declared model
+        in nix-config/personas.nix. hermes-agent has a native Gemini adapter
+        (agent/gemini_native_adapter.py in the hermes-agent flake) — talks
+        directly to Google's API, no local LiteLLM proxy involved. Requires
+        GEMINI_API_KEY or GOOGLE_API_KEY in secretsFile.
+      '';
     };
-    vllmUrl = lib.mkOption {
-      type = lib.types.str;
-      default = "";
-      description = "OpenAI-compatible base URL for a local vLLM instance. Only used if ollamaUrl is unset.";
+    secretsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Host path to an env file bind-mounted as Hermes's environmentFiles — GEMINI_API_KEY (or GOOGLE_API_KEY) goes here.";
     };
     gitIdentity = {
       name = lib.mkOption {
@@ -135,16 +141,13 @@ in
             # notifications.
             addToSystemPackages = true;
 
+            environmentFiles = lib.optional (cfg.secretsFile != null) "/run/secrets/hermes-juan.env";
+
             settings = {
               # Same upstream packaging gap as hermes.nix's main instance —
               # ModuleNotFoundError: hermes_state_common. Not used anyway.
               kanban.dispatch_in_gateway = false;
-            }
-            // lib.optionalAttrs (cfg.ollamaUrl != "" || cfg.vllmUrl != "") {
-              model = {
-                provider = "custom";
-                base_url = if cfg.ollamaUrl != "" then cfg.ollamaUrl else cfg.vllmUrl;
-              };
+              model = cfg.model;
             };
           };
 
@@ -169,6 +172,12 @@ in
           (lib.optionalAttrs (cfg.gitIdentity.signingKeyFile != null) {
             "/run/secrets/git-signing-key" = {
               hostPath = cfg.gitIdentity.signingKeyFile;
+              isReadOnly = true;
+            };
+          })
+          // (lib.optionalAttrs (cfg.secretsFile != null) {
+            "/run/secrets/hermes-juan.env" = {
+              hostPath = cfg.secretsFile;
               isReadOnly = true;
             };
           })
