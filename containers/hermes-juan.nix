@@ -115,6 +115,8 @@ in
         name = "hermes-juan";
         inherit cfg;
         innerConfig = {
+          imports = [ inputs.hermes.nixosModules.default ];
+
           networking.nameservers = lib.mkForce [
             "1.1.1.1"
             "8.8.8.8"
