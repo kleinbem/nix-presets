@@ -30,7 +30,13 @@ in
     };
     model = lib.mkOption {
       type = lib.types.str;
-      default = "gemini/gemini-2.5-pro";
+      # gemini-2.5-pro (juan's declared model in nix-config/personas.nix) has
+      # ZERO quota on the free tier — Google gates Pro models behind a
+      # billing-enabled project. gemini-2.5-flash is also blocked (deprecated
+      # for new projects). gemini-flash-latest is what actually works on the
+      # kleinbem-ai project's free tier as of 2026-08-08. Switch back to
+      # gemini-2.5-pro once/if billing is enabled on the project.
+      default = "gemini/gemini-flash-latest";
       description = ''
         litellm-style provider/model string, matching juan's declared model
         in nix-config/personas.nix. hermes-agent has a native Gemini adapter
