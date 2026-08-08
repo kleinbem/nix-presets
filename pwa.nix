@@ -89,11 +89,16 @@ in
         "--ozone-platform=wayland"
         "--enable-gpu-rasterization"
         "--enable-zero-copy"
-        # Reports prefers-color-scheme: dark to every PWA's web content, so
-        # sites with real dark-mode CSS (GitHub, Bitwarden vault, ...) render
-        # their own dark theme instead of Chromium's crude --force-dark-mode
+        # Chromium on Linux doesn't pick up the desktop's dark-mode
+        # preference on its own (long-standing upstream bug), so PWA windows
+        # default to light. --force-color-scheme=dark isn't a real Chromium
+        # switch (verified against upstream chrome/ui_base switches source —
+        # it's silently ignored), which is why this wasn't working. The real
+        # switch is --force-dark-mode, which also flips prefers-color-scheme
+        # to dark for web content, so sites with real dark-mode CSS (GitHub,
+        # Bitwarden vault, ...) render their own dark theme rather than a
         # color-inversion hack.
-        "--force-color-scheme=dark"
+        "--force-dark-mode"
       ];
       description = "Global Chromium CLI flags applied to all PWAs.";
     };

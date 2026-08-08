@@ -68,21 +68,36 @@ class AtlasEngine:
             except Exception:
                 pass
 
-        # 3. Fall back to running SOPS CLI
-        try:
-            # Use the centralized nix-secrets repository
-            secrets_path = f"{self.flake_root}/nix-secrets/secrets.yaml"
-            result = subprocess.run(
-                ["sops", "--decrypt", "--extract", f'["{key}"]', secrets_path],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5,
-            )
-            return result.stdout.strip()
-        except Exception as e:
-            log(f"Failed to fetch secret {key}: {e}", RED)
-            return None
+        # 3. Fall back to running SOPS CLI against kleinbem-secrets. The old
+        # nix-secrets/secrets.yaml was one flat file (and that path never
+        # existed under flake_root=nix/ anyway — kleinbem/nix-secrets was
+        # always a flat sibling, not nested under nix/); kleinbem-secrets
+        # scopes keys across several files instead, so try each candidate
+        # this engine's callers actually use (github_*, brave_api_key all
+        # live in nix/shared.yaml) until one has the key.
+        secrets_root = os.path.join(os.path.dirname(self.flake_root), "kleinbem-secrets")
+        for rel_path in ("nix/shared.yaml", "nix/per-host/nixos-nvme.yaml", "infra/terraform.yaml"):
+            secrets_path = os.path.join(secrets_root, rel_path)
+            if not os.path.exists(secrets_path):
+                continue
+            try:
+                result = subprocess.run(
+                    ["sops", "--decrypt", "--extract", f'["{key}"]', secrets_path],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=5,
+                )
+                value = result.stdout.strip()
+                if value:
+                    return value
+            except subprocess.CalledProcessError:
+                continue  # key not in this file — try the next candidate
+            except Exception as e:
+                log(f"Failed to fetch secret {key}: {e}", RED)
+                return None
+        log(f"Failed to fetch secret {key}: not found in any kleinbem-secrets file", RED)
+        return None
 
 
 # --- AUTH MODULE ---

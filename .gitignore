@@ -6,6 +6,8 @@ result-*
 .devenv/
 
 # Development Tools
+__pycache__/
+*.pyc
 .pre-commit-config.yaml
 .agent/
 _
