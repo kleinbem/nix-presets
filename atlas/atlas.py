@@ -75,8 +75,14 @@ class AtlasEngine:
         # scopes keys across several files instead, so try each candidate
         # this engine's callers actually use (github_*, brave_api_key all
         # live in nix/shared.yaml) until one has the key.
-        secrets_root = os.path.join(os.path.dirname(self.flake_root), "kleinbem-secrets")
-        for rel_path in ("nix/shared.yaml", "nix/per-host/nixos-nvme.yaml", "infra/terraform.yaml"):
+        secrets_root = os.path.join(
+            os.path.dirname(self.flake_root), "kleinbem-secrets"
+        )
+        for rel_path in (
+            "nix/shared.yaml",
+            "nix/per-host/nixos-nvme.yaml",
+            "infra/terraform.yaml",
+        ):
             secrets_path = os.path.join(secrets_root, rel_path)
             if not os.path.exists(secrets_path):
                 continue
@@ -96,7 +102,9 @@ class AtlasEngine:
             except Exception as e:
                 log(f"Failed to fetch secret {key}: {e}", RED)
                 return None
-        log(f"Failed to fetch secret {key}: not found in any kleinbem-secrets file", RED)
+        log(
+            f"Failed to fetch secret {key}: not found in any kleinbem-secrets file", RED
+        )
         return None
 
 
