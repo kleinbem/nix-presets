@@ -95,7 +95,8 @@ in
         description = "IPs/CIDRs inside the blocked private ranges hermes MAY initiate connections to.";
       };
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
@@ -153,7 +154,7 @@ in
               # Same upstream packaging gap as hermes.nix's main instance —
               # ModuleNotFoundError: hermes_state_common. Not used anyway.
               kanban.dispatch_in_gateway = false;
-              model = cfg.model;
+              inherit (cfg) model;
             };
           };
 
@@ -164,9 +165,11 @@ in
           programs.git = lib.mkIf (cfg.gitIdentity.signingKeyFile != null) {
             enable = true;
             config = {
-              user.name = cfg.gitIdentity.name;
-              user.email = cfg.gitIdentity.email;
-              user.signingkey = "/run/secrets/git-signing-key";
+              user = {
+                name = cfg.gitIdentity.name;
+                email = cfg.gitIdentity.email;
+                signingkey = "/run/secrets/git-signing-key";
+              };
               commit.gpgsign = true;
               gpg.format = "ssh";
             };
