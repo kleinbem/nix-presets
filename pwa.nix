@@ -183,6 +183,27 @@ in
           "Network"
         ];
       };
+      gemini = {
+        name = "Gemini";
+        url = "https://gemini.google.com";
+        svg = ''
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+            <defs>
+              <linearGradient id="geminiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4285F4"/>
+                <stop offset="50%" stop-color="#9B72CB"/>
+                <stop offset="100%" stop-color="#D96570"/>
+              </linearGradient>
+            </defs>
+            <rect width="512" height="512" rx="96" fill="#131314"/>
+            <path fill="url(#geminiGrad)" d="M256 88 C 266 176, 336 246, 424 256 C 336 266, 266 336, 256 424 C 246 336, 176 266, 88 256 C 176 246, 246 176, 256 88 Z"/>
+          </svg>
+        '';
+        categories = [
+          "Network"
+          "Utility"
+        ];
+      };
       github = {
         name = "GitHub";
         url = "https://github.com";
