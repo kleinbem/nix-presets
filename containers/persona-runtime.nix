@@ -10,11 +10,31 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
+  # tool → {binary inside the container, env var its API key needs to land
+  # in}. This is internal knowledge of what this container's own package
+  # set provides — the consumer host just says which `tool` a persona
+  # uses (same field name as nix-config/personas.nix's own `tool`), it
+  # doesn't need to know container-internal paths.
+  toolSpecs = {
+    gemini-cli = {
+      binary = "/run/current-system/sw/bin/hermes";
+      apiKeyEnvVar = "GEMINI_API_KEY";
+    };
+    claude-code = {
+      binary = "/run/current-system/sw/bin/claude";
+      apiKeyEnvVar = "ANTHROPIC_API_KEY";
+    };
+  };
+
   personasManifest = pkgs.writeText "persona-runtime-personas.json" (
     builtins.toJSON (
-      lib.mapAttrs (_: p: {
-        inherit (p) signingKeyPath apiKeyPath fullName email;
-      }) cfg.personas
+      lib.mapAttrs (
+        name: p:
+        (toolSpecs.${p.tool} or (throw "persona-runtime: persona '${name}' has unwired tool '${p.tool}' — add it to toolSpecs and this container's environment.systemPackages first"))
+        // {
+          inherit (p) signingKeyPath apiKeyPath fullName email;
+        }
+      ) cfg.personas
     )
   );
 
@@ -58,6 +78,8 @@ let
       API_KEY_PATH=$(jq -r --arg n "$NAME" '.[$n].apiKeyPath // empty' "$MANIFEST")
       FULLNAME=$(jq -r --arg n "$NAME" '.[$n].fullName' "$MANIFEST")
       EMAIL=$(jq -r --arg n "$NAME" '.[$n].email' "$MANIFEST")
+      BINARY=$(jq -r --arg n "$NAME" '.[$n].binary' "$MANIFEST")
+      API_KEY_ENV_VAR=$(jq -r --arg n "$NAME" '.[$n].apiKeyEnvVar' "$MANIFEST")
 
       echo "Invoking $NAME via persona-runtime..."
 
@@ -77,7 +99,7 @@ let
       chmod 644 ${lib.escapeShellArg cfg.gitConfigFile}
 
       if [[ -n "''${API_KEY_PATH:-}" && -f "$API_KEY_PATH" ]]; then
-        printf 'GEMINI_API_KEY=%s\n' "$(cat "$API_KEY_PATH")" >${lib.escapeShellArg cfg.secretsEnvFile}
+        printf '%s=%s\n' "$API_KEY_ENV_VAR" "$(cat "$API_KEY_PATH")" >${lib.escapeShellArg cfg.secretsEnvFile}
       else
         : >${lib.escapeShellArg cfg.secretsEnvFile}
       fi
@@ -107,11 +129,22 @@ let
         sleep 0.5
       done
 
+      # Source agent.env inside the container before exec'ing the tool,
+      # rather than passing the API key via `machinectl shell --setenv`
+      # (would put the secret in the host's own argv/process list). Works
+      # uniformly for every tool — hermes-agent also reads GEMINI_API_KEY
+      # from its own $HERMES_HOME/.env (copied from this same file at
+      # container activation), so sourcing it again here is redundant but
+      # harmless for that tool specifically.
       set +e
+      # shellcheck disable=SC2016  # single-quoted on purpose — this runs
+      # INSIDE the container via `sh -c`, must not expand here.
       machinectl shell \
         --setenv=HOME=/var/lib/hermes \
         --setenv=HERMES_HOME=/var/lib/hermes/.hermes \
-        persona-runtime /run/current-system/sw/bin/hermes "$@"
+        persona-runtime /run/current-system/sw/bin/bash -c \
+        'set -a; [ -f /run/secrets/agent.env ] && . /run/secrets/agent.env; set +a; exec "$0" "$@"' \
+        "$BINARY" "$@"
       RESULT=$?
       set -e
 
@@ -167,7 +200,7 @@ in
     };
     secretsEnvFile = lib.mkOption {
       type = lib.types.str;
-      description = "Fixed HOST path bind-mounted as the agent's environmentFiles (e.g. GEMINI_API_KEY=...). Content rewritten per invocation by persona-invoke.sh — not persona-specific at the Nix level.";
+      description = "Fixed HOST path bind-mounted to /run/secrets/agent.env — one KEY=VALUE line (env var name depends on the invoked persona's tool, e.g. GEMINI_API_KEY or ANTHROPIC_API_KEY). Content rewritten per invocation by persona-invoke — not persona-specific at the Nix level.";
     };
     gitConfigFile = lib.mkOption {
       type = lib.types.str;
@@ -196,6 +229,10 @@ in
       type = lib.types.attrsOf (
         lib.types.submodule {
           options = {
+            tool = lib.mkOption {
+              type = lib.types.enum (builtins.attrNames toolSpecs);
+              description = "Which of this container's built-in tools to run this persona through — same value as nix-config/personas.nix's own `tool` field. Resolves to a binary path + API-key env var via this module's toolSpecs, not something the consumer host needs to know.";
+            };
             signingKeyPath = lib.mkOption {
               type = lib.types.str;
               description = "Host path to this persona's DECRYPTED ed25519 signing key — the consumer host declares this via its own sops.secrets, e.g. config.sops.secrets.persona_<name>_signing_key.path. Not decrypted by this module.";
@@ -304,11 +341,15 @@ in
             };
           };
 
-          # Other personas' declared tools (claude-code, aider, gemini-cli —
-          # see nix-config/personas.nix's `tool` field per persona) get
-          # added here as they're actually invoked through this container,
-          # not preemptively for all of them.
-          environment.systemPackages = [ ];
+          # Other personas' declared tools (aider, antigravity, self-hosted-
+          # runner — see nix-config/personas.nix's `tool` field per persona)
+          # get added here as they're actually invoked through this
+          # container, not preemptively for all of them. ANTHROPIC_API_KEY
+          # (claude-code) reads straight from the process environment, no
+          # dotenv-from-home convention like hermes-agent's — see
+          # persona-invoke's `machinectl shell ... bash -c 'source agent.env'`
+          # wrapper above, which is what actually gets it there.
+          environment.systemPackages = [ pkgs.claude-code ];
 
           # NOT programs.git — that bakes a static /etc/gitconfig at build
           # time, which defeats the point (one shared container, N
