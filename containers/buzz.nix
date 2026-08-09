@@ -128,13 +128,28 @@ in
               # Static user (not the module's DynamicUser) so the
               # bind-mounted data dir has stable ownership across restarts —
               # see the services.garage comment below.
+              #
+              # uid/gid PINNED, not left to isSystemUser's dynamic
+              # allocation: confirmed live 2026-08-09 that adding the
+              # typesense user below shifted garage's auto-allocated uid
+              # (996 -> 997), orphaning its already-on-disk data
+              # (/var/lib/garage/meta's files, e.g. node_key, stayed
+              # owned by 996) under the new uid — Garage panicked
+              # ("Unable to read or generate node ID: Permission
+              # denied") since only the top-level StateDirectory gets
+              # auto-rechowned on a uid change, not existing file
+              # contents. Pinning every static user here at its
+              # currently-resolved id freezes them against any future
+              # reshuffle from unrelated user-list edits.
               garage = {
                 isSystemUser = true;
                 group = "garage";
+                uid = 997;
               };
               buzz-relay = {
                 isSystemUser = true;
                 group = "buzz-relay";
+                uid = 998;
               };
               # Same reasoning as garage — services.typesense defaults to
               # DynamicUser, which conflicts with bind-mounting a host dir
@@ -146,12 +161,13 @@ in
               typesense = {
                 isSystemUser = true;
                 group = "typesense";
+                uid = 993;
               };
             };
             groups = {
-              garage = { };
-              buzz-relay = { };
-              typesense = { };
+              garage.gid = 997;
+              buzz-relay.gid = 998;
+              typesense.gid = 991;
             };
           };
 
