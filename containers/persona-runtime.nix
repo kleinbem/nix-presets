@@ -9,6 +9,109 @@ let
   cfg = config.my.containers.persona-runtime;
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
+
+  personasManifest = pkgs.writeText "persona-runtime-personas.json" (
+    builtins.toJSON (
+      lib.mapAttrs (_: p: {
+        inherit (p) signingKeyPath apiKeyPath fullName email;
+      }) cfg.personas
+    )
+  );
+
+  # Packaged here (not left as a standalone repo script) so it ships with
+  # the container closure on any host that enables this module — no manual
+  # file copy, no live git checkout of nix-config/kleinbem-secrets needed
+  # on the target host. Identity material is read straight from paths
+  # sops-nix already decrypted at activation time (the host's own
+  # sops.secrets.*, wired up by the consumer host's config) — this script
+  # never shells out to sops or nix eval itself.
+  personaInvokeScript = pkgs.writeShellApplication {
+    name = "persona-invoke";
+    runtimeInputs = [
+      pkgs.jq
+      pkgs.systemd
+      pkgs.coreutils
+    ];
+    text = ''
+      MANIFEST=${personasManifest}
+      DATA_DIR=${lib.escapeShellArg cfg.hostDataDir}
+
+      if [[ $EUID -ne 0 ]]; then
+        echo "Must run as root — machinectl start/stop, and writes root:root identity files." >&2
+        exit 1
+      fi
+      if [[ $# -lt 1 ]]; then
+        echo "Usage: persona-invoke <persona-name> [args passed straight to the persona's tool]" >&2
+        echo "Available personas: $(jq -r 'keys | join(", ")' "$MANIFEST")" >&2
+        exit 1
+      fi
+      NAME=$1
+      shift
+
+      if ! jq -e --arg n "$NAME" 'has($n)' "$MANIFEST" >/dev/null; then
+        echo "'$NAME' isn't wired into persona-runtime yet." >&2
+        echo "Available: $(jq -r 'keys | join(", ")' "$MANIFEST")" >&2
+        exit 1
+      fi
+
+      SIGNING_KEY_PATH=$(jq -r --arg n "$NAME" '.[$n].signingKeyPath' "$MANIFEST")
+      API_KEY_PATH=$(jq -r --arg n "$NAME" '.[$n].apiKeyPath // empty' "$MANIFEST")
+      FULLNAME=$(jq -r --arg n "$NAME" '.[$n].fullName' "$MANIFEST")
+      EMAIL=$(jq -r --arg n "$NAME" '.[$n].email' "$MANIFEST")
+
+      echo "Invoking $NAME via persona-runtime..."
+
+      umask 077
+      install -m 600 "$SIGNING_KEY_PATH" ${lib.escapeShellArg cfg.signingKeyFile}
+
+      cat >${lib.escapeShellArg cfg.gitConfigFile} <<EOF
+      [user]
+      	name = $FULLNAME
+      	email = $EMAIL
+      	signingkey = /run/secrets/signing-key
+      [commit]
+      	gpgsign = true
+      [gpg]
+      	format = ssh
+      EOF
+      chmod 644 ${lib.escapeShellArg cfg.gitConfigFile}
+
+      if [[ -n "''${API_KEY_PATH:-}" && -f "$API_KEY_PATH" ]]; then
+        printf 'GEMINI_API_KEY=%s\n' "$(cat "$API_KEY_PATH")" >${lib.escapeShellArg cfg.secretsEnvFile}
+      else
+        : >${lib.escapeShellArg cfg.secretsEnvFile}
+      fi
+      chmod 600 ${lib.escapeShellArg cfg.secretsEnvFile}
+
+      # Clean slate — a host-side bind mount survives the container's own
+      # ephemeral rootfs reset, so without this, one persona's session
+      # state could bleed into the next persona's context.
+      find "$DATA_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+
+      echo "Starting persona-runtime as $NAME..."
+      machinectl start persona-runtime
+
+      for _ in $(seq 1 20); do
+        if machinectl show persona-runtime -p State 2>/dev/null | grep -q '^State=running'; then
+          break
+        fi
+        sleep 0.5
+      done
+
+      set +e
+      machinectl shell \
+        --setenv=HOME=/var/lib/hermes \
+        --setenv=HERMES_HOME=/var/lib/hermes/.hermes \
+        persona-runtime /run/current-system/sw/bin/hermes "$@"
+      RESULT=$?
+      set -e
+
+      echo "Stopping persona-runtime..."
+      machinectl poweroff persona-runtime 2>/dev/null || true
+
+      exit "$RESULT"
+    '';
+  };
 in
 {
   # Generic, persona-agnostic worker container — ONE declared instance,
@@ -18,16 +121,20 @@ in
   # containers the wrong model: this way NixOS eval/deploy cost is O(1)
   # regardless of how many personas exist, not O(n).
   #
-  # How identity gets in: NOTHING persona-specific is a Nix option here.
-  # secretsEnvFile / gitConfigFile / signingKeyFile are bind-mounted at
-  # FIXED container paths; their HOST-SIDE content gets rewritten by the
-  # invocation script (nix-config/scripts/persona-invoke.sh) immediately
-  # before each `machinectl start`, and the model is passed as a
-  # `hermes -m ...` runtime flag, not a NixOS config value (confirmed
-  # working live 2026-08-08 testing juan's standing container). autoStart
-  # = false — the invoke script starts/stops it per call. ephemeral =
-  # true (mkContainer's default) means the rootfs resets on every start,
-  # so no persona's session state leaks into the next invocation.
+  # How identity gets in: NOTHING persona-specific is a Nix option here
+  # EXCEPT `personas` (below), which is plain data — signing-key/API-key
+  # paths the consumer host already decrypted via its own sops.secrets,
+  # plus git name/email. secretsEnvFile / gitConfigFile / signingKeyFile
+  # are bind-mounted at FIXED container paths; their HOST-SIDE content
+  # gets rewritten by the packaged `persona-invoke <name>` command (built
+  # below as personaInvokeScript, shipped via environment.systemPackages —
+  # no separate script checkout needed on the host) immediately before
+  # each `machinectl start`, and the model is passed as a `hermes -m ...`
+  # runtime flag, not a NixOS config value (confirmed working live
+  # 2026-08-08 testing juan's standing container). autoStart = false — the
+  # invoke script starts/stops it per call. ephemeral = true (mkContainer's
+  # default) means the rootfs resets on every start, so no persona's
+  # session state leaks into the next invocation.
   #
   # Rights/egress tiers per persona (role-tags → different egress
   # profiles) are NOT built yet — this first version ships one
@@ -76,6 +183,42 @@ in
         default = [ ];
       };
     };
+    personas = lib.mkOption {
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            signingKeyPath = lib.mkOption {
+              type = lib.types.str;
+              description = "Host path to this persona's DECRYPTED ed25519 signing key — the consumer host declares this via its own sops.secrets, e.g. config.sops.secrets.persona_<name>_signing_key.path. Not decrypted by this module.";
+            };
+            apiKeyPath = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Host path to this persona's DECRYPTED API key (e.g. Gemini), if it has one.";
+            };
+            fullName = lib.mkOption {
+              type = lib.types.str;
+              description = "Git commit author name for this persona.";
+            };
+            email = lib.mkOption {
+              type = lib.types.str;
+              description = "Git commit author email for this persona.";
+            };
+          };
+        }
+      );
+      default = { };
+      description = ''
+        Every persona invocable through this shared runtime, keyed by
+        name. This is a plain data option — nix-presets doesn't import
+        nix-config's personas.nix (presets must not depend back on the
+        consumer, see this repo's CLAUDE.md); the consumer host builds
+        this attrset from its own personas.nix + sops.secrets and passes
+        it in. persona-invoke reads it via a generated JSON manifest, not
+        by any live nix eval — the script has zero nix-config/
+        kleinbem-secrets checkout dependency.
+      '';
+    };
   } // tlsOpts;
 
   config = lib.mkIf cfg.enable (
@@ -90,6 +233,11 @@ in
           "f ${cfg.gitConfigFile} 0644 root root - -"
           "f ${cfg.signingKeyFile} 0600 root root - -"
         ];
+
+        # Host-level (not innerConfig) — persona-invoke runs on the HOST to
+        # drive machinectl, it doesn't run inside the persona-runtime
+        # container itself.
+        environment.systemPackages = [ personaInvokeScript ];
       }
 
       # ─── Host-side egress containment (mirrors openclaw.nix/hermes-juan.nix) ───
