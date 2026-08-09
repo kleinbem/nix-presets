@@ -30,9 +30,16 @@ let
     builtins.toJSON (
       lib.mapAttrs (
         name: p:
-        (toolSpecs.${p.tool} or (throw "persona-runtime: persona '${name}' has unwired tool '${p.tool}' — add it to toolSpecs and this container's environment.systemPackages first"))
+        (toolSpecs.${p.tool}
+          or (throw "persona-runtime: persona '${name}' has unwired tool '${p.tool}' — add it to toolSpecs and this container's environment.systemPackages first")
+        )
         // {
-          inherit (p) signingKeyPath apiKeyPath fullName email;
+          inherit (p)
+            signingKeyPath
+            apiKeyPath
+            fullName
+            email
+            ;
         }
       ) cfg.personas
     )
@@ -265,7 +272,8 @@ in
         kleinbem-secrets checkout dependency.
       '';
     };
-  } // tlsOpts;
+  }
+  // tlsOpts;
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [

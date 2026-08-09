@@ -112,16 +112,14 @@ in
       # environment at runtime instead, sourced from the EnvironmentFile
       # above (cfg.secretsFile, sops-templated on the host).
       environment.etc."litellm/config.yaml".text = builtins.toJSON {
-        model_list = map (
-          b:
-          {
-            model_name = b.name;
-            litellm_params = {
-              inherit (b) model;
-              api_key = if b.apiKeyEnvVar != null then "os.environ/${b.apiKeyEnvVar}" else "sk-not-needed";
-            } // lib.optionalAttrs (b.url != null) { api_base = b.url; };
+        model_list = map (b: {
+          model_name = b.name;
+          litellm_params = {
+            inherit (b) model;
+            api_key = if b.apiKeyEnvVar != null then "os.environ/${b.apiKeyEnvVar}" else "sk-not-needed";
           }
-        ) cfg.backends;
+          // lib.optionalAttrs (b.url != null) { api_base = b.url; };
+        }) cfg.backends;
         router_settings = {
           routing_strategy = "latency-based-routing";
           enable_pre_call_checks = true;
