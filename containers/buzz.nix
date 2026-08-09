@@ -298,6 +298,33 @@ in
                   RELAY_URL = cfg.relayUrl;
                   BUZZ_GIT_REPO_PATH = "/var/lib/buzz-relay/repos";
                   RUST_LOG = "buzz_relay=info,buzz_datastore=info,buzz_db=info,buzz_auth=info,buzz_pubsub=info";
+
+                  # Garage cannot pass this: its own docs state atomic
+                  # conditional writes (If-Match/If-None-Match CAS) are
+                  # "structurally impossible... due to the lack of a
+                  # consensus algorithm" — a permanent design choice, not a
+                  # version gap. buzz-relay's git-over-S3 storage leans on
+                  # that CAS as a formal correctness axiom (A3) for its
+                  # linearizability proof (docs/git-on-object-storage.md
+                  # upstream) — with the probe on, Garage fails it outright
+                  # (confirmed live 2026-08-09: "expected exactly 1 winner
+                  # among 32 classified observers, got 32").
+                  #
+                  # Deliberate tradeoff, not a fix: disabling this only
+                  # skips the startup check — Garage still can't provide
+                  # the guarantee, so a genuine same-repo concurrent push
+                  # could theoretically lose an update. Accepted here
+                  # because (a) this is a single-operator/low-concurrency
+                  # instance where that race is rare, (b) the git-hosting
+                  # feature isn't in active use — chat/relay/media (the
+                  # actual reason this container exists) don't touch this
+                  # code path at all, and (c) the alternative (a second
+                  # self-hosted object store, MinIO, just for this) was
+                  # already rejected fleet-wide 2026-06-27 for real CVEs.
+                  # Revisit if buzz's git hosting ever sees real concurrent
+                  # use — MinIO (or real AWS S3) is upstream's tested
+                  # reference backend for that guarantee, Garage is not.
+                  BUZZ_GIT_CONFORMANCE_PROBE = "false";
                 };
                 # BUZZ_RELAY_PRIVATE_KEY, BUZZ_S3_ACCESS_KEY/SECRET_KEY (same
                 # values as MINIO_ROOT_USER/PASSWORD, duplicated under the name
