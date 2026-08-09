@@ -125,26 +125,119 @@ in
     # Open WebUI, Ente Auth) shows a cert-warning interstitial in its app
     # window. Idempotent: reinitializes the DB only if missing, and
     # replaces any stale cert under the same nickname before re-adding.
-    home.activation.trustFleetInternalCas = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      let
-        certutil = "${pkgs.nss.tools}/bin/certutil";
-        nssdb = "sql:$HOME/.pki/nssdb";
-        importCert = nickname: certFile: ''
-          if [ -f "${certFile}" ]; then
-            ${certutil} -D -d "${nssdb}" -n "${nickname}" 2>/dev/null || true
-            ${certutil} -A -d "${nssdb}" -t "C,," -n "${nickname}" -i "${certFile}"
+    # Grouped into one `home` binding (statix repeated-key: activation/file/
+    # packages were three separate top-level `home.*` assignments before —
+    # same convention nix-config's mac-mini/default.nix uses for its own
+    # my.*/services.*/systemd.*/environment.* blocks).
+    home = {
+      activation.trustFleetInternalCas = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+        let
+          certutil = "${pkgs.nss.tools}/bin/certutil";
+          nssdb = "sql:$HOME/.pki/nssdb";
+          importCert = nickname: certFile: ''
+            if [ -f "${certFile}" ]; then
+              ${certutil} -D -d "${nssdb}" -n "${nickname}" 2>/dev/null || true
+              ${certutil} -A -d "${nssdb}" -t "C,," -n "${nickname}" -i "${certFile}"
+            fi
+          '';
+        in
+        ''
+          mkdir -p "$HOME/.pki"
+          if [ ! -f "$HOME/.pki/nssdb/cert9.db" ]; then
+            ${certutil} -N -d "${nssdb}" --empty-password
           fi
+          ${importCert "Caddy Internal CA" "$HOME/.pki/caddy-root.crt"}
+          ${importCert "Kleinbem Internal CA" "/nix/persist/pki/internal/ca.crt"}
+        ''
+      );
+
+      # Generate managed Chromium policies (disable default browser prompts)
+      # and vector SVG icon files under ~/.local/share/icons/hicolor/scalable/apps/
+      file = {
+        ".config/chromium/policies/managed/default_policy.json".text = builtins.toJSON {
+          "DefaultBrowserSettingEnabled" = false;
+          "FirstRunTabsEnabled" = false;
+          "SystemTheme" = 1;
+          "UseSystemTitleBar" = true;
+        };
+        ".local/share/icons/hicolor/index.theme".text = ''
+          [Icon Theme]
+          Name=Hicolor
+          Comment=Fallback icon theme
+          Hidden=true
+          Directories=16x16/apps,32x32/apps,48x48/apps,128x128/apps,256x256/apps,512x512/apps,scalable/apps
+
+          [16x16/apps]
+          Size=16
+          Context=Applications
+          Type=Threshold
+
+          [32x32/apps]
+          Size=32
+          Context=Applications
+          Type=Threshold
+
+          [48x48/apps]
+          Size=48
+          Context=Applications
+          Type=Threshold
+
+          [128x128/apps]
+          Size=128
+          Context=Applications
+          Type=Threshold
+
+          [256x256/apps]
+          Size=256
+          Context=Applications
+          Type=Threshold
+
+          [512x512/apps]
+          Size=512
+          Context=Applications
+          Type=Threshold
+
+          [scalable/apps]
+          Size=128
+          Context=Applications
+          Type=Scalable
+          MinSize=16
+          MaxSize=512
         '';
-      in
-      ''
-        mkdir -p "$HOME/.pki"
-        if [ ! -f "$HOME/.pki/nssdb/cert9.db" ]; then
-          ${certutil} -N -d "${nssdb}" --empty-password
-        fi
-        ${importCert "Caddy Internal CA" "$HOME/.pki/caddy-root.crt"}
-        ${importCert "Kleinbem Internal CA" "/nix/persist/pki/internal/ca.crt"}
-      ''
-    );
+        ".local/share/icons/hicolor/128x128/apps/chromium.png".source =
+          "${cfg.package}/share/icons/hicolor/128x128/apps/chromium.png";
+      }
+      // (lib.mapAttrs' (
+        id: pwa:
+        lib.nameValuePair ".local/share/icons/hicolor/scalable/apps/pwa-${id}.svg" {
+          text = pwa.svg;
+        }
+      ) (lib.filterAttrs (_: pwa: pwa.enable && pwa.svg != null) cfg.apps));
+
+      packages = [
+        cfg.package
+      ]
+      ++ (builtins.filter (x: x != null) (
+        lib.mapAttrsToList (
+          id: pwa:
+          if pwa.enable then
+            let
+              allFlags = cfg.defaultFlags ++ pwa.extraFlags;
+              flagsStr = lib.concatStringsSep " \\\n  " (map (f: "\"${f}\"") allFlags);
+            in
+            pkgs.writeShellScriptBin "pwa-${id}" ''
+              exec ${cfg.package}/bin/chromium \
+                --app="${pwa.url}" \
+                --user-data-dir="$HOME/.local/share/pwa/${id}" \
+                --class="${pwa.wmClass}" \
+                ${flagsStr} \
+                "$@"
+            ''
+          else
+            null
+        ) cfg.apps
+      ));
+    };
 
     # Built-in default apps. Defined here (as a config-level definition)
     # rather than as the option's `default`, so that consuming hosts adding
@@ -600,93 +693,6 @@ in
         ];
       };
     };
-
-    # Generate managed Chromium policies (disable default browser prompts)
-    # and vector SVG icon files under ~/.local/share/icons/hicolor/scalable/apps/
-    home.file = {
-      ".config/chromium/policies/managed/default_policy.json".text = builtins.toJSON {
-        "DefaultBrowserSettingEnabled" = false;
-        "FirstRunTabsEnabled" = false;
-        "SystemTheme" = 1;
-        "UseSystemTitleBar" = true;
-      };
-      ".local/share/icons/hicolor/index.theme".text = ''
-        [Icon Theme]
-        Name=Hicolor
-        Comment=Fallback icon theme
-        Hidden=true
-        Directories=16x16/apps,32x32/apps,48x48/apps,128x128/apps,256x256/apps,512x512/apps,scalable/apps
-
-        [16x16/apps]
-        Size=16
-        Context=Applications
-        Type=Threshold
-
-        [32x32/apps]
-        Size=32
-        Context=Applications
-        Type=Threshold
-
-        [48x48/apps]
-        Size=48
-        Context=Applications
-        Type=Threshold
-
-        [128x128/apps]
-        Size=128
-        Context=Applications
-        Type=Threshold
-
-        [256x256/apps]
-        Size=256
-        Context=Applications
-        Type=Threshold
-
-        [512x512/apps]
-        Size=512
-        Context=Applications
-        Type=Threshold
-
-        [scalable/apps]
-        Size=128
-        Context=Applications
-        Type=Scalable
-        MinSize=16
-        MaxSize=512
-      '';
-      ".local/share/icons/hicolor/128x128/apps/chromium.png".source =
-        "${cfg.package}/share/icons/hicolor/128x128/apps/chromium.png";
-    }
-    // (lib.mapAttrs' (
-      id: pwa:
-      lib.nameValuePair ".local/share/icons/hicolor/scalable/apps/pwa-${id}.svg" {
-        text = pwa.svg;
-      }
-    ) (lib.filterAttrs (_: pwa: pwa.enable && pwa.svg != null) cfg.apps));
-
-    home.packages = [
-      cfg.package
-    ]
-    ++ (builtins.filter (x: x != null) (
-      lib.mapAttrsToList (
-        id: pwa:
-        if pwa.enable then
-          let
-            allFlags = cfg.defaultFlags ++ pwa.extraFlags;
-            flagsStr = lib.concatStringsSep " \\\n  " (map (f: "\"${f}\"") allFlags);
-          in
-          pkgs.writeShellScriptBin "pwa-${id}" ''
-            exec ${cfg.package}/bin/chromium \
-              --app="${pwa.url}" \
-              --user-data-dir="$HOME/.local/share/pwa/${id}" \
-              --class="${pwa.wmClass}" \
-              ${flagsStr} \
-              "$@"
-          ''
-        else
-          null
-      ) cfg.apps
-    ));
 
     xdg.desktopEntries = lib.mapAttrs' (
       id: pwa:
