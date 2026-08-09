@@ -50,7 +50,9 @@ in
       services.authelia.instances.main = {
         enable = true;
         settings = {
-          theme = "dark";
+          # "auto" follows the browser's prefers-color-scheme; Authelia
+          # supports this natively so there's no need to hardcode "dark".
+          theme = "auto";
           default_redirection_url = "https://${cfg.ip}.local";
           server = {
             address = "tcp://0.0.0.0:9091";

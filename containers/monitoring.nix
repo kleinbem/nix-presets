@@ -94,6 +94,9 @@ in
                 server.http_addr = "0.0.0.0";
                 server.http_port = 3000;
                 security.secret_key = "antigravity-monitoring-key-2026";
+                # "system" follows the browser's prefers-color-scheme
+                # (Grafana 10+); no need to hardcode a theme.
+                users.default_theme = "system";
               };
               provision = {
                 enable = true;
