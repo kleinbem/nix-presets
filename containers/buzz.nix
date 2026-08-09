@@ -125,10 +125,6 @@ in
 
           users = {
             users = {
-              buzz = {
-                isSystemUser = true;
-                group = "buzz";
-              };
               # Static user (not the module's DynamicUser) so the
               # bind-mounted data dir has stable ownership across restarts —
               # see the services.garage comment below.
@@ -140,11 +136,22 @@ in
                 isSystemUser = true;
                 group = "buzz-relay";
               };
+              # Same reasoning as garage — services.typesense defaults to
+              # DynamicUser, which conflicts with bind-mounting a host dir
+              # straight onto /var/lib/typesense (systemd tries to migrate
+              # it to /var/lib/private/typesense and fails with "Device or
+              # resource busy" on an already-mounted, non-empty directory —
+              # confirmed live 2026-08-09). See the systemd.services.typesense
+              # override below.
+              typesense = {
+                isSystemUser = true;
+                group = "typesense";
+              };
             };
             groups = {
-              buzz = { };
               garage = { };
               buzz-relay = { };
+              typesense = { };
             };
           };
 
@@ -160,6 +167,23 @@ in
                   ensureDBOwnership = true;
                 }
               ];
+              # Peer auth compares the connecting OS username to the
+              # requested Postgres role directly unless mapped — buzz-relay
+              # (the systemd service's own OS user, isolated from postgres/
+              # garage/etc. for directory-ownership reasons) requests role
+              # "buzz", so the module's own default `local all all peer`
+              # rejected it outright ("Peer authentication failed for user
+              # buzz", confirmed live 2026-08-09). identMap translates
+              # buzz-relay → buzz for that one rule; the plain `peer`
+              # fallback below preserves default behavior (e.g. interactive
+              # `psql` as OS user postgres/root) for everything else.
+              identMap = ''
+                buzz-relay-map buzz-relay buzz
+              '';
+              authentication = ''
+                local all buzz peer map=buzz-relay-map
+                local all all peer
+              '';
             };
 
             # ── Redis, local-only ────────────────────────────────────────────
@@ -216,6 +240,12 @@ in
                 DynamicUser = lib.mkForce false;
                 User = "garage";
                 Group = "garage";
+              };
+
+              typesense.serviceConfig = {
+                DynamicUser = lib.mkForce false;
+                User = "typesense";
+                Group = "typesense";
               };
 
               # ── The relay itself ──────────────────────────────────────────
