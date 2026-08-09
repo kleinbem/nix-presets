@@ -89,7 +89,16 @@ let
       find "$DATA_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
       echo "Starting persona-runtime as $NAME..."
-      machinectl start persona-runtime
+      # autoStart = false means this is a declarative NixOS container that
+      # has never been booted yet — nothing is registered with
+      # systemd-machined for `machinectl start` to boot (that verb wants a
+      # pre-existing image under /var/lib/machines, which doesn't exist for
+      # an ephemeral container until its own systemd unit runs it). The
+      # unit NixOS actually generates is container@persona-runtime.service
+      # — go through systemctl, same as any other declarative container
+      # that isn't autoStart'd. `machinectl shell`/`machinectl poweroff`
+      # below still work fine once it's running, machined discovers it then.
+      systemctl start container@persona-runtime.service
 
       for _ in $(seq 1 20); do
         if machinectl show persona-runtime -p State 2>/dev/null | grep -q '^State=running'; then
@@ -107,7 +116,7 @@ let
       set -e
 
       echo "Stopping persona-runtime..."
-      machinectl poweroff persona-runtime 2>/dev/null || true
+      systemctl stop container@persona-runtime.service 2>/dev/null || true
 
       exit "$RESULT"
     '';
