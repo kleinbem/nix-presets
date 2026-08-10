@@ -299,6 +299,18 @@ in
                   BUZZ_GIT_REPO_PATH = "/var/lib/buzz-relay/repos";
                   RUST_LOG = "buzz_relay=info,buzz_datastore=info,buzz_db=info,buzz_auth=info,buzz_pubsub=info";
 
+                  # Schema was never created — the one-time init never ran
+                  # this. Without it every background job (push matching,
+                  # reminders, community scan) loops failing against tables
+                  # that don't exist ("relation events/communities/
+                  # push_match_queue does not exist"), confirmed live
+                  # 2026-08-10, even though the process itself stays up.
+                  # Upstream's own deploy docs (engineering.block.xyz/blog/
+                  # run-your-own-buzz-relay) set this permanently, not as a
+                  # one-shot — safe to leave on, applies pending migrations
+                  # idempotently on every start.
+                  BUZZ_AUTO_MIGRATE = "true";
+
                   # Garage cannot pass this: its own docs state atomic
                   # conditional writes (If-Match/If-None-Match CAS) are
                   # "structurally impossible... due to the lack of a
