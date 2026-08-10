@@ -27,6 +27,13 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
   buzzRelay = pkgs.callPackage ../pkgs/buzz-relay.nix { };
+
+  # Evaluated by the CONSUMING host (nixos-nvme, etc.), not baked into the
+  # container-factory build — see the comment on RELAY_URL's removal from
+  # systemd.services.buzz-relay.environment above. bindMounts (below) is a
+  # host-level option, so this derivation and its content genuinely differ
+  # per real deploying host, unlike anything inside innerConfig.
+  relayUrlEnvFile = pkgs.writeText "buzz-relay-url.env" "RELAY_URL=${cfg.relayUrl}\n";
 in
 {
   options.my.containers.buzz = {
@@ -295,9 +302,29 @@ in
                   BUZZ_S3_REGION = "us-east-1";
                   BUZZ_S3_ADDRESSING_STYLE = "path";
                   BUZZ_BIND_ADDR = "0.0.0.0:3000";
-                  RELAY_URL = cfg.relayUrl;
                   BUZZ_GIT_REPO_PATH = "/var/lib/buzz-relay/repos";
                   RUST_LOG = "buzz_relay=info,buzz_datastore=info,buzz_db=info,buzz_auth=info,buzz_pubsub=info";
+
+                  # NOT RELAY_URL = cfg.relayUrl here (tried first, wrong):
+                  # this whole `environment` block gets BAKED into the
+                  # container's systemd unit at BUILD time — fine for
+                  # constants, but this container is deployed standalone
+                  # (my.services.container-updater.containers), which means
+                  # the store path that actually ships is built ONCE by
+                  # hosts/container-factory (placeholder cfg, relayUrl =
+                  # "wss://buzz.example.invalid") and that exact closure is
+                  # what every consuming host's `update-container@buzz`
+                  # pulls verbatim — a real host's own `cfg.relayUrl` here
+                  # would just be evaluated and discarded, never built.
+                  # Confirmed live 2026-08-10: the desktop client got a 404
+                  # ("no community is configured for this host") because the
+                  # running relay had literally registered buzz.example.invalid
+                  # as its community, not the real address. secretsFile/
+                  # typesenseApiKeyFile don't have this problem because
+                  # bindMounts (below) is a HOST-level option, evaluated by
+                  # each consuming host's OWN config, not baked into the
+                  # shared factory build — so RELAY_URL needs the same
+                  # bind-mounted-file treatment, see relayUrlEnvFile below.
 
                   # Schema was never created — the one-time init never ran
                   # this. Without it every background job (push matching,
@@ -341,8 +368,14 @@ in
                 # BUZZ_RELAY_PRIVATE_KEY, BUZZ_S3_ACCESS_KEY/SECRET_KEY (same
                 # values as MINIO_ROOT_USER/PASSWORD, duplicated under the name
                 # the relay reads) all come from secretsFile — see its option doc.
+                # relay-url.env carries RELAY_URL — see the comment on its
+                # removal from the `environment` block above for why it has
+                # to arrive this way instead.
                 serviceConfig = {
-                  EnvironmentFile = "/run/secrets/buzz.env";
+                  EnvironmentFile = [
+                    "/run/secrets/buzz.env"
+                    "/run/secrets/relay-url.env"
+                  ];
                   ExecStart = "${buzzRelay}/bin/buzz-relay";
                   User = "buzz-relay";
                   Group = "buzz-relay";
@@ -361,41 +394,46 @@ in
             ];
           };
         };
-        bindMounts =
-          (lib.optionalAttrs (cfg.secretsFile != null) {
-            "/run/secrets/buzz.env" = {
-              hostPath = cfg.secretsFile;
-              isReadOnly = true;
-            };
-          })
-          // (lib.optionalAttrs (cfg.typesenseApiKeyFile != null) {
-            "/run/secrets/buzz-typesense-api-key" = {
-              hostPath = cfg.typesenseApiKeyFile;
-              isReadOnly = true;
-            };
-          })
-          // {
-            "/var/lib/postgresql" = {
-              hostPath = "${cfg.hostDataDir}/postgresql";
-              isReadOnly = false;
-            };
-            "/var/lib/redis-buzz" = {
-              hostPath = "${cfg.hostDataDir}/redis";
-              isReadOnly = false;
-            };
-            "/var/lib/typesense" = {
-              hostPath = "${cfg.hostDataDir}/typesense";
-              isReadOnly = false;
-            };
-            "/var/lib/garage" = {
-              hostPath = "${cfg.hostDataDir}/garage";
-              isReadOnly = false;
-            };
-            "/var/lib/buzz-relay" = {
-              hostPath = "${cfg.hostDataDir}/relay";
-              isReadOnly = false;
-            };
+        bindMounts = {
+          "/run/secrets/relay-url.env" = {
+            hostPath = "${relayUrlEnvFile}";
+            isReadOnly = true;
           };
+        }
+        // (lib.optionalAttrs (cfg.secretsFile != null) {
+          "/run/secrets/buzz.env" = {
+            hostPath = cfg.secretsFile;
+            isReadOnly = true;
+          };
+        })
+        // (lib.optionalAttrs (cfg.typesenseApiKeyFile != null) {
+          "/run/secrets/buzz-typesense-api-key" = {
+            hostPath = cfg.typesenseApiKeyFile;
+            isReadOnly = true;
+          };
+        })
+        // {
+          "/var/lib/postgresql" = {
+            hostPath = "${cfg.hostDataDir}/postgresql";
+            isReadOnly = false;
+          };
+          "/var/lib/redis-buzz" = {
+            hostPath = "${cfg.hostDataDir}/redis";
+            isReadOnly = false;
+          };
+          "/var/lib/typesense" = {
+            hostPath = "${cfg.hostDataDir}/typesense";
+            isReadOnly = false;
+          };
+          "/var/lib/garage" = {
+            hostPath = "${cfg.hostDataDir}/garage";
+            isReadOnly = false;
+          };
+          "/var/lib/buzz-relay" = {
+            hostPath = "${cfg.hostDataDir}/relay";
+            isReadOnly = false;
+          };
+        };
       })
     ]
   );
