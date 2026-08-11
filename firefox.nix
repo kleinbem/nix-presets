@@ -168,9 +168,16 @@ in
           Default = false;
         };
         ExtensionSettings = {
+          # "allowed", not "blocked": this only governs whether an extension
+          # may be (re-)registered at all. Manual/GUI installs from AMO are
+          # already blocked by InstallAddonsPermission above. A "blocked"
+          # default here instead vetoes Nix's own declaratively-sideloaded
+          # extensions whenever their store path changes (e.g. on a Firefox
+          # version bump) — the addon manager treats the new symlink target
+          # as a fresh, policy-gated "install" and silently drops it from
+          # extensions.json instead of re-registering it.
           "*" = {
-            installation_mode = "blocked";
-            blocked_install_message = "Extension installations are managed declaratively via Nix.";
+            installation_mode = "allowed";
           };
         };
       };
