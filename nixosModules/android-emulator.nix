@@ -11,7 +11,7 @@ let
   # Dynamic SDK based on configuration
   androidSdk = pkgs.androidenv.composeAndroidPackages {
     cmdLineToolsVersion = "13.0";
-    platformToolsVersion = "36.0.1";
+    platformToolsVersion = "37.0.1";
     buildToolsVersions = [ "36.0.0" ];
     includeEmulator = true;
     includeSystemImages = true;
