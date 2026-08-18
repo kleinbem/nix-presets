@@ -14,7 +14,7 @@ utils.mkSandboxed {
     { sloth, ... }:
     {
       bubblewrap.bind.rw = [
-        (sloth.concat' sloth.homeDir "/GoogleDrive/Obsidian/MyVault")
+        (sloth.concat' sloth.homeDir "/Documents/Notes")
       ];
       bubblewrap.bind.ro = [
         # Link system documentation into the vault sandbox

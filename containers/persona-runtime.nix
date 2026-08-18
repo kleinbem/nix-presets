@@ -24,6 +24,14 @@ let
       binary = "/run/current-system/sw/bin/claude";
       apiKeyEnvVar = "ANTHROPIC_API_KEY";
     };
+    # aider reads ANTHROPIC_API_KEY via its litellm backend the same way
+    # claude-code does (its own --anthropic-api-key flag maps to the more
+    # specific AIDER_ANTHROPIC_API_KEY, but the plain var works too and
+    # keeps this entry consistent with claude-code's).
+    aider = {
+      binary = "/run/current-system/sw/bin/aider";
+      apiKeyEnvVar = "ANTHROPIC_API_KEY";
+    };
   };
 
   personasManifest = pkgs.writeText "persona-runtime-personas.json" (
@@ -349,15 +357,18 @@ in
             };
           };
 
-          # Other personas' declared tools (aider, antigravity, self-hosted-
-          # runner — see nix-config/personas.nix's `tool` field per persona)
-          # get added here as they're actually invoked through this
-          # container, not preemptively for all of them. ANTHROPIC_API_KEY
-          # (claude-code) reads straight from the process environment, no
+          # Other personas' declared tools (antigravity, self-hosted-runner —
+          # see nix-config/personas.nix's `tool` field per persona) get
+          # added here as they're actually invoked through this container,
+          # not preemptively for all of them. ANTHROPIC_API_KEY (claude-code,
+          # aider) reads straight from the process environment, no
           # dotenv-from-home convention like hermes-agent's — see
           # persona-invoke's `machinectl shell ... bash -c 'source agent.env'`
           # wrapper above, which is what actually gets it there.
-          environment.systemPackages = [ pkgs.claude-code ];
+          environment.systemPackages = [
+            pkgs.claude-code
+            pkgs.aider-chat
+          ];
 
           # NOT programs.git — that bakes a static /etc/gitconfig at build
           # time, which defeats the point (one shared container, N
