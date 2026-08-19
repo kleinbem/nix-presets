@@ -451,7 +451,7 @@
     "ghostty": {
       "inputs": {
         "flake-compat": "flake-compat_3",
-        "home-manager": "home-manager",
+        "home-manager": "home-manager_2",
         "nixpkgs": "nixpkgs_3",
         "systems": "systems",
         "zig": "zig",
@@ -474,7 +474,7 @@
     "ghostty_2": {
       "inputs": {
         "flake-compat": "flake-compat_7",
-        "home-manager": "home-manager_2",
+        "home-manager": "home-manager_3",
         "nixpkgs": "nixpkgs_6",
         "systems": "systems_2",
         "zig": "zig_2",
@@ -641,6 +641,7 @@
     "hermes": {
       "inputs": {
         "flake-parts": "flake-parts_2",
+        "home-manager": "home-manager",
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -650,11 +651,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1787019777,
-        "narHash": "sha256-Xp/Oa2Hae3QavPML7lEYxhPlZHXn5RZIdwaXT76WeeU=",
+        "lastModified": 1787105178,
+        "narHash": "sha256-IJJG62dJypHe8Ls5s8HbB+4ziPhN/Wp5PlqjuOH8DzM=",
         "owner": "NousResearch",
         "repo": "hermes-agent",
-        "rev": "c9ce66e25e55332b557b6af4471fbcdee3779022",
+        "rev": "74f99af470ae8ce47f0903cf431d106cecbd37f2",
         "type": "github"
       },
       "original": {
@@ -664,6 +665,27 @@
       }
     },
     "home-manager": {
+      "inputs": {
+        "nixpkgs": [
+          "hermes",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786487128,
+        "narHash": "sha256-ad60hrRVhH/bo3Jl1YLzO+QcS3mUNZr9LNJdzhMO2P4=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "f404edbfa4117810c96b97048299242fc50e5362",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "home-manager_2": {
       "inputs": {
         "nixpkgs": [
           "nix-devshells",
@@ -685,7 +707,7 @@
         "type": "github"
       }
     },
-    "home-manager_2": {
+    "home-manager_3": {
       "inputs": {
         "nixpkgs": [
           "nix-packages",
@@ -708,7 +730,7 @@
         "type": "github"
       }
     },
-    "home-manager_3": {
+    "home-manager_4": {
       "inputs": {
         "nixpkgs": [
           "openclaw",
@@ -895,11 +917,11 @@
         "treefmt-nix": "treefmt-nix_5"
       },
       "locked": {
-        "lastModified": 1786934556,
-        "narHash": "sha256-VWbA23hUZHWGuSX8QqCgnbTdRs4NL/pCcPfVnL8knlk=",
+        "lastModified": 1787107281,
+        "narHash": "sha256-RR3rs1+FjvZf+m8qACLctDjOxapXeuPWbY/ble/sHAQ=",
         "owner": "kleinbem",
         "repo": "nix-packages",
-        "rev": "f64bc1d09e8b3fd2cefa59dd1bbbb4ef08273da5",
+        "rev": "99247c417754ce495cd655106c407edba28e15ab",
         "type": "github"
       },
       "original": {
@@ -915,11 +937,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787016972,
-        "narHash": "sha256-6B98mtehXRht8nSiX+1tqm8WyeQvjCjhf8IjCKLh/dU=",
+        "lastModified": 1787103818,
+        "narHash": "sha256-ATm0WHSBL4ZiKAzCXNn3EDZPXISAxJBzQk3NQaqnT0o=",
         "owner": "nix-community",
         "repo": "nix-vscode-extensions",
-        "rev": "596319216632f6e6da839787295a350c027d39be",
+        "rev": "3180d2a35f4373f6931455cd5f49e6ae42977c90",
         "type": "github"
       },
       "original": {
@@ -1380,11 +1402,11 @@
     },
     "nixpkgs_7": {
       "locked": {
-        "lastModified": 1786862985,
-        "narHash": "sha256-FBJRXmbGXiSUDvYEbfLYRkckayyZ6SK1UEqhCrIZ2Cs=",
+        "lastModified": 1787001381,
+        "narHash": "sha256-Ue1Yo8gfHdD4TMtNewhA4tkSYeFqXThju0nCyJc3ALo=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "e5bdc4a41d4c072fe1e3787eaa0320a384741d44",
+        "rev": "ec2d622de0773551768cf98f3fc50cbcc003b9c5",
         "type": "github"
       },
       "original": {
@@ -1434,7 +1456,7 @@
     "openclaw": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "home-manager": "home-manager_3",
+        "home-manager": "home-manager_4",
         "nix-openclaw-tools": "nix-openclaw-tools",
         "nixpkgs": [
           "nixpkgs"
