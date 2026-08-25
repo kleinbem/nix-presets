@@ -51,13 +51,13 @@
       freecad-mcp-src = pkgs.fetchFromGitHub {
         owner = "neka-nat";
         repo = "freecad-mcp";
-        rev = "6de952ae923e68af236f40570ae06b1a37994592";
-        sha256 = "074yvx0fapg2r9wbv3wr10nkkrkgaxki4qc1ikd5yi9kyhjb59vk";
+        rev = "3745ff9a7ddc127831873048e0000ce64e8b9c1f";
+        sha256 = "1fk40rbhqg47i6wl54x3y2vy90dcrig9v64g4ms330gpb5jgcp4a";
       };
 
       freecadMcpPkg = pkgs.python3.pkgs.buildPythonPackage {
         pname = "freecad-mcp";
-        version = "0.1.21";
+        version = "0.1.22";
         pyproject = true;
         src = freecad-mcp-src;
         nativeBuildInputs = [ pkgs.python3.pkgs.hatchling ];
