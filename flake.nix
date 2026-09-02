@@ -218,6 +218,7 @@
               paperless = import ./containers/paperless.nix { inherit self; };
               anythingllm = import ./containers/anythingllm.nix { inherit self; };
               ente = import ./containers/ente.nix { inherit self; };
+              vaultwarden = import ./containers/vaultwarden.nix { inherit self; };
             };
 
             # Variant implementations of the same preset (they redeclare the
