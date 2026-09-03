@@ -78,65 +78,85 @@ in
     name = "kleinbem-auth";
     inherit cfg;
     innerConfig = {
-      # Compose the runtime env file from sops-materialised secret files.
-      systemd.services.kleinbem-auth-env-setup = {
-        description = "Materialise kleinbem-auth environment from sops files";
-        wantedBy = [ "kleinbem-auth.service" ];
-        before = [ "kleinbem-auth.service" ];
-        serviceConfig.Type = "oneshot";
-        script = ''
-          umask 077
-          {
-            printf 'BETTER_AUTH_URL=%s\n' 'https://${cfg.domain}'
-            printf 'TRUSTED_ORIGINS=%s\n' '${lib.concatStringsSep "," cfg.trustedOrigins}'
-            printf 'COOKIE_DOMAIN=%s\n' '${cfg.cookieDomain}'
-            printf 'DB_PATH=%s\n' '/var/lib/kleinbem-auth/auth.db'
-            printf 'PORT=%d\n' ${toString cfg.port}
-            ${lib.optionalString (
-              cfg.betterAuthSecretFile != null
-            ) "printf 'BETTER_AUTH_SECRET=%s\\n' \"$(cat ${cfg.betterAuthSecretFile})\""}
-            ${lib.optionalString (
-              cfg.googleClientIdFile != null
-            ) "printf 'GOOGLE_CLIENT_ID=%s\\n' \"$(cat ${cfg.googleClientIdFile})\""}
-            ${lib.optionalString (
-              cfg.googleClientSecretFile != null
-            ) "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.googleClientSecretFile})\""}
-            ${lib.optionalString (
-              cfg.facebookClientIdFile != null
-            ) "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${cfg.facebookClientIdFile})\""}
-            ${lib.optionalString (
-              cfg.facebookClientSecretFile != null
-            ) "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.facebookClientSecretFile})\""}
-          } > /run/kleinbem-auth.env
-        '';
+      # Fixed user — the SQLite DB persists via a host bind-mount onto
+      # /var/lib/kleinbem-auth (the container is ephemeral). DynamicUser +
+      # StateDirectory can't take ownership of a pre-existing bind mount
+      # (systemd exit 238/STATE_DIRECTORY), so use a fixed uid and let
+      # tmpfiles own the mounted dir each boot.
+      users.users.kleinbem-auth = {
+        isSystemUser = true;
+        group = "kleinbem-auth";
+        home = "/var/lib/kleinbem-auth";
       };
-
-      systemd.services.kleinbem-auth = {
-        description = "kleinbem-auth (better-auth social login)";
-        wantedBy = [ "multi-user.target" ];
-        after = [
-          "network.target"
-          "kleinbem-auth-env-setup.service"
-        ];
-        serviceConfig = {
-          EnvironmentFile = "/run/kleinbem-auth.env";
-          ExecStartPre = "${pkgs.kleinbem-auth}/bin/kleinbem-auth-migrate";
-          ExecStart = "${pkgs.kleinbem-auth}/bin/kleinbem-auth";
-          DynamicUser = true;
-          StateDirectory = "kleinbem-auth";
-          WorkingDirectory = "/var/lib/kleinbem-auth";
-          Restart = "on-failure";
-          RestartSec = "5s";
-          # hardening
-          NoNewPrivileges = true;
-          ProtectSystem = "strict";
-          ProtectHome = true;
-          PrivateTmp = true;
-          ReadWritePaths = [ "/var/lib/kleinbem-auth" ];
-        };
-      };
+      users.groups.kleinbem-auth = { };
 
       networking.firewall.allowedTCPPorts = [ cfg.port ];
+
+      systemd = {
+        tmpfiles.rules = [
+          "d /var/lib/kleinbem-auth 0750 kleinbem-auth kleinbem-auth - -"
+        ];
+
+        services = {
+          # Compose the runtime env file from sops-materialised secret files.
+          kleinbem-auth-env-setup = {
+            description = "Materialise kleinbem-auth environment from sops files";
+            wantedBy = [ "kleinbem-auth.service" ];
+            before = [ "kleinbem-auth.service" ];
+            serviceConfig.Type = "oneshot";
+            script = ''
+              umask 077
+              {
+                printf 'BETTER_AUTH_URL=%s\n' 'https://${cfg.domain}'
+                printf 'TRUSTED_ORIGINS=%s\n' '${lib.concatStringsSep "," cfg.trustedOrigins}'
+                printf 'COOKIE_DOMAIN=%s\n' '${cfg.cookieDomain}'
+                printf 'DB_PATH=%s\n' '/var/lib/kleinbem-auth/auth.db'
+                printf 'PORT=%d\n' ${toString cfg.port}
+                ${lib.optionalString (
+                  cfg.betterAuthSecretFile != null
+                ) "printf 'BETTER_AUTH_SECRET=%s\\n' \"$(cat ${cfg.betterAuthSecretFile})\""}
+                ${lib.optionalString (
+                  cfg.googleClientIdFile != null
+                ) "printf 'GOOGLE_CLIENT_ID=%s\\n' \"$(cat ${cfg.googleClientIdFile})\""}
+                ${lib.optionalString (
+                  cfg.googleClientSecretFile != null
+                ) "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.googleClientSecretFile})\""}
+                ${lib.optionalString (
+                  cfg.facebookClientIdFile != null
+                ) "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${cfg.facebookClientIdFile})\""}
+                ${lib.optionalString (
+                  cfg.facebookClientSecretFile != null
+                ) "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.facebookClientSecretFile})\""}
+              } > /run/kleinbem-auth.env
+            '';
+          };
+
+          kleinbem-auth = {
+            description = "kleinbem-auth (better-auth social login)";
+            wantedBy = [ "multi-user.target" ];
+            after = [
+              "network.target"
+              "kleinbem-auth-env-setup.service"
+            ];
+            serviceConfig = {
+              EnvironmentFile = "/run/kleinbem-auth.env";
+              ExecStartPre = "${pkgs.kleinbem-auth}/bin/kleinbem-auth-migrate";
+              ExecStart = "${pkgs.kleinbem-auth}/bin/kleinbem-auth";
+              User = "kleinbem-auth";
+              Group = "kleinbem-auth";
+              WorkingDirectory = "/var/lib/kleinbem-auth";
+              Restart = "on-failure";
+              RestartSec = "5s";
+              # hardening
+              NoNewPrivileges = true;
+              ProtectSystem = "strict";
+              ProtectHome = true;
+              PrivateTmp = true;
+              ReadWritePaths = [ "/var/lib/kleinbem-auth" ];
+            };
+          };
+        };
+      };
     };
 
     bindMounts = {
