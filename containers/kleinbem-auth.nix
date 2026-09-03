@@ -134,21 +134,11 @@ in
                 printf 'COOKIE_DOMAIN=%s\n' '${cfg.cookieDomain}'
                 printf 'DB_PATH=%s\n' '/var/lib/kleinbem-auth/auth.db'
                 printf 'PORT=%d\n' ${toString cfg.port}
-                ${lib.optionalString hasBetterAuthSecret
-                  "printf 'BETTER_AUTH_SECRET=%s\\n' \"$(cat ${betterAuthSecretPath})\""
-                }
-                ${lib.optionalString hasGoogleClientId
-                  "printf 'GOOGLE_CLIENT_ID=%s\\n' \"$(cat ${googleClientIdPath})\""
-                }
-                ${lib.optionalString hasGoogleClientSecret
-                  "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${googleClientSecretPath})\""
-                }
-                ${lib.optionalString hasFacebookClientId
-                  "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${facebookClientIdPath})\""
-                }
-                ${lib.optionalString hasFacebookClientSecret
-                  "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${facebookClientSecretPath})\""
-                }
+                ${lib.optionalString hasBetterAuthSecret "printf 'BETTER_AUTH_SECRET=%s\\n' \"$(cat ${betterAuthSecretPath})\""}
+                ${lib.optionalString hasGoogleClientId "printf 'GOOGLE_CLIENT_ID=%s\\n' \"$(cat ${googleClientIdPath})\""}
+                ${lib.optionalString hasGoogleClientSecret "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${googleClientSecretPath})\""}
+                ${lib.optionalString hasFacebookClientId "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${facebookClientIdPath})\""}
+                ${lib.optionalString hasFacebookClientSecret "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${facebookClientSecretPath})\""}
               } > /run/kleinbem-auth.env
             '';
           };
