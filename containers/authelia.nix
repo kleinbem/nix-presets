@@ -73,7 +73,14 @@ in
             default_policy = "deny";
             rules = [
               {
-                domain = "*.local";
+                # Internal .local vhost names and the mesh-only *.kleinbem.dev
+                # services that opt into caddy forward_auth (inventory node
+                # auth = true). Services that must stay open (cache, ntfy, s3)
+                # carry auth = false, so caddy never forwards them here.
+                domain = [
+                  "*.local"
+                  "*.kleinbem.dev"
+                ];
                 policy = "one_factor";
               }
             ];
