@@ -9,6 +9,28 @@ let
   cfg = config.my.containers.kleinbem-auth;
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
+
+  # Fixed paths the sops secret files are bind-mounted to *inside* the
+  # container. The cfg.*File host attrs hold sops-nix paths resolved on the
+  # deploying host; the inner env-setup script only ever reads these
+  # constants, so the cached closure is byte-identical whether built by the
+  # container-factory (ADR-002 standalone build) or a real host. Reading
+  # cfg.*File directly in the inner script instead — as this preset used to —
+  # bakes the factory's `/run/secrets/factory-dummy` into the closure the
+  # host then runs, and the real sops path never takes effect (the host-side
+  # innerConfig is discarded for standalone containers). Same pattern as
+  # vaultwarden.nix.
+  betterAuthSecretPath = "/run/secrets/kleinbem-auth-better-auth-secret";
+  googleClientIdPath = "/run/secrets/kleinbem-auth-google-client-id";
+  googleClientSecretPath = "/run/secrets/kleinbem-auth-google-client-secret";
+  facebookClientIdPath = "/run/secrets/kleinbem-auth-facebook-client-id";
+  facebookClientSecretPath = "/run/secrets/kleinbem-auth-facebook-client-secret";
+
+  hasBetterAuthSecret = cfg.betterAuthSecretFile != null;
+  hasGoogleClientId = cfg.googleClientIdFile != null;
+  hasGoogleClientSecret = cfg.googleClientSecretFile != null;
+  hasFacebookClientId = cfg.facebookClientIdFile != null;
+  hasFacebookClientSecret = cfg.facebookClientSecretFile != null;
 in
 {
   options.my.containers.kleinbem-auth = {
@@ -112,21 +134,21 @@ in
                 printf 'COOKIE_DOMAIN=%s\n' '${cfg.cookieDomain}'
                 printf 'DB_PATH=%s\n' '/var/lib/kleinbem-auth/auth.db'
                 printf 'PORT=%d\n' ${toString cfg.port}
-                ${lib.optionalString (
-                  cfg.betterAuthSecretFile != null
-                ) "printf 'BETTER_AUTH_SECRET=%s\\n' \"$(cat ${cfg.betterAuthSecretFile})\""}
-                ${lib.optionalString (
-                  cfg.googleClientIdFile != null
-                ) "printf 'GOOGLE_CLIENT_ID=%s\\n' \"$(cat ${cfg.googleClientIdFile})\""}
-                ${lib.optionalString (
-                  cfg.googleClientSecretFile != null
-                ) "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.googleClientSecretFile})\""}
-                ${lib.optionalString (
-                  cfg.facebookClientIdFile != null
-                ) "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${cfg.facebookClientIdFile})\""}
-                ${lib.optionalString (
-                  cfg.facebookClientSecretFile != null
-                ) "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.facebookClientSecretFile})\""}
+                ${lib.optionalString hasBetterAuthSecret
+                  "printf 'BETTER_AUTH_SECRET=%s\\n' \"$(cat ${betterAuthSecretPath})\""
+                }
+                ${lib.optionalString hasGoogleClientId
+                  "printf 'GOOGLE_CLIENT_ID=%s\\n' \"$(cat ${googleClientIdPath})\""
+                }
+                ${lib.optionalString hasGoogleClientSecret
+                  "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${googleClientSecretPath})\""
+                }
+                ${lib.optionalString hasFacebookClientId
+                  "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${facebookClientIdPath})\""
+                }
+                ${lib.optionalString hasFacebookClientSecret
+                  "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${facebookClientSecretPath})\""
+                }
               } > /run/kleinbem-auth.env
             '';
           };
@@ -163,6 +185,36 @@ in
       "/var/lib/kleinbem-auth" = {
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
+      };
+    }
+    // lib.optionalAttrs hasBetterAuthSecret {
+      ${betterAuthSecretPath} = {
+        hostPath = cfg.betterAuthSecretFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasGoogleClientId {
+      ${googleClientIdPath} = {
+        hostPath = cfg.googleClientIdFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasGoogleClientSecret {
+      ${googleClientSecretPath} = {
+        hostPath = cfg.googleClientSecretFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasFacebookClientId {
+      ${facebookClientIdPath} = {
+        hostPath = cfg.facebookClientIdFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasFacebookClientSecret {
+      ${facebookClientSecretPath} = {
+        hostPath = cfg.facebookClientSecretFile;
+        isReadOnly = true;
       };
     };
   });
