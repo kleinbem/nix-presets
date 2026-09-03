@@ -164,7 +164,23 @@ in
             (_: {
               networking = {
                 hostName = cfg.hostName or name;
-                defaultGateway = lib.mkForce config.my.network.hostAddress;
+                # Default route derived from THIS container's own address
+                # (.1 of its /24), NOT the build host's bridge IP. A
+                # standalone closure is built once by container-factory but
+                # runs on whichever host deploys it; baking the factory's
+                # `config.my.network.hostAddress` (10.85.46.1) made every
+                # container deployed off the .46 subnet (mac-mini/.50,
+                # core-pi/.48, hass-pi/.49, nasbook/.47) route its replies
+                # to a gateway that doesn't exist there — unreachable
+                # cross-host and no internet egress. Every fleet container
+                # host is .1 of its container /24, so this is exact.
+                defaultGateway = lib.mkForce (
+                  let
+                    addr = lib.head (lib.splitString "/" cfg.ip);
+                    o = lib.splitString "." addr;
+                  in
+                  lib.concatStringsSep "." (lib.take 3 o ++ [ "1" ])
+                );
                 # NOT config.my.network.hostAddress: nothing on ANY host in
                 # the fleet actually answers DNS on the container-bridge
                 # gateway address (systemd-resolved only binds loopback +
