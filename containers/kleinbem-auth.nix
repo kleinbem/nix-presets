@@ -92,16 +92,21 @@ in
             printf 'COOKIE_DOMAIN=%s\n' '${cfg.cookieDomain}'
             printf 'DB_PATH=%s\n' '/var/lib/kleinbem-auth/auth.db'
             printf 'PORT=%d\n' ${toString cfg.port}
-            ${lib.optionalString (cfg.betterAuthSecretFile != null)
-              "printf 'BETTER_AUTH_SECRET=%s\\n' \"$(cat ${cfg.betterAuthSecretFile})\""}
-            ${lib.optionalString (cfg.googleClientIdFile != null)
-              "printf 'GOOGLE_CLIENT_ID=%s\\n' \"$(cat ${cfg.googleClientIdFile})\""}
-            ${lib.optionalString (cfg.googleClientSecretFile != null)
-              "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.googleClientSecretFile})\""}
-            ${lib.optionalString (cfg.facebookClientIdFile != null)
-              "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${cfg.facebookClientIdFile})\""}
-            ${lib.optionalString (cfg.facebookClientSecretFile != null)
-              "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.facebookClientSecretFile})\""}
+            ${lib.optionalString (
+              cfg.betterAuthSecretFile != null
+            ) "printf 'BETTER_AUTH_SECRET=%s\\n' \"$(cat ${cfg.betterAuthSecretFile})\""}
+            ${lib.optionalString (
+              cfg.googleClientIdFile != null
+            ) "printf 'GOOGLE_CLIENT_ID=%s\\n' \"$(cat ${cfg.googleClientIdFile})\""}
+            ${lib.optionalString (
+              cfg.googleClientSecretFile != null
+            ) "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.googleClientSecretFile})\""}
+            ${lib.optionalString (
+              cfg.facebookClientIdFile != null
+            ) "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${cfg.facebookClientIdFile})\""}
+            ${lib.optionalString (
+              cfg.facebookClientSecretFile != null
+            ) "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${cfg.facebookClientSecretFile})\""}
           } > /run/kleinbem-auth.env
         '';
       };
