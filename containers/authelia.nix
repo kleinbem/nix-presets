@@ -53,7 +53,10 @@ in
           # "auto" follows the browser's prefers-color-scheme; Authelia
           # supports this natively so there's no need to hardcode "dark".
           theme = "auto";
-          default_redirection_url = "https://${cfg.ip}.local";
+          # default_redirection_url moved to session.cookies[].default_redirection_url
+          # below — the global form can't coexist with `cookies` (validation error).
+          # It also used to be "https://${cfg.ip}.local" here, i.e.
+          # https://10.85.48.123.local — never a valid hostname.
           server = {
             address = "tcp://0.0.0.0:9091";
           };
@@ -87,14 +90,23 @@ in
           };
           session = {
             name = "authelia_session";
-            inherit (cfg) domain;
             expiration = "1h";
             inactivity = "30m";
-            remember_me_duration = "1w";
+            remember_me = "1w";
+            # Global `domain` can't coexist with `cookies`, and a bare "local"
+            # domain is rejected outright (must have a period or be an IP) —
+            # that's what was crash-looping the service. Scoped to
+            # kleinbem.dev: every currently auth-gated app (code, frigate,
+            # n8n) is reached via *.kleinbem.dev over the mesh/tunnel, never
+            # by its .local name (mDNS/Avahi, bridge-local only) — so this
+            # isn't a narrower fix than what was actually working, just a
+            # valid one. authelia_url matches what caddy's forward_auth
+            # already redirects to (core-pi's mesh IP).
             cookies = [
               {
-                inherit (cfg) domain;
-                authelia_url = "https://authelia.local";
+                domain = "kleinbem.dev";
+                authelia_url = "https://100.117.146.201:9091/";
+                default_redirection_url = "https://100.117.146.201:9091/";
               }
             ];
           };
