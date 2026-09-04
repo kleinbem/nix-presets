@@ -146,7 +146,14 @@ in
       # directory too — same pattern as crowdsec's hostDataDir fix.
       systemd.tmpfiles.rules = [
         "Z /var/lib/authelia - authelia-main authelia-main - -"
-        "f /var/lib/authelia/users.yml 0600 authelia-main authelia-main - users: {}"
+        # Current Authelia rejects an empty `users: {}` map outright
+        # ('non zero value required') -- it won't even boot without at
+        # least one real account, so the old empty-placeholder approach no
+        # longer works. Seeds one real admin (password: kleinbem-bootstrap-2026,
+        # argon2id hash below) -- CHANGE THIS on first login, there's no
+        # forced-reset flow. `f` only writes this if the file doesn't
+        # already exist, so re-deploys never clobber a real users.yml.
+        ''f /var/lib/authelia/users.yml 0600 authelia-main authelia-main - users: { admin: { displayname: "Admin", password: "$argon2id$v=19$m=65536,t=3,p=4$rDRnyr5BTZqqhhghLCjlCA$fganLBTQZMaAXpLb4PtkFuGVppvlTO5ZEJQZQLd3UDs", email: "admin@kleinbem.dev", groups: ["admins"] } }''
       ];
 
       # Ensure the secret files are reachable inside the container with proper permissions
