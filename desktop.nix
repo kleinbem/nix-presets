@@ -82,7 +82,16 @@ in
       # -- Apps (Sandboxed via Firejail on host) --
       obsidian
       mpv
-      google-chrome
+      (google-chrome.override {
+        # No managed policy any more (nix-config modules/nixos/desktop.nix) —
+        # these are just our own launch defaults, not enterprise policy.
+        commandLineArgs = lib.concatStringsSep " " [
+          # GNOME-drawn title bar under Wayland — replaces the old
+          # UseSystemTitleBar policy, which only existed as a policy (no
+          # normal chrome://settings equivalent on Linux).
+          "--enable-features=WaylandWindowDecorations"
+        ];
+      })
       zathura
       imv # Image Viewer
       pkgs.rbw
