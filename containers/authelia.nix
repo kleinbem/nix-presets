@@ -136,9 +136,17 @@ in
 
       networking.firewall.allowedTCPPorts = [ 9091 ];
 
-      # Create a dummy users.yml if it doesn't exist (User should manage this)
+      # Recursive ownership fix first (Z) -- root:root leftovers (below) and
+      # an unwritable-by-authelia-main top-level dir were causing fatal
+      # startup-check failures: "unable to open database file" (db.sqlite3's
+      # parent wasn't writable) and "permission denied" reading users.yml
+      # (created root:root by the old `f` rule, but Authelia runs as
+      # authelia-main). Z re-applies every boot and, since this runs inside
+      # the container on the bind-mounted path, fixes the host-side
+      # directory too — same pattern as crowdsec's hostDataDir fix.
       systemd.tmpfiles.rules = [
-        "f /var/lib/authelia/users.yml 0600 root root - users: {}"
+        "Z /var/lib/authelia - authelia-main authelia-main - -"
+        "f /var/lib/authelia/users.yml 0600 authelia-main authelia-main - users: {}"
       ];
 
       # Ensure the secret files are reachable inside the container with proper permissions
