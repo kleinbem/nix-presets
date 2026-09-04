@@ -40,6 +40,14 @@ in
       default = config.sops.secrets.authelia_storage_encryption_key.path;
       defaultText = lib.literalExpression "config.sops.secrets.authelia_storage_encryption_key.path";
     };
+    # The seed users.yml (real, argon2id-hashed accounts) -- sops-backed like
+    # the three secrets above, not baked into this shared preset. A preset
+    # must not embed a host-specific credential (see this repo's AGENTS.md).
+    usersFile = lib.mkOption {
+      type = lib.types.str;
+      default = config.sops.secrets.authelia_users_file.path;
+      defaultText = lib.literalExpression "config.sops.secrets.authelia_users_file.path";
+    };
   };
 
   config = lib.mkIf cfg.enable (mkContainer {
@@ -136,24 +144,17 @@ in
 
       networking.firewall.allowedTCPPorts = [ 9091 ];
 
-      # Recursive ownership fix first (Z) -- root:root leftovers (below) and
-      # an unwritable-by-authelia-main top-level dir were causing fatal
-      # startup-check failures: "unable to open database file" (db.sqlite3's
-      # parent wasn't writable) and "permission denied" reading users.yml
-      # (created root:root by the old `f` rule, but Authelia runs as
-      # authelia-main). Z re-applies every boot and, since this runs inside
-      # the container on the bind-mounted path, fixes the host-side
-      # directory too — same pattern as crowdsec's hostDataDir fix.
+      # Recursive ownership fix (Z) -- db.sqlite3's parent dir wasn't
+      # writable by authelia-main, causing a fatal "unable to open database
+      # file" startup check failure. Z re-applies every boot and, since this
+      # runs inside the container on the bind-mounted path, fixes the
+      # host-side directory too — same pattern as crowdsec's hostDataDir fix.
+      # users.yml itself is no longer created here -- it's a sops secret,
+      # copied into place by the activation script below (same reasoning as
+      # jwt/session/storage secrets: a plain bind-mount can't fix the
+      # decrypted file's ownership for authelia-main to read it).
       systemd.tmpfiles.rules = [
         "Z /var/lib/authelia - authelia-main authelia-main - -"
-        # Current Authelia rejects an empty `users: {}` map outright
-        # ('non zero value required') -- it won't even boot without at
-        # least one real account, so the old empty-placeholder approach no
-        # longer works. Seeds one real admin (password: kleinbem-bootstrap-2026,
-        # argon2id hash below) -- CHANGE THIS on first login, there's no
-        # forced-reset flow. `f` only writes this if the file doesn't
-        # already exist, so re-deploys never clobber a real users.yml.
-        ''f /var/lib/authelia/users.yml 0600 authelia-main authelia-main - users: { admin: { displayname: "Admin", password: "$argon2id$v=19$m=65536,t=3,p=4$rDRnyr5BTZqqhhghLCjlCA$fganLBTQZMaAXpLb4PtkFuGVppvlTO5ZEJQZQLd3UDs", email: "admin@kleinbem.dev", groups: ["admins"] } }''
       ];
 
       # Ensure the secret files are reachable inside the container with proper permissions
@@ -166,6 +167,15 @@ in
             chmod 400 /run/secrets/authelia_''${secret}
           fi
         done
+        # Seed users.yml from its sops secret -- `f`-type tmpfiles create-if-
+        # missing doesn't apply here since this is a real secret value, not
+        # a static default; copy runs every activation but is idempotent
+        # (same content in, same content out) and cheap.
+        if [ -f /run/secrets/authelia_users_file_host ]; then
+          cp -f /run/secrets/authelia_users_file_host /var/lib/authelia/users.yml
+          chown authelia-main:authelia-main /var/lib/authelia/users.yml
+          chmod 600 /var/lib/authelia/users.yml
+        fi
       '';
     };
     bindMounts = {
@@ -183,6 +193,10 @@ in
       };
       "/run/secrets/authelia_storage_encryption_key_host" = {
         hostPath = cfg.storageEncryptionKeyFile;
+        isReadOnly = true;
+      };
+      "/run/secrets/authelia_users_file_host" = {
+        hostPath = cfg.usersFile;
         isReadOnly = true;
       };
     };
