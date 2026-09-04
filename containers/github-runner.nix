@@ -148,7 +148,7 @@ in
           replace = true;
           inherit (r) url name;
           tokenFile = "/run/secrets/github-runner-token";
-          extraLabels = r.extraLabels;
+          inherit (r) extraLabels;
           extraPackages = [
             pkgs.git
           ]
