@@ -253,7 +253,6 @@
               _module.args.inputs = inputs;
             };
           mcp = import ./mcp.nix;
-          pwa = import ./pwa.nix;
         };
       };
     };
