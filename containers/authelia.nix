@@ -100,13 +100,17 @@ in
             # n8n) is reached via *.kleinbem.dev over the mesh/tunnel, never
             # by its .local name (mDNS/Avahi, bridge-local only) — so this
             # isn't a narrower fix than what was actually working, just a
-            # valid one. authelia_url matches what caddy's forward_auth
-            # already redirects to (core-pi's mesh IP).
+            # valid one. authelia_url and default_redirection_url must each
+            # share a cookie scope with `domain` (i.e. actually be
+            # *.kleinbem.dev, not a bare IP) and must differ from each other —
+            # authelia.kleinbem.dev is Authelia's own real vhost (nix-config
+            # inventory.nix, mesh-only); redirect after login to the
+            # dashboard rather than back to Authelia itself.
             cookies = [
               {
                 domain = "kleinbem.dev";
-                authelia_url = "https://100.117.146.201:9091/";
-                default_redirection_url = "https://100.117.146.201:9091/";
+                authelia_url = "https://authelia.kleinbem.dev/";
+                default_redirection_url = "https://home.kleinbem.dev/";
               }
             ];
           };
