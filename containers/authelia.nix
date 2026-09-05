@@ -144,6 +144,18 @@ in
 
       networking.firewall.allowedTCPPorts = [ 9091 ];
 
+      # The upstream module's authelia-main.service runs with ProtectSystem =
+      # "strict", which makes everything under / read-only except its own
+      # auto-managed StateDirectory (/var/lib/authelia-main). Our bind-mounted
+      # /var/lib/authelia (where storage.local.path, users.yml, and the
+      # notifier file all live) is a different, custom path, so it's silently
+      # read-only inside the service's sandbox by default -- confirmed via
+      # `nsenter --mount=/proc/<pid>/ns/mnt -- touch` returning "Read-only
+      # file system" even though ownership/mode looked fine. Without this,
+      # every startup fails the storage check with a misleading "unable to
+      # open database file: no such file or directory".
+      systemd.services.authelia-main.serviceConfig.ReadWritePaths = [ "/var/lib/authelia" ];
+
       # Recursive ownership fix (Z) -- db.sqlite3's parent dir wasn't
       # writable by authelia-main, causing a fatal "unable to open database
       # file" startup check failure. Z re-applies every boot and, since this
