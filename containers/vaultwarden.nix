@@ -129,6 +129,15 @@ in
           SIGNUPS_VERIFY = false; # needs SMTP; flip on once mail is wired
           INVITATIONS_ALLOWED = cfg.invitationsAllowed;
           WEB_VAULT_ENABLED = true;
+          # Favicon fetching is a server-side GET to a user-controlled URL —
+          # an SSRF primitive that, from this container's slice, can reach the
+          # rest of 10.85.48.0/24 (Caddy, kleinbem-auth, crowdsec LAPI, …).
+          # Kill it outright rather than delegate to an external ICON_SERVICE,
+          # which would leak the set of domains stored in the vault to a third
+          # party. Cost: new entries have no favicon; already-cached icons
+          # keep serving. (Fixed upstream in 1.37.0 / CVE batch, but removing
+          # the vector beats tracking the patch.)
+          DISABLE_ICON_DOWNLOAD = true;
         }
         // lib.optionalAttrs hasSmtp {
           SMTP_HOST = cfg.smtp.host;
