@@ -246,12 +246,6 @@
           desktop = import ./desktop.nix;
           dx = import ./dx.nix;
           herdr = import ./herdr.nix;
-          firefox-browser =
-            { ... }:
-            {
-              imports = [ ./firefox.nix ];
-              _module.args.inputs = inputs;
-            };
           mcp = import ./mcp.nix;
         };
       };

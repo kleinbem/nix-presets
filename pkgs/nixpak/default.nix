@@ -1,7 +1,6 @@
 {
   pkgs,
   nixpak,
-  homeDirectory ? "/home/martin",
 }:
 
 let
@@ -11,10 +10,6 @@ let
       inherit pkgs nixpak;
       inherit (pkgs) lib;
     };
-  chrome = import ./chrome.nix {
-    inherit pkgs nixpak homeDirectory;
-    inherit (pkgs) lib;
-  };
 in
 {
   bitwarden = call ./bitwarden.nix;
@@ -25,7 +20,4 @@ in
   obsidian = call ./obsidian.nix;
   signal-desktop = call ./signal.nix;
   slack = call ./slack.nix;
-
-  # Chrome Variants
-  google-chrome-stable = chrome.stable;
 }
