@@ -39,6 +39,8 @@ in
     # 1. Install Packages & Configure Environment
     home = {
       packages = with pkgs; [
+        opencode # Real nixpkgs package — a genuine binary on PATH, required
+        # for herdr's `opencode` integration to have anything to launch/attach.
         nodejs_22 # Runtime for OpenCode
         opencode-mcp-script # Our custom bridge script
       ];
@@ -51,13 +53,6 @@ in
       sessionPath = [
         "${config.home.homeDirectory}/.npm-global/bin"
       ];
-
-      # 2. Install OpenCode (Imperative is safest for self-updating CLI tools)
-      # We add a shell alias to help install/update it easily
-      shellAliases = {
-        opencode = "nix run github:opencode-ai/opencode-ai --";
-        update-opencode = "echo 'OpenCode is now managed via Nix flakes. Run opencode to use it.'";
-      };
     };
 
     # 3. Configure OpenCode (The "Safe" Paid Gemini Setup)

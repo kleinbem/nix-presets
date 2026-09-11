@@ -13,6 +13,13 @@
   home.packages = [
     pkgs.herdr
 
+    # Google Antigravity CLI (`agy`) — built by nix-packages, reachable here
+    # via its overlay (modules/nixos/base.nix, useGlobalPkgs = true). Without
+    # this, herdr's `antigravity-cli` integration has an installed hook
+    # (herdr integration install antigravity-cli, below) but nothing to
+    # actually launch a pane with.
+    pkgs.google-antigravity-cli
+
     # Hermes Agent (Nous Research) — terminal-native coding agent, run
     # interactively in a Herdr pane alongside claude/opencode. It's a
     # first-class Herdr integration; the state hook is installed by the
