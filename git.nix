@@ -5,6 +5,15 @@
   ...
 }:
 
+let
+  # jj-toolbox (~/Develop/github.com/kleinbem/jj-toolbox) — generic jj
+  # enhancements, not tied to this fleet's repos, cwd-scoped like any
+  # built-in jj command. `jj util exec` is jj's own documented way to chain
+  # multiple commands behind one alias.
+  jjToolboxBin = "${config.home.homeDirectory}/Develop/github.com/kleinbem/jj-toolbox/bin";
+  jjToolboxTool = name: [ "util" "exec" "--" "${jjToolboxBin}/jj-${name}" ];
+in
+
 {
   home.packages = [
     pkgs.git-credential-oauth
@@ -49,6 +58,17 @@
           # Works touchlessly with the V2 SSH-FIDO key (no-touch-required).
           behavior = "own";
           backend = "ssh";
+        };
+        aliases = {
+          save = jjToolboxTool "save";
+          sweep-merged = jjToolboxTool "sweep-merged";
+          check-signatures = jjToolboxTool "check-signatures";
+          push = jjToolboxTool "push";
+          pull = jjToolboxTool "pull";
+          sign-unsigned = jjToolboxTool "sign-unsigned";
+          ws-new = jjToolboxTool "ws-new";
+          ws-list = jjToolboxTool "ws-list";
+          ws-gc = jjToolboxTool "ws-gc";
         };
       };
     };
