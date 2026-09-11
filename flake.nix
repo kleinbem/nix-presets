@@ -180,7 +180,6 @@
               code-server = import ./containers/code-server.nix { inherit self; };
               open-webui = import ./containers/open-webui.nix { inherit self; };
               dashboard = import ./containers/dashboard { inherit self; };
-              dashboard-custom = import ./containers/dashboard { inherit self; };
               dashboard-homer = import ./containers/dashboard/homer { inherit self; };
               dashboard-homepage = import ./containers/dashboard/homepage { inherit self; };
               qdrant = import ./containers/qdrant.nix { inherit self; };
