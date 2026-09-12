@@ -241,7 +241,7 @@
         homeManagerModules = {
           opencode = import ./opencode.nix;
           terminal = import ./terminal.nix;
-          git = import ./git.nix;
+          vcs = import ./vcs.nix;
           desktop = import ./desktop.nix;
           dx = import ./dx.nix;
           herdr = import ./herdr.nix;
