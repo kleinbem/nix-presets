@@ -60,6 +60,7 @@ in
           backend = "ssh";
         };
         aliases = {
+          ahead = jjToolboxTool "ahead";
           save = jjToolboxTool "save";
           sweep-merged = jjToolboxTool "sweep-merged";
           check-signatures = jjToolboxTool "check-signatures";
