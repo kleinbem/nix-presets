@@ -86,63 +86,67 @@ let
   };
 in
 {
-  # Herdr — terminal-based multiplexer for running/attaching to multiple AI
-  # coding agent sessions in real PTYs (persistent, SSH-friendly, no Electron).
-  # https://herdr.dev
-  home.packages = [
-    pkgs.herdr
+  home = {
+    # Herdr — terminal-based multiplexer for running/attaching to multiple AI
+    # coding agent sessions in real PTYs (persistent, SSH-friendly, no Electron).
+    # https://herdr.dev
+    packages = [
+      pkgs.herdr
 
-    # Google Antigravity CLI (`agy`) — built by nix-packages, reachable here
-    # via its overlay (modules/nixos/base.nix, useGlobalPkgs = true). Without
-    # this, herdr's `antigravity-cli` integration has an installed hook
-    # (herdr integration install antigravity-cli, below) but nothing to
-    # actually launch a pane with.
-    pkgs.google-antigravity-cli
+      # Google Antigravity CLI (`agy`) — built by nix-packages, reachable here
+      # via its overlay (modules/nixos/base.nix, useGlobalPkgs = true). Without
+      # this, herdr's `antigravity-cli` integration has an installed hook
+      # (herdr integration install antigravity-cli, below) but nothing to
+      # actually launch a pane with.
+      pkgs.google-antigravity-cli
 
-    # Hermes Agent (Nous Research) — terminal-native coding agent, run
-    # interactively in a Herdr pane alongside claude/opencode. It's a
-    # first-class Herdr integration; the state hook is installed by the
-    # activation block below. This is the CLI, NOT the headless Discord
-    # gateway — that's the separate mac-mini container (my.containers.hermes),
-    # which uses the `messaging` build. `minimal` here would trim the closure
-    # if that ever matters.
-    inputs.hermes.packages.${pkgs.stdenv.hostPlatform.system}.default
-  ];
+      # Hermes Agent (Nous Research) — terminal-native coding agent, run
+      # interactively in a Herdr pane alongside claude/opencode. It's a
+      # first-class Herdr integration; the state hook is installed by the
+      # activation block below. This is the CLI, NOT the headless Discord
+      # gateway — that's the separate mac-mini container (my.containers.hermes),
+      # which uses the `messaging` build. `minimal` here would trim the closure
+      # if that ever matters.
+      inputs.hermes.packages.${pkgs.stdenv.hostPlatform.system}.default
+    ];
 
-  # herdr has exactly one config file (`herdr --help` → "Config:
-  # ~/.config/herdr/config.toml") and persists runtime UI state into it too
-  # (agent_panel_sort changes, the onboarding-seen flag, ...) — there's no
-  # separate state file. A plain xdg.configFile symlink into the Nix store
-  # made every one of those writes fail with "Read-only file system (os
-  # error 30)" (see herdr-server.log: context="onboarding setting" /
-  # context="agent panel sort"). Seed it as a real, writable copy instead —
-  # and only replace it while it's still missing or still the old symlink,
-  # so we don't clobber whatever herdr has since written into it.
-  home.activation.herdrConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    configPath="${config.xdg.configHome}/herdr/config.toml"
-    if [ -L "$configPath" ] || [ ! -e "$configPath" ]; then
-      run install -Dm644 ${herdrConfigFile} "$configPath"
-    fi
-  '';
+    activation = {
+      # herdr has exactly one config file (`herdr --help` → "Config:
+      # ~/.config/herdr/config.toml") and persists runtime UI state into it too
+      # (agent_panel_sort changes, the onboarding-seen flag, ...) — there's no
+      # separate state file. A plain xdg.configFile symlink into the Nix store
+      # made every one of those writes fail with "Read-only file system (os
+      # error 30)" (see herdr-server.log: context="onboarding setting" /
+      # context="agent panel sort"). Seed it as a real, writable copy instead —
+      # and only replace it while it's still missing or still the old symlink,
+      # so we don't clobber whatever herdr has since written into it.
+      herdrConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        configPath="${config.xdg.configHome}/herdr/config.toml"
+        if [ -L "$configPath" ] || [ ! -e "$configPath" ]; then
+          run install -Dm644 ${herdrConfigFile} "$configPath"
+        fi
+      '';
 
-  # Herdr's per-agent state hooks (e.g. ~/.claude/hooks/herdr-agent-state.sh)
-  # are extracted from the herdr binary by `integration install` and carry a
-  # version stamp that must match the binary — a plain package bump silently
-  # leaves them stale ("outdated (v7 < v8)"). Re-running the install on every
-  # activation is idempotent (overwrites the hook, upserts the agent's
-  # settings entry) and, because the string embeds ${pkgs.herdr}, only
-  # actually re-runs when the herdr version changes.
-  #
-  # Each `install` writes into that agent's own config dir. claude/opencode/
-  # gemini already have theirs, but Hermes' ~/.hermes is created lazily by
-  # `hermes setup` on first interactive run — so on a fresh machine that
-  # line would error and abort activation. `|| true` keeps the switch green;
-  # the hook installs cleanly on the next switch once ~/.hermes exists (or
-  # run `herdr integration install hermes` by hand right after setup).
-  home.activation.herdrIntegrations = lib.hm.dag.entryAfter [ "herdrConfig" ] ''
-    run ${pkgs.herdr}/bin/herdr integration install claude
-    run ${pkgs.herdr}/bin/herdr integration install opencode
-    run ${pkgs.herdr}/bin/herdr integration install antigravity-cli
-    run ${pkgs.herdr}/bin/herdr integration install hermes || true
-  '';
+      # Herdr's per-agent state hooks (e.g. ~/.claude/hooks/herdr-agent-state.sh)
+      # are extracted from the herdr binary by `integration install` and carry a
+      # version stamp that must match the binary — a plain package bump silently
+      # leaves them stale ("outdated (v7 < v8)"). Re-running the install on every
+      # activation is idempotent (overwrites the hook, upserts the agent's
+      # settings entry) and, because the string embeds ${pkgs.herdr}, only
+      # actually re-runs when the herdr version changes.
+      #
+      # Each `install` writes into that agent's own config dir. claude/opencode/
+      # gemini already have theirs, but Hermes' ~/.hermes is created lazily by
+      # `hermes setup` on first interactive run — so on a fresh machine that
+      # line would error and abort activation. `|| true` keeps the switch green;
+      # the hook installs cleanly on the next switch once ~/.hermes exists (or
+      # run `herdr integration install hermes` by hand right after setup).
+      herdrIntegrations = lib.hm.dag.entryAfter [ "herdrConfig" ] ''
+        run ${pkgs.herdr}/bin/herdr integration install claude
+        run ${pkgs.herdr}/bin/herdr integration install opencode
+        run ${pkgs.herdr}/bin/herdr integration install antigravity-cli
+        run ${pkgs.herdr}/bin/herdr integration install hermes || true
+      '';
+    };
+  };
 }

@@ -11,7 +11,12 @@ let
   # built-in jj command. `jj util exec` is jj's own documented way to chain
   # multiple commands behind one alias.
   jjToolboxBin = "${config.home.homeDirectory}/Develop/github.com/kleinbem/jj-toolbox/bin";
-  jjToolboxTool = name: [ "util" "exec" "--" "${jjToolboxBin}/jj-${name}" ];
+  jjToolboxTool = name: [
+    "util"
+    "exec"
+    "--"
+    "${jjToolboxBin}/jj-${name}"
+  ];
 in
 
 {
