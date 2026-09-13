@@ -31,6 +31,8 @@ let
   linkedinClientSecretPath = "/run/secrets/kleinbem-auth-linkedin-client-secret";
   microsoftClientIdPath = "/run/secrets/kleinbem-auth-microsoft-client-id";
   microsoftClientSecretPath = "/run/secrets/kleinbem-auth-microsoft-client-secret";
+  smtpUserPath = "/run/secrets/kleinbem-auth-smtp-user";
+  smtpPasswordPath = "/run/secrets/kleinbem-auth-smtp-password";
 
   hasBetterAuthSecret = cfg.betterAuthSecretFile != null;
   hasGoogleClientId = cfg.googleClientIdFile != null;
@@ -43,6 +45,8 @@ let
   hasLinkedinClientSecret = cfg.linkedinClientSecretFile != null;
   hasMicrosoftClientId = cfg.microsoftClientIdFile != null;
   hasMicrosoftClientSecret = cfg.microsoftClientSecretFile != null;
+  hasSmtpUser = cfg.smtpUserFile != null;
+  hasSmtpPassword = cfg.smtpPasswordFile != null;
 in
 {
   options.my.containers.kleinbem-auth = {
@@ -128,6 +132,32 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
     };
+
+    # Email+password sign-up/reset — only enabled (auth.ts) once smtpUserFile
+    # and smtpPasswordFile both exist. Host/port/from aren't secrets, so they
+    # stay plain options rather than *File indirection.
+    smtpHost = lib.mkOption {
+      type = lib.types.str;
+      default = "mail.kleinbem.dev";
+      description = "Stalwart's SMTP submission host (port 587, STARTTLS).";
+    };
+    smtpPort = lib.mkOption {
+      type = lib.types.port;
+      default = 587;
+    };
+    smtpFrom = lib.mkOption {
+      type = lib.types.str;
+      default = "kleinbem-auth <noreply@kleinbem.dev>";
+    };
+    smtpUserFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "File containing the Stalwart mailbox username to authenticate as.";
+    };
+    smtpPasswordFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
   }
   // tlsOpts;
 
@@ -181,6 +211,13 @@ in
                 ${lib.optionalString hasLinkedinClientSecret "printf 'LINKEDIN_CLIENT_SECRET=%s\\n' \"$(cat ${linkedinClientSecretPath})\""}
                 ${lib.optionalString hasMicrosoftClientId "printf 'MICROSOFT_CLIENT_ID=%s\\n' \"$(cat ${microsoftClientIdPath})\""}
                 ${lib.optionalString hasMicrosoftClientSecret "printf 'MICROSOFT_CLIENT_SECRET=%s\\n' \"$(cat ${microsoftClientSecretPath})\""}
+                ${lib.optionalString (hasSmtpUser && hasSmtpPassword) ''
+                  printf 'SMTP_HOST=%s\n' '${cfg.smtpHost}'
+                  printf 'SMTP_PORT=%d\n' ${toString cfg.smtpPort}
+                  printf 'SMTP_FROM=%s\n' '${cfg.smtpFrom}'
+                ''}
+                ${lib.optionalString hasSmtpUser "printf 'SMTP_USER=%s\\n' \"$(cat ${smtpUserPath})\""}
+                ${lib.optionalString hasSmtpPassword "printf 'SMTP_PASSWORD=%s\\n' \"$(cat ${smtpPasswordPath})\""}
               } > /run/kleinbem-auth.env
             '';
           };
@@ -282,6 +319,18 @@ in
     // lib.optionalAttrs hasMicrosoftClientSecret {
       ${microsoftClientSecretPath} = {
         hostPath = cfg.microsoftClientSecretFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasSmtpUser {
+      ${smtpUserPath} = {
+        hostPath = cfg.smtpUserFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasSmtpPassword {
+      ${smtpPasswordPath} = {
+        hostPath = cfg.smtpPasswordFile;
         isReadOnly = true;
       };
     };
