@@ -169,6 +169,15 @@
       };
     };
 
+    ghostty = {
+      enable = true;
+      # No theme set yet — pick one interactively (ghostty +list-themes)
+      # and add it here once you've seen how it looks on your setup.
+      settings = {
+        shell-integration = "bash";
+      };
+    };
+
     ssh = {
       enable = true;
       enableDefaultConfig = false;
