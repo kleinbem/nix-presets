@@ -25,12 +25,24 @@ let
   googleClientSecretPath = "/run/secrets/kleinbem-auth-google-client-secret";
   facebookClientIdPath = "/run/secrets/kleinbem-auth-facebook-client-id";
   facebookClientSecretPath = "/run/secrets/kleinbem-auth-facebook-client-secret";
+  githubClientIdPath = "/run/secrets/kleinbem-auth-github-client-id";
+  githubClientSecretPath = "/run/secrets/kleinbem-auth-github-client-secret";
+  linkedinClientIdPath = "/run/secrets/kleinbem-auth-linkedin-client-id";
+  linkedinClientSecretPath = "/run/secrets/kleinbem-auth-linkedin-client-secret";
+  microsoftClientIdPath = "/run/secrets/kleinbem-auth-microsoft-client-id";
+  microsoftClientSecretPath = "/run/secrets/kleinbem-auth-microsoft-client-secret";
 
   hasBetterAuthSecret = cfg.betterAuthSecretFile != null;
   hasGoogleClientId = cfg.googleClientIdFile != null;
   hasGoogleClientSecret = cfg.googleClientSecretFile != null;
   hasFacebookClientId = cfg.facebookClientIdFile != null;
   hasFacebookClientSecret = cfg.facebookClientSecretFile != null;
+  hasGithubClientId = cfg.githubClientIdFile != null;
+  hasGithubClientSecret = cfg.githubClientSecretFile != null;
+  hasLinkedinClientId = cfg.linkedinClientIdFile != null;
+  hasLinkedinClientSecret = cfg.linkedinClientSecretFile != null;
+  hasMicrosoftClientId = cfg.microsoftClientIdFile != null;
+  hasMicrosoftClientSecret = cfg.microsoftClientSecretFile != null;
 in
 {
   options.my.containers.kleinbem-auth = {
@@ -92,6 +104,30 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
     };
+    githubClientIdFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    githubClientSecretFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    linkedinClientIdFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    linkedinClientSecretFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    microsoftClientIdFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    microsoftClientSecretFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
   }
   // tlsOpts;
 
@@ -139,6 +175,12 @@ in
                 ${lib.optionalString hasGoogleClientSecret "printf 'GOOGLE_CLIENT_SECRET=%s\\n' \"$(cat ${googleClientSecretPath})\""}
                 ${lib.optionalString hasFacebookClientId "printf 'FACEBOOK_CLIENT_ID=%s\\n' \"$(cat ${facebookClientIdPath})\""}
                 ${lib.optionalString hasFacebookClientSecret "printf 'FACEBOOK_CLIENT_SECRET=%s\\n' \"$(cat ${facebookClientSecretPath})\""}
+                ${lib.optionalString hasGithubClientId "printf 'GITHUB_CLIENT_ID=%s\\n' \"$(cat ${githubClientIdPath})\""}
+                ${lib.optionalString hasGithubClientSecret "printf 'GITHUB_CLIENT_SECRET=%s\\n' \"$(cat ${githubClientSecretPath})\""}
+                ${lib.optionalString hasLinkedinClientId "printf 'LINKEDIN_CLIENT_ID=%s\\n' \"$(cat ${linkedinClientIdPath})\""}
+                ${lib.optionalString hasLinkedinClientSecret "printf 'LINKEDIN_CLIENT_SECRET=%s\\n' \"$(cat ${linkedinClientSecretPath})\""}
+                ${lib.optionalString hasMicrosoftClientId "printf 'MICROSOFT_CLIENT_ID=%s\\n' \"$(cat ${microsoftClientIdPath})\""}
+                ${lib.optionalString hasMicrosoftClientSecret "printf 'MICROSOFT_CLIENT_SECRET=%s\\n' \"$(cat ${microsoftClientSecretPath})\""}
               } > /run/kleinbem-auth.env
             '';
           };
@@ -204,6 +246,42 @@ in
     // lib.optionalAttrs hasFacebookClientSecret {
       ${facebookClientSecretPath} = {
         hostPath = cfg.facebookClientSecretFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasGithubClientId {
+      ${githubClientIdPath} = {
+        hostPath = cfg.githubClientIdFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasGithubClientSecret {
+      ${githubClientSecretPath} = {
+        hostPath = cfg.githubClientSecretFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasLinkedinClientId {
+      ${linkedinClientIdPath} = {
+        hostPath = cfg.linkedinClientIdFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasLinkedinClientSecret {
+      ${linkedinClientSecretPath} = {
+        hostPath = cfg.linkedinClientSecretFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasMicrosoftClientId {
+      ${microsoftClientIdPath} = {
+        hostPath = cfg.microsoftClientIdFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasMicrosoftClientSecret {
+      ${microsoftClientSecretPath} = {
+        hostPath = cfg.microsoftClientSecretFile;
         isReadOnly = true;
       };
     };
