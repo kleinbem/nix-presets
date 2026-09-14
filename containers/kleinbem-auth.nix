@@ -33,6 +33,7 @@ let
   microsoftClientSecretPath = "/run/secrets/kleinbem-auth-microsoft-client-secret";
   smtpUserPath = "/run/secrets/kleinbem-auth-smtp-user";
   smtpPasswordPath = "/run/secrets/kleinbem-auth-smtp-password";
+  turnstileSecretPath = "/run/secrets/kleinbem-auth-turnstile-secret";
 
   hasBetterAuthSecret = cfg.betterAuthSecretFile != null;
   hasGoogleClientId = cfg.googleClientIdFile != null;
@@ -47,6 +48,7 @@ let
   hasMicrosoftClientSecret = cfg.microsoftClientSecretFile != null;
   hasSmtpUser = cfg.smtpUserFile != null;
   hasSmtpPassword = cfg.smtpPasswordFile != null;
+  hasTurnstileSecret = cfg.turnstileSecretKeyFile != null;
 in
 {
   options.my.containers.kleinbem-auth = {
@@ -158,6 +160,16 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
     };
+
+    # Cloudflare Turnstile — bot-check on /sign-up/email (and the
+    # kleinbem-site contact form, verified independently there). Only
+    # enforced (auth.ts hook) once this file exists, same off-by-default
+    # pattern as every other secret here.
+    turnstileSecretKeyFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "File containing the Cloudflare Turnstile secret key (server-side siteverify).";
+    };
   }
   // tlsOpts;
 
@@ -218,6 +230,7 @@ in
                 ''}
                 ${lib.optionalString hasSmtpUser "printf 'SMTP_USER=%s\\n' \"$(cat ${smtpUserPath})\""}
                 ${lib.optionalString hasSmtpPassword "printf 'SMTP_PASSWORD=%s\\n' \"$(cat ${smtpPasswordPath})\""}
+                ${lib.optionalString hasTurnstileSecret "printf 'TURNSTILE_SECRET_KEY=%s\\n' \"$(cat ${turnstileSecretPath})\""}
               } > /run/kleinbem-auth.env
             '';
           };
@@ -331,6 +344,12 @@ in
     // lib.optionalAttrs hasSmtpPassword {
       ${smtpPasswordPath} = {
         hostPath = cfg.smtpPasswordFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs hasTurnstileSecret {
+      ${turnstileSecretPath} = {
+        hostPath = cfg.turnstileSecretKeyFile;
         isReadOnly = true;
       };
     };
