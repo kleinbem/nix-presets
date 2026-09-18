@@ -87,7 +87,26 @@ in
               PAPERLESS_HTTP_REMOTE_USER_HEADER = "HTTP_REMOTE_USER";
               PAPERLESS_LOGOUT_REDIRECT_URL = "https://authelia.local/"; # Adjust if your domain is different
             };
-            passwordFile = lib.mkIf (cfg.passwordFile != null) "/run/secrets/paperless_password";
+            # NOT gated on cfg.passwordFile here — innerConfig gets evaluated
+            # by container-factory (ADR-002: one shared closure, built
+            # once, consumed by whichever hosts enable this container), so
+            # `cfg` here is container-factory's OWN (nonexistent)
+            # my.containers.paperless config, never the consuming host's.
+            # Confirmed live 2026-09-18 via builtins.trace: cfg.passwordFile
+            # was unconditionally null in this scope even though nasbook's
+            # own eval of it was a real path — meaning this mkIf always
+            # evaluated false and LoadCredential was silently never set,
+            # so PAPERLESS_ADMIN_USER/PASSWORD never got exported and
+            # manage_superuser never ran, leaving the container's own
+            # first-run "create an account" web wizard as the only way in.
+            # The actual secret file is already placed correctly at
+            # runtime by the (per-host, correctly-evaluated) bindMounts
+            # entry below + the activationScript above, independent of
+            # this — so this just needs to unconditionally point at that
+            # fixed in-container path. A host that provides no passwordFile
+            # simply never populates it, and the activationScript's own
+            # `if [ -f ... ]` guard already handles that gracefully.
+            passwordFile = "/run/secrets/paperless_password";
           };
 
           # Database: services.paperless.database.createLocally defaults to
