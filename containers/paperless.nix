@@ -65,6 +65,19 @@ in
             port = 28981;
             # Use Redis for better performance with task queue
             consumptionDirIsPublic = true;
+            # Postgres over SQLite: paperless-ngx itself recommends it for
+            # anything beyond a toy install (concurrent web+consumer+task
+            # writers, crash resilience without a UPS, clean pg_dump
+            # backups vs. copying a live db file). Migrated 2026-09-19 while
+            # the instance still had zero real documents and only the
+            # "admin" superuser (itself recreated idempotently from sops on
+            # every activation via passwordFile below) — confirmed via
+            # `paperless-manage shell` before switching, so no export/import
+            # dance was needed. database.createLocally wires up
+            # services.postgresql + PAPERLESS_DBHOST/NAME/USER
+            # automatically; persistence is the /var/lib/postgresql
+            # bindMount below.
+            database.createLocally = true;
             settings = {
               PAPERLESS_OCR_LANGUAGE = "deu+eng"; # Common for European users, adjust if needed
               # "clean" was set on the WRONG variable here — that's the
@@ -109,12 +122,6 @@ in
             passwordFile = "/run/secrets/paperless_password";
           };
 
-          # Database: services.paperless.database.createLocally defaults to
-          # false in this nixpkgs version (confirmed live 2026-09-18 — no
-          # postgres user/service exists in the container), so this is
-          # actually SQLite under /var/lib/paperless (bind-mounted below,
-          # already persisted).
-
           networking.firewall.allowedTCPPorts = [ 28981 ];
 
           # Ensure the secret file is reachable inside
@@ -137,6 +144,14 @@ in
             hostPath = cfg.hostConsumptionDir;
             isReadOnly = false;
           };
+          # Postgres data dir — persists across container rebuilds the same
+          # way /var/lib/paperless does. postgres has a static NixOS system
+          # uid, so ownership stays consistent across independently-built
+          # container closures.
+          "/var/lib/postgresql" = {
+            hostPath = "${cfg.hostDataDir}/postgresql";
+            isReadOnly = false;
+          };
           "/run/secrets/paperless_password_host" = lib.mkIf (cfg.passwordFile != null) {
             hostPath = cfg.passwordFile;
             isReadOnly = true;
@@ -147,6 +162,7 @@ in
         # Ensure host bind-mount directories exist
         systemd.services."container@paperless".preStart = ''
           mkdir -p ${cfg.hostDataDir}
+          mkdir -p ${cfg.hostDataDir}/postgresql
           mkdir -p ${cfg.hostConsumptionDir}
           # No chown here because nspawn handles it or we use non-private users
         '';
