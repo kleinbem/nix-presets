@@ -43,6 +43,13 @@ in
         cfg = cfg // {
           privateUsers = "no"; # Consistant with other containers for bind-mount ease
         };
+        # Default 90s TimeoutStartSec kills the container mid-migration on
+        # weak hardware — confirmed live on nasbook 2026-09-18: a from-empty
+        # `manage.py migrate` was still pegged at ~98% CPU when systemd
+        # killed it at 90s, looping forever without ever converging. Same
+        # fix anythingllm.nix/monitoring.nix already needed for their own
+        # slow first-time startups.
+        timeout = "10m";
 
         innerConfig = _: {
           # Security Hardening for the container's NixOS system
