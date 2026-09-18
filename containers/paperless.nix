@@ -113,8 +113,7 @@ in
           # false in this nixpkgs version (confirmed live 2026-09-18 — no
           # postgres user/service exists in the container), so this is
           # actually SQLite under /var/lib/paperless (bind-mounted below,
-          # already persisted). The /var/lib/postgresql bind mount further
-          # down predates this finding and is inert; harmless to leave.
+          # already persisted).
 
           networking.firewall.allowedTCPPorts = [ 28981 ];
 
@@ -138,21 +137,6 @@ in
             hostPath = cfg.hostConsumptionDir;
             isReadOnly = false;
           };
-          # services.paperless.database.createLocally (default) sets up a
-          # LOCAL postgres inside this container — its data dir was never
-          # bind-mounted, so it lived on the ephemeral per-boot container
-          # snapshot and got wiped + re-initdb'd from zero on every single
-          # restart. Confirmed live on nasbook 2026-09-18: repeated restarts
-          # (90s, then 10m timeout) never converged because the from-scratch
-          # migration never got to keep any progress across a restart —
-          # this was the actual root cause, not "needs more time". NixOS's
-          # own postgresql module handles ownership/initdb on first use of
-          # a bind-mounted dir the same way it already does for
-          # /var/lib/paperless above.
-          "/var/lib/postgresql" = {
-            hostPath = "${cfg.hostDataDir}/postgresql";
-            isReadOnly = false;
-          };
           "/run/secrets/paperless_password_host" = lib.mkIf (cfg.passwordFile != null) {
             hostPath = cfg.passwordFile;
             isReadOnly = true;
@@ -164,7 +148,6 @@ in
         systemd.services."container@paperless".preStart = ''
           mkdir -p ${cfg.hostDataDir}
           mkdir -p ${cfg.hostConsumptionDir}
-          mkdir -p ${cfg.hostDataDir}/postgresql
           # No chown here because nspawn handles it or we use non-private users
         '';
       }
