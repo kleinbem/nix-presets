@@ -67,7 +67,18 @@ in
             consumptionDirIsPublic = true;
             settings = {
               PAPERLESS_OCR_LANGUAGE = "deu+eng"; # Common for European users, adjust if needed
-              PAPERLESS_OCR_MODE = "clean";
+              # "clean" was set on the WRONG variable here — that's the
+              # value for PAPERLESS_OCR_CLEAN (which already defaults to
+              # "clean" on its own), not PAPERLESS_OCR_MODE (valid values:
+              # auto/force/off/redo). Confirmed live on nasbook 2026-09-18:
+              # this crashed the container at Django settings-import time,
+              # every single restart, in ~17s — before it ever reached the
+              # database. Every earlier fix this session (10m timeout,
+              # persisting a postgres dir it doesn't even use) was chasing
+              # a symptom; this was the actual bug the whole time. Just
+              # omit OCR_MODE — paperless-ngx's own default ("auto") is
+              # correct, and the intended "clean" behavior was already
+              # the default for OCR_CLEAN regardless.
               PAPERLESS_TIME_ZONE = "Europe/London";
               PAPERLESS_ADMIN_USER = "admin";
 
@@ -79,7 +90,12 @@ in
             passwordFile = lib.mkIf (cfg.passwordFile != null) "/run/secrets/paperless_password";
           };
 
-          # Database is managed automatically by the module (PostgreSQL by default)
+          # Database: services.paperless.database.createLocally defaults to
+          # false in this nixpkgs version (confirmed live 2026-09-18 — no
+          # postgres user/service exists in the container), so this is
+          # actually SQLite under /var/lib/paperless (bind-mounted below,
+          # already persisted). The /var/lib/postgresql bind mount further
+          # down predates this finding and is inert; harmless to leave.
 
           networking.firewall.allowedTCPPorts = [ 28981 ];
 
