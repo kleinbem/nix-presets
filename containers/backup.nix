@@ -98,8 +98,20 @@ in
             "rclone.args=\"serve restic --stdio --tpslimit 5 --fast-list --drive-chunk-size 64M\""
           ];
 
-          # Iterate over the container paths we defined
-          paths = lib.mapAttrsToList (containerPath: _hostPath: containerPath) cfg.targets;
+          # NOT derived from cfg.targets here — same innerConfig/
+          # container-factory scoping issue as passwordFile above, but
+          # unfixable with a single fixed secret path since the actual
+          # set of host paths genuinely varies per host. Confirmed live
+          # on nasbook 2026-09-18: with this reading container-factory's
+          # own empty cfg.targets, `paths` evaluated to [] in the built
+          # closure, so the NixOS restic module emitted no backup
+          # ExecStart at all (only unlock + forget/prune) — the jobs
+          # "succeeded" every run without ever backing up anything.
+          # Fixed instead by mounting every host target under one fixed,
+          # host-independent parent directory (bindMounts below) and
+          # just backing up that whole parent — same trick as
+          # passwordFile, generalized to a directory instead of a file.
+          paths = [ "/mnt/backup-targets" ];
 
           exclude = [
             # Cache & Temporary
@@ -150,7 +162,9 @@ in
             "rclone.args=\"serve restic --stdio --tpslimit 3 --fast-list --drive-chunk-size 128M\""
           ];
 
-          paths = lib.mapAttrsToList (containerPath: _hostPath: containerPath) cfg.systemTargets;
+          # Same fixed-parent-directory fix as services.restic.backups.daily
+          # above.
+          paths = [ "/mnt/backup-system-targets" ];
 
           exclude = [
             "**/tmp"
@@ -177,11 +191,33 @@ in
       };
 
     # Read-Only Bind Mounts
+    #
+    # Mounted under fixed, host-independent parent directories
+    # (/mnt/backup-targets, /mnt/backup-system-targets) rather than at the
+    # arbitrary container-path keys of cfg.targets/cfg.systemTargets — the
+    # `paths` options above back up those two fixed parents wholesale, so
+    # each host's real target directories just need to appear as SOME
+    # subdirectory underneath, keyed by a sanitized version of whatever
+    # container path the host chose (only used here as a unique label now,
+    # not as the actual in-container path).
     bindMounts =
-      lib.mapAttrs (_containerPath: hostPath: {
-        inherit hostPath;
-        isReadOnly = true; # CRITICAL: The backup container cannot modify these files
-      }) (cfg.targets // cfg.systemTargets)
+      let
+        sanitize = path: lib.replaceStrings [ "/" ] [ "-" ] (lib.removePrefix "/" path);
+      in
+      (lib.mapAttrs' (
+        containerPath: hostPath:
+        lib.nameValuePair "/mnt/backup-targets/${sanitize containerPath}" {
+          inherit hostPath;
+          isReadOnly = true; # CRITICAL: The backup container cannot modify these files
+        }
+      ) cfg.targets)
+      // (lib.mapAttrs' (
+        containerPath: hostPath:
+        lib.nameValuePair "/mnt/backup-system-targets/${sanitize containerPath}" {
+          inherit hostPath;
+          isReadOnly = true;
+        }
+      ) cfg.systemTargets)
       // (
         if cfg.passwordFile != null then
           {
