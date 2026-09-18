@@ -80,17 +80,22 @@ in
           extraOptions = [
             # restic's rclone backend default is "serve restic --stdio";
             # rclone.args REPLACES that default rather than appending to
-            # it, so omitting it here made restic invoke rclone as
-            # `rclone <tuning-flags> gdrive:backups/nixos-system`, i.e.
+            # it, so the old value (tuning flags only) made restic invoke
+            # rclone as `rclone <tuning-flags> gdrive:backups/nixos-system`,
             # with no "serve restic --stdio" verb at all — rclone then
             # tried to parse the remote path itself as a subcommand and
-            # failed with "unknown command ... for rclone". Confirmed live
-            # on nasbook 2026-09-18, surfaced only once the passwordFile
-            # fix above let the job get this far. Also drop the embedded
-            # literal quote characters from the old value — restic passes
-            # this string through as-is (no shell involved), so they'd
-            # have become part of the literal argv tokens.
-            "rclone.args=serve restic --stdio --tpslimit 5 --fast-list --drive-chunk-size 64M"
+            # failed with "unknown command ... for rclone".
+            #
+            # The embedded double quotes here are NOT redundant — NixOS's
+            # restic module writes ExecStart as a plain systemd unit-file
+            # command line, which systemd itself word-splits on
+            # whitespace. Without quotes around the value, "serve restic
+            # --stdio ..." gets split into separate bare argv tokens for
+            # restic itself, and restic's cobra CLI treats the first one
+            # ("restic") as an attempted subcommand: 'unknown command
+            # "restic" for "restic"'. Confirmed both failure modes live on
+            # nasbook 2026-09-18, in that order, while fixing this.
+            "rclone.args=\"serve restic --stdio --tpslimit 5 --fast-list --drive-chunk-size 64M\""
           ];
 
           # Iterate over the container paths we defined
@@ -140,8 +145,9 @@ in
           rcloneConfigFile = "/run/secrets/rclone_config";
 
           extraOptions = [
-            # Same rclone.args fix as services.restic.backups.daily above.
-            "rclone.args=serve restic --stdio --tpslimit 3 --fast-list --drive-chunk-size 128M"
+            # Same rclone.args fix as services.restic.backups.daily above
+            # (quotes required — see the comment there).
+            "rclone.args=\"serve restic --stdio --tpslimit 3 --fast-list --drive-chunk-size 128M\""
           ];
 
           paths = lib.mapAttrsToList (containerPath: _hostPath: containerPath) cfg.systemTargets;
