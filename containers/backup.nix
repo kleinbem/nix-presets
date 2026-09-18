@@ -60,9 +60,22 @@ in
           initialize = true;
           user = "root"; # Run as root inside the container
           repository = "rclone:gdrive:backups/nixos";
-          passwordFile =
-            if cfg.passwordFile != null then "/run/secrets/restic_password" else "/run/secrets/dummy";
-          rcloneConfigFile = if cfg.rcloneConfigFile != null then "/run/secrets/rclone_config" else null;
+          # NOT gated on cfg here — innerConfig is evaluated by
+          # container-factory (ADR-002: one shared closure, built once),
+          # so cfg is container-factory's OWN (nonexistent) config, never
+          # the consuming host's. Confirmed live on nasbook 2026-09-18,
+          # same bug class as paperless's passwordFile: both restic
+          # backup jobs failed every single run with "Fatal: Resolving
+          # password failed: /run/secrets/dummy does not exist" — the
+          # real secret WAS correctly bind-mounted to
+          # /run/secrets/restic_password by the (per-host, correctly
+          # evaluated) bindMounts below, this option just never pointed
+          # at it. Point at the fixed in-container paths unconditionally;
+          # a host with nothing configured just gets a missing-file error
+          # instead, which is the correct behavior for backup without
+          # credentials anyway.
+          passwordFile = "/run/secrets/restic_password";
+          rcloneConfigFile = "/run/secrets/rclone_config";
 
           extraOptions = [
             "rclone.args=\"--tpslimit 5 --fast-list --drive-chunk-size 64M\""
@@ -110,12 +123,9 @@ in
           initialize = false;
           user = "root";
           repository = "rclone:gdrive:backups/nixos-system";
-          passwordFile =
-            if cfg.systemPasswordFile != null then
-              "/run/secrets/restic_system_password"
-            else
-              "/run/secrets/dummy";
-          rcloneConfigFile = if cfg.rcloneConfigFile != null then "/run/secrets/rclone_config" else null;
+          # Same fixed-path fix as services.restic.backups.daily above.
+          passwordFile = "/run/secrets/restic_system_password";
+          rcloneConfigFile = "/run/secrets/rclone_config";
 
           extraOptions = [
             "rclone.args=\"--tpslimit 3 --fast-list --drive-chunk-size 128M\""
