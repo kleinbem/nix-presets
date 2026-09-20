@@ -87,6 +87,25 @@ in
             themes = "!include themes.yaml";
           };
 
+          # ESPHome device builder (dashboard for authoring/compiling/
+          # flashing device configs) isn't a Supervisor add-on here — this
+          # host runs Home Assistant Core natively via NixOS, not HAOS, so
+          # the usual embedded-add-on sidebar panel isn't available.
+          # panel_iframe gets the same "feels integrated" result: a sidebar
+          # tab that just embeds the standalone dashboard's own URL. Only
+          # one host (hass-pi) has ever consumed this preset, so the LAN IP
+          # is hardcoded here rather than plumbed through as a cfg option —
+          # same pragmatic call already made for e.g. `trusted_proxies`
+          # above. Revisit if a second host ever needs a different URL.
+          panel_iframe = {
+            esphome_builder = {
+              title = "ESPHome Builder";
+              icon = "mdi:chip";
+              url = "http://10.0.0.21:6052";
+              require_admin = true;
+            };
+          };
+
           # Performance tuning for RPi
           recorder = {
             purge_keep_days = 7;
