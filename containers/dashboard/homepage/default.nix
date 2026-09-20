@@ -49,7 +49,10 @@ in
           "NODE_TLS_REJECT_UNAUTHORIZED" = "0";
         };
 
-        systemd.services.homepage-dashboard.serviceConfig.EnvironmentFile = "/run/secrets/homepage.env";
+        # `-` prefix: optional. Without a secretsFile, widgets that need an
+        # API key (n8n, Grafana) just render unconfigured instead of the
+        # whole unit hard-failing to start on a missing EnvironmentFile.
+        systemd.services.homepage-dashboard.serviceConfig.EnvironmentFile = "-/run/secrets/homepage.env";
 
         # Allow port 8082
         networking.firewall.allowedTCPPorts = [ 8082 ];

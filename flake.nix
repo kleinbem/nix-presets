@@ -179,7 +179,11 @@
               attic = import ./containers/attic.nix { inherit self; };
               code-server = import ./containers/code-server.nix { inherit self; };
               open-webui = import ./containers/open-webui.nix { inherit self; };
-              dashboard = import ./containers/dashboard { inherit self; };
+              # The hand-rolled custom skin (plain index.html/script.js) that
+              # used to live here is retired — dashboard-homepage (a real
+              # gethomepage/homepage deployment) is now the only default
+              # frontend; dashboard-homer stays available as an opt-in
+              # alternative skin.
               dashboard-homer = import ./containers/dashboard/homer { inherit self; };
               dashboard-homepage = import ./containers/dashboard/homepage { inherit self; };
               qdrant = import ./containers/qdrant.nix { inherit self; };
@@ -220,13 +224,14 @@
               vaultwarden = import ./containers/vaultwarden.nix { inherit self; };
             };
 
-            # Variant implementations of the same preset (they redeclare the
-            # options their sibling `dashboard` declares) — importing them
-            # alongside it would collide, so the `all` bundle skips them.
+            # dashboard-homer redeclares the same my.containers.dashboard
+            # options as dashboard-homepage — building both by default from
+            # `all` would be wasteful (and, if both ever enabled at once,
+            # redundant containers), so `all` only carries the homepage skin
+            # through by default; homer stays reachable only via an explicit
+            # nixosModules.dashboard-homer import on a host that wants it.
             variants = [
-              "dashboard-custom"
               "dashboard-homer"
-              "dashboard-homepage"
             ];
           in
           presets

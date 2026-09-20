@@ -327,13 +327,27 @@ in
     } - -"
   ];
 
-  # Inject resource limits into the systemd unit on the host
+  # Inject resource limits into the systemd unit on the host. Also self-heal:
+  # upstream nixos-containers leaves container@ at the systemd default
+  # (Restart=no), which used to be papered over by a bespoke polling daemon
+  # (workspace-guardian, single-host, 5-minute cycle) shelling out to
+  # `systemctl restart container@*`. Restart=on-failure here does the same
+  # job natively, fleet-wide, instantly — the StartLimit guard keeps a
+  # genuinely broken container from restart-looping forever silently.
   systemd.services."container@${name}" = {
-    unitConfig = mkIf isStandalone {
+    unitConfig = {
+      StartLimitIntervalSec = 300;
+      StartLimitBurst = 5;
+    }
+    // (lib.optionalAttrs isStandalone {
       ConditionPathExists = "/var/lib/machines/${name}/current";
-    };
-    serviceConfig =
-      mkIf
+    });
+    serviceConfig = lib.mkMerge [
+      {
+        Restart = "on-failure";
+        RestartSec = "10s";
+      }
+      (mkIf
         (
           (cfg ? memoryLimit && cfg.memoryLimit != null)
           || (cfg ? memorySwapMax && cfg.memorySwapMax != null)
@@ -343,6 +357,8 @@ in
           MemoryMax = mkIf (cfg ? memoryLimit && cfg.memoryLimit != null) (cfg.memoryLimit or null);
           MemorySwapMax = mkIf (cfg ? memorySwapMax && cfg.memorySwapMax != null) (cfg.memorySwapMax or null);
           CPUQuota = mkIf (cfg ? cpuLimit && cfg.cpuLimit != null) (cfg.cpuLimit or null);
-        };
+        }
+      )
+    ];
   };
 }

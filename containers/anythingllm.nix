@@ -74,6 +74,15 @@ in
               OPENAI_API_KEY = "dummy";
               FREE_MODEL_NAME = cfg.modelName;
               FREE_MODEL_MAX_TOKENS = "4096";
+              # Pinned explicitly (these are already AnythingLLM's own
+              # untouched defaults) now that the vault-sync job
+              # (hosts/nixos-nvme/vault-anythingllm-sync.nix) actively
+              # depends on them — no fleet Ollama instance currently serves
+              # embeddings (ollama-orin was replaced by llama-cpp), so this
+              # deliberately stays on the bundled CPU embedder + LanceDB
+              # rather than reaching for infra that doesn't exist yet.
+              EMBEDDING_ENGINE = "native";
+              VECTOR_DB = "lancedb";
             };
           };
         };
