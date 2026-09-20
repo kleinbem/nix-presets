@@ -141,6 +141,10 @@ in
                 #     --upstream-cache-key-name devenv.cachix.org-1 \
                 #     --upstream-cache-key-name cuda-maintainers.cachix.org-1 \
                 #     --upstream-cache-key-name anduril.cachix.org-1
+                # cuda-maintainers.cachix.org was retired Nov 2025 in favour of
+                # cache.nixos-cuda.org (2026-09-20) — swap the filter key too:
+                #   attic cache configure system \
+                #     --upstream-cache-key-name cache.nixos-cuda.org
                 # This is PER-CACHE DB state, NOT captured by this module — if the
                 # cache DB is ever recreated, re-run the above (keep it in sync with
                 # trusted-public-keys in nix-config/modules/nixos/core.nix).
