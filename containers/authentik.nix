@@ -244,6 +244,19 @@ in
             hostPath = "${cfg.hostDataDir}/postgresql";
             isReadOnly = false;
           };
+          # Podman's own image/layer storage. The container's root ("/") is
+          # an EPHEMERAL 2G tmpfs (fixed, not tied to memoryLimit) — without
+          # this, podman unpacks the (multi-GB, two containers: server +
+          # worker) authentik image straight into that 2G tmpfs and hits
+          # "no space left on device" on every pull, crash-looping forever
+          # (confirmed live 2026-09-21: restart counter 42 and climbing,
+          # 18GB+ of repeated failed-pull traffic). anythingllm.nix gets
+          # away without this only because its single image is much
+          # smaller and it runs one container, not two.
+          "/var/lib/containers" = {
+            hostPath = "${cfg.hostDataDir}/containers";
+            isReadOnly = false;
+          };
         }
         // lib.optionalAttrs (cfg.secretKeyFile != null) {
           ${secretKeyPath} = {
@@ -275,6 +288,7 @@ in
         # same pattern as paperless.nix / syncthing.nix.
         systemd.services."container@authentik".preStart = ''
           mkdir -p ${cfg.hostDataDir}/postgresql
+          mkdir -p ${cfg.hostDataDir}/containers
         '';
       }
   );
