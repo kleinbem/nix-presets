@@ -91,16 +91,19 @@ in
                 # other service here (victoriametrics, alertmanager) has no
                 # such default and was already reachable on the bridge IP,
                 # only grafana silently wasn't.
-                server.http_addr = "0.0.0.0";
-                server.http_port = 3000;
-                # Reverse-proxied at grafana.kleinbem.dev (Caddy + Cloudflare
-                # Tunnel, see nix-config's inventory.nix monitoring node +
-                # cloudflare-tunnel.nix). Without these, Grafana's default
-                # root_url (http://localhost:3000/) leaks into generated
-                # links and its Origin/CSRF check on state-changing requests
-                # is validated against the wrong host.
-                server.domain = "grafana.kleinbem.dev";
-                server.root_url = "https://grafana.kleinbem.dev/";
+                server = {
+                  http_addr = "0.0.0.0";
+                  http_port = 3000;
+                  # Reverse-proxied at grafana.kleinbem.dev (Caddy +
+                  # Cloudflare Tunnel, see nix-config's inventory.nix
+                  # monitoring node + cloudflare-tunnel.nix). Without these,
+                  # Grafana's default root_url (http://localhost:3000/)
+                  # leaks into generated links and its Origin/CSRF check on
+                  # state-changing requests is validated against the wrong
+                  # host.
+                  domain = "grafana.kleinbem.dev";
+                  root_url = "https://grafana.kleinbem.dev/";
+                };
                 security.secret_key = "antigravity-monitoring-key-2026";
                 # "system" follows the browser's prefers-color-scheme
                 # (Grafana 10+); no need to hardcode a theme.
