@@ -5,8 +5,18 @@
   config,
   innerConfig ? { },
   bindMounts ? { },
-  timeout ? "90s",
+  timeout ? null,
   enableNesting ? false,
+  # Bundles the boilerplate every podman-in-nspawn preset (anythingllm,
+  # agent-zero, ente, authentik) was hand-duplicating: implies
+  # enableNesting, sets a 15m start timeout (image pulls blow the 90s
+  # default), configures podman's own unqualified-search-registries
+  # (without it, a short image name fails outright), and — the part that
+  # was missing from every one of them until it crash-looped authentik
+  # into "no space left on device" — bind-mounts podman's image/layer
+  # storage onto real host disk instead of the container's own fixed 2G
+  # ephemeral tmpfs root.
+  usesPodman ? false,
   enableGPU ? false,
   enableAudio ? false,
   enableVideo ? false,
@@ -15,6 +25,13 @@
 }:
 let
   inherit (lib) mkIf mkDefault;
+
+  # usesPodman implies enableNesting (every current podman-in-nspawn
+  # caller was already setting both) — nested computed as one value so
+  # the rest of the file doesn't need to know about usesPodman at all
+  # except where it adds its own extra bits (registries, storage mount).
+  nesting = enableNesting || usesPodman;
+  effectiveTimeout = if timeout != null then timeout else (if usesPodman then "15m" else "90s");
 
   # ─── mTLS Sidecar Configuration ─────────────────────────────
   hasTls = cfg ? tls && cfg.tls ? enable && cfg.tls.enable;
@@ -92,7 +109,7 @@ in
     # actually win against it regardless of mkDefault/mkForce. Confirmed
     # live 2026-08-05 after that override silently did nothing for every
     # container using this factory, including monitoring.nix's "5m".
-    timeoutStartSec = timeout;
+    timeoutStartSec = effectiveTimeout;
 
     # Conditionally allow hardware device pass-through
     allowedDevices =
@@ -124,7 +141,7 @@ in
           modifier = "rw";
         }
       ])
-      ++ (lib.optionals enableNesting [
+      ++ (lib.optionals nesting [
         {
           node = "/dev/fuse";
           modifier = "rw";
@@ -133,7 +150,7 @@ in
       ++ (cfg.extraAllowedDevices or [ ]);
 
     additionalCapabilities =
-      (lib.optionals enableNesting [
+      (lib.optionals nesting [
         "CAP_SYS_ADMIN"
         "CAP_MKNOD"
         "CAP_SETFCAP"
@@ -269,6 +286,20 @@ in
               environment.etc."caddy-sidecar/Caddyfile".text = sidecarCaddyfile;
             })
 
+            # usesPodman boilerplate: podman itself + its own
+            # registries.conf (separate from the outer host's — without
+            # this, a short/unqualified image name fails to pull outright
+            # with "no unqualified-search registries are defined").
+            (mkIf usesPodman {
+              virtualisation.podman = {
+                enable = true;
+                dockerCompat = mkDefault true;
+              };
+              virtualisation.containers.registries.settings.unqualified-search-registries = [
+                "docker.io"
+              ];
+            })
+
             # Inject the user-provided config
             (if builtins.isFunction innerConfig then innerConfig args else innerConfig)
           ];
@@ -307,9 +338,22 @@ in
           isReadOnly = true;
         };
       })
-      // (lib.optionalAttrs enableNesting {
+      // (lib.optionalAttrs nesting {
         "/dev/fuse" = {
           hostPath = "/dev/fuse";
+          isReadOnly = false;
+        };
+      })
+      // (lib.optionalAttrs usesPodman {
+        # Podman's own image/layer storage. The container's root ("/") is
+        # a fixed 2G ephemeral tmpfs regardless of memoryLimit — without
+        # this, podman unpacks pulled images straight into that 2G tmpfs
+        # and eventually hits "no space left on device", crash-looping
+        # forever (confirmed live 2026-09-21 on authentik: restart
+        # counter 42+, 18GB+ of repeated failed-pull traffic before this
+        # was added). Requires cfg.hostDataDir to be set.
+        "/var/lib/containers" = {
+          hostPath = "${cfg.hostDataDir}/containers";
           isReadOnly = false;
         };
       });
@@ -321,11 +365,20 @@ in
   # CAP_DAC_OVERRIDE (e.g. crowdsec: upstream module strips ALL capabilities,
   # so even User=root obeys plain permission bits) must own the dir instead —
   # pass dataDirOwner/dataDirGroup in cfg.
-  systemd.tmpfiles.rules = mkIf (cfg ? hostDataDir && cfg.hostDataDir != null) [
-    "d ${cfg.hostDataDir} 0755 ${toString (cfg.dataDirOwner or 1000)} ${
-      toString (cfg.dataDirGroup or 100)
-    } - -"
-  ];
+  systemd.tmpfiles.rules =
+    (lib.optionals (cfg ? hostDataDir && cfg.hostDataDir != null) [
+      "d ${cfg.hostDataDir} 0755 ${toString (cfg.dataDirOwner or 1000)} ${
+        toString (cfg.dataDirGroup or 100)
+      } - -"
+    ])
+    ++ (lib.optionals usesPodman [
+      # Must pre-exist on the host before nspawn starts — bind mounts
+      # don't auto-create missing host-side directories (same lesson
+      # postgresql bind mounts already needed a preStart mkdir for).
+      "d ${cfg.hostDataDir}/containers 0755 ${toString (cfg.dataDirOwner or 1000)} ${
+        toString (cfg.dataDirGroup or 100)
+      } - -"
+    ]);
 
   # Inject resource limits into the systemd unit on the host. Also self-heal:
   # upstream nixos-containers leaves container@ at the systemd default

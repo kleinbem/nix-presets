@@ -102,24 +102,13 @@ in
         inherit config;
         name = "authentik";
         inherit cfg;
-        # Image pull can be slow on first start — same fix anythingllm.nix
-        # needed (default 90s TimeoutStartSec kills the container mid-pull).
-        timeout = "15m";
-        enableNesting = true; # Required for OCI-in-nspawn
+        # Bundles the 15m pull timeout, nesting caps/devices, and podman's
+        # own registries.conf — see factory.nix's usesPodman doc comment.
+        usesPodman = true;
         innerConfig =
           { pkgs, ... }:
           {
             virtualisation = {
-              podman = {
-                enable = true;
-                dockerCompat = true;
-              };
-              # Same fix anythingllm.nix needed: podman's own registries.conf
-              # inside this container is separate from the host's.
-              containers.registries.settings.unqualified-search-registries = [
-                "docker.io"
-              ];
-
               oci-containers = {
                 backend = "podman";
                 containers = {
@@ -244,19 +233,8 @@ in
             hostPath = "${cfg.hostDataDir}/postgresql";
             isReadOnly = false;
           };
-          # Podman's own image/layer storage. The container's root ("/") is
-          # an EPHEMERAL 2G tmpfs (fixed, not tied to memoryLimit) — without
-          # this, podman unpacks the (multi-GB, two containers: server +
-          # worker) authentik image straight into that 2G tmpfs and hits
-          # "no space left on device" on every pull, crash-looping forever
-          # (confirmed live 2026-09-21: restart counter 42 and climbing,
-          # 18GB+ of repeated failed-pull traffic). anythingllm.nix gets
-          # away without this only because its single image is much
-          # smaller and it runs one container, not two.
-          "/var/lib/containers" = {
-            hostPath = "${cfg.hostDataDir}/containers";
-            isReadOnly = false;
-          };
+          # Podman's own image/layer storage is bind-mounted automatically
+          # by usesPodman (factory.nix) — see its doc comment for why.
         }
         // lib.optionalAttrs (cfg.secretKeyFile != null) {
           ${secretKeyPath} = {
@@ -288,7 +266,6 @@ in
         # same pattern as paperless.nix / syncthing.nix.
         systemd.services."container@authentik".preStart = ''
           mkdir -p ${cfg.hostDataDir}/postgresql
-          mkdir -p ${cfg.hostDataDir}/containers
         '';
       }
   );

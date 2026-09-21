@@ -33,31 +33,12 @@ in
     inherit config;
     name = "anythingllm";
     inherit cfg;
-    # Default 90s TimeoutStartSec kills the container mid-pull before its
-    # (large, multi-hundred-MB) docker image finishes downloading —
-    # confirmed live 2026-08-05: repeated restarts in a row, never
-    # converging. Same fix monitoring.nix already needed for its own
-    # (native, not podman-pulled) heavier startup.
-    timeout = "15m";
-    enableNesting = true; # Required for OCI-in-LXC
+    # Bundles the 15m pull timeout, nesting caps/devices, podman's own
+    # registries.conf, and persistent podman image storage — see
+    # factory.nix's usesPodman doc comment.
+    usesPodman = true;
     innerConfig = {
       virtualisation = {
-        podman = {
-          enable = true;
-          dockerCompat = true;
-        };
-
-        # Podman inside this nspawn container has its own registries.conf,
-        # separate from whatever the outer host configures — without this, a
-        # short/unqualified image name like "mintplexlabs/anythingllm:latest"
-        # (below) fails to pull outright ("no unqualified-search registries
-        # are defined"). Confirmed live 2026-08-05: this had never actually
-        # worked on any host before, 0 bytes of ever-persisted state proved
-        # it.
-        containers.registries.settings.unqualified-search-registries = [
-          "docker.io"
-        ];
-
         oci-containers = {
           backend = "podman";
           containers.anythingllm = {

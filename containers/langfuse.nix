@@ -71,7 +71,6 @@ in
         cfg = {
           inherit (cfg) autoStart ip memoryLimit;
           inherit (cfg) hostDataDir;
-          enableNesting = true; # Required for Podman-in-Nspawn
           tls = {
             enable = true;
             serverPort = 3000;

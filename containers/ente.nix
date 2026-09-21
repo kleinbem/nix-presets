@@ -29,13 +29,14 @@ in
     inherit config;
     name = "ente";
     inherit cfg;
-    enableNesting = true; # Required for OCI-in-LXC
+    # Bundles the 15m pull timeout, nesting caps/devices, podman's own
+    # registries.conf, and persistent podman image storage — see
+    # factory.nix's usesPodman doc comment. This container pulls THREE
+    # images (postgres, minio, museum) into the same 2G ephemeral root —
+    # closest of the four podman-in-nspawn presets to tripping the
+    # "no space left on device" crash loop authentik.nix hit.
+    usesPodman = true;
     innerConfig = {
-      virtualisation.podman = {
-        enable = true;
-        dockerCompat = true;
-      };
-
       environment.etc."museum.yaml".text = ''
         db:
           host: postgres
