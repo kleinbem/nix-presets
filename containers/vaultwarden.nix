@@ -131,7 +131,7 @@ in
           WEB_VAULT_ENABLED = true;
           # Favicon fetching is a server-side GET to a user-controlled URL —
           # an SSRF primitive that, from this container's slice, can reach the
-          # rest of 10.85.48.0/24 (Caddy, kleinbem-auth, crowdsec LAPI, …).
+          # rest of 10.85.48.0/24 (Caddy, Authentik, crowdsec LAPI, …).
           # Kill it outright rather than delegate to an external ICON_SERVICE,
           # which would leak the set of domains stored in the vault to a third
           # party. Cost: new entries have no favicon; already-cached icons
