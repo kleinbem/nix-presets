@@ -37,8 +37,12 @@ in
           openFirewall = true;
           inherit (homepageConfig) services widgets settings;
           customCSS = builtins.readFile ./custom.css;
-          # Allow access from any host (fixes "Host validation failed")
-          allowedHosts = "*,${inv.nodes.dashboard.ip},${inv.nodes.dashboard.ip}:8082,0.0.0.0,0.0.0.0:8082";
+          # A bare "*" entry does NOT mean "allow any host" here — confirmed
+          # live 2026-09-21: it still rejected the real public domain
+          # ("Host validation failed for: home.kleinbem.dev") despite being
+          # first in this list. Homepage matches the Host header against
+          # this list literally, so the actual domain has to be listed.
+          allowedHosts = "${inv.nodes.dashboard.domain},${inv.nodes.dashboard.ip},${inv.nodes.dashboard.ip}:8082,0.0.0.0,0.0.0.0:8082";
         };
 
         systemd.services.homepage-dashboard.environment = {
