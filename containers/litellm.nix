@@ -82,6 +82,9 @@ in
     inherit config;
     name = "litellm";
     inherit cfg;
+    # Bind-mounts to /run/secrets/litellm.env — see factory.nix's
+    # secretsFile doc comment.
+    inherit (cfg) secretsFile;
     innerConfig = {
       # 1. Custom LiteLLM Service Block
       systemd.services.litellm = {
@@ -132,19 +135,12 @@ in
       networking.firewall.allowedTCPPorts = [ 4000 ];
     };
 
-    # Bind-mount secrets and data
-    bindMounts =
-      (lib.optionalAttrs (cfg.secretsFile != null) {
-        "/run/secrets/litellm.env" = {
-          hostPath = cfg.secretsFile;
-          isReadOnly = true;
-        };
-      })
-      // {
-        "/var/lib/litellm" = {
-          hostPath = cfg.hostDataDir;
-          isReadOnly = false;
-        };
+    # Bind-mount data (secrets handled by the factory's secretsFile above)
+    bindMounts = {
+      "/var/lib/litellm" = {
+        hostPath = cfg.hostDataDir;
+        isReadOnly = false;
       };
+    };
   });
 }

@@ -120,6 +120,9 @@ in
     inherit config;
     name = "agent-team";
     inherit cfg;
+    # Bind-mounts to /run/secrets/agent-team.env — see factory.nix's
+    # secretsFile doc comment.
+    inherit (cfg) secretsFile;
     innerConfig = {
       # 1. Provide necessary packages natively (Distroless)
       environment.systemPackages = [
@@ -233,23 +236,16 @@ in
       ];
     };
 
-    bindMounts =
-      (lib.optionalAttrs (cfg.secretsFile != null) {
-        "/run/secrets/agent-team.env" = {
-          hostPath = cfg.secretsFile;
-          isReadOnly = true;
-        };
-      })
-      // {
-        # Redirect internal paths to host persistence
-        "/app/workspace" = {
-          hostPath = "${cfg.hostDataDir}/workspace";
-          isReadOnly = false;
-        };
-        "/app/state" = {
-          hostPath = "${cfg.hostDataDir}/state";
-          isReadOnly = false;
-        };
+    bindMounts = {
+      # Redirect internal paths to host persistence
+      "/app/workspace" = {
+        hostPath = "${cfg.hostDataDir}/workspace";
+        isReadOnly = false;
       };
+      "/app/state" = {
+        hostPath = "${cfg.hostDataDir}/state";
+        isReadOnly = false;
+      };
+    };
   });
 }

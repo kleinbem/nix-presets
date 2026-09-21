@@ -39,6 +39,9 @@ in
     inherit config;
     name = "n8n";
     inherit cfg;
+    # Bind-mounts to /run/secrets/n8n.env — see factory.nix's secretsFile
+    # doc comment.
+    inherit (cfg) secretsFile;
     innerConfig = {
       nixpkgs.config.allowUnfree = true;
       services.n8n = {
@@ -80,12 +83,6 @@ in
       "/var/lib/n8n" = {
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
-      };
-    }
-    // lib.optionalAttrs (cfg.secretsFile != null) {
-      "/run/secrets/n8n.env" = {
-        hostPath = cfg.secretsFile;
-        isReadOnly = true;
       };
     }
     // (lib.mapAttrs' (

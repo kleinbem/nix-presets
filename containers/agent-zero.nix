@@ -45,6 +45,9 @@ in
     # registries.conf, and persistent podman image storage — see
     # factory.nix's usesPodman doc comment.
     usesPodman = true;
+    # Bind-mounts to /run/secrets/agent-zero.env — see factory.nix's
+    # secretsFile doc comment.
+    inherit (cfg) secretsFile;
     innerConfig = {
       virtualisation = {
         oci-containers.backend = "podman";
@@ -100,12 +103,6 @@ in
       "/var/lib/agent-zero" = {
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
-      };
-    }
-    // lib.optionalAttrs (cfg.secretsFile != null) {
-      "/run/secrets/agent-zero.env" = {
-        hostPath = cfg.secretsFile;
-        isReadOnly = true;
       };
     };
   });

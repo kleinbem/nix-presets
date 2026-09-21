@@ -17,6 +17,27 @@
   # storage onto real host disk instead of the container's own fixed 2G
   # ephemeral tmpfs root.
   usesPodman ? false,
+  # Subdirectories of cfg.hostDataDir that must pre-exist on the HOST
+  # before nspawn starts, because a bind mount doesn't auto-create a
+  # missing host-side directory. Every caller with a nested persistent
+  # service (postgres, etc.) was hand-rolling this via a
+  # `lib.recursiveUpdate (mkContainer {...}) { systemd.services."container@X"
+  # .preStart = "mkdir -p ..."; }` wrapper (authentik.nix, paperless.nix,
+  # syncthing.nix) — same class of bug as usesPodman's storage mount:
+  # easy to forget, silently breaks first boot. List plain subdir names,
+  # e.g. `subDirs = [ "postgresql" ];` for `${cfg.hostDataDir}/postgresql`.
+  subDirs ? [ ],
+  # A host-side env/secrets file to bind-mount read-only into the
+  # container. ~12 presets were hand-rolling the identical
+  # `bindMounts = lib.optionalAttrs (cfg.secretsFile != null) { "/run/secrets/
+  # <name>.env" = { hostPath = cfg.secretsFile; isReadOnly = true; }; };`
+  # block (the option declaration + wiring it into the specific service's
+  # environmentFile/environmentFiles field stays per-preset — that varies
+  # too much to generalize). Defaults the in-container path to
+  # /run/secrets/${name}.env; override with secretsFilePath for a preset
+  # whose service expects a different path (e.g. attic's /etc/atticd-env).
+  secretsFile ? null,
+  secretsFilePath ? null,
   enableGPU ? false,
   enableAudio ? false,
   enableVideo ? false,
@@ -32,6 +53,11 @@ let
   # except where it adds its own extra bits (registries, storage mount).
   nesting = enableNesting || usesPodman;
   effectiveTimeout = if timeout != null then timeout else (if usesPodman then "15m" else "90s");
+  # usesPodman's own storage dir rides the same subDirs mechanism instead
+  # of a bespoke tmpfiles rule.
+  effectiveSubDirs = subDirs ++ (lib.optional usesPodman "containers");
+  effectiveSecretsFilePath =
+    if secretsFilePath != null then secretsFilePath else "/run/secrets/${name}.env";
 
   # ─── mTLS Sidecar Configuration ─────────────────────────────
   hasTls = cfg ? tls && cfg.tls ? enable && cfg.tls.enable;
@@ -356,6 +382,12 @@ in
           hostPath = "${cfg.hostDataDir}/containers";
           isReadOnly = false;
         };
+      })
+      // (lib.optionalAttrs (secretsFile != null) {
+        ${effectiveSecretsFilePath} = {
+          hostPath = secretsFile;
+          isReadOnly = true;
+        };
       });
   };
 
@@ -371,14 +403,14 @@ in
         toString (cfg.dataDirGroup or 100)
       } - -"
     ])
-    ++ (lib.optionals usesPodman [
+    ++ (map (
+      d:
       # Must pre-exist on the host before nspawn starts — bind mounts
-      # don't auto-create missing host-side directories (same lesson
-      # postgresql bind mounts already needed a preStart mkdir for).
-      "d ${cfg.hostDataDir}/containers 0755 ${toString (cfg.dataDirOwner or 1000)} ${
+      # don't auto-create missing host-side directories.
+      "d ${cfg.hostDataDir}/${d} 0755 ${toString (cfg.dataDirOwner or 1000)} ${
         toString (cfg.dataDirGroup or 100)
       } - -"
-    ]);
+    ) effectiveSubDirs);
 
   # Inject resource limits into the systemd unit on the host. Also self-heal:
   # upstream nixos-containers leaves container@ at the systemd default

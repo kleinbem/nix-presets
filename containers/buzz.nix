@@ -124,6 +124,10 @@ in
         inherit config;
         name = "buzz";
         inherit cfg;
+        # Bind-mounts to /run/secrets/buzz.env — see factory.nix's
+        # secretsFile doc comment. relay-url.env and the typesense key
+        # below are separate secrets, left as manual bindMounts.
+        inherit (cfg) secretsFile;
         innerConfig = {
           networking.firewall = {
             enable = true;
@@ -400,12 +404,6 @@ in
             isReadOnly = true;
           };
         }
-        // (lib.optionalAttrs (cfg.secretsFile != null) {
-          "/run/secrets/buzz.env" = {
-            hostPath = cfg.secretsFile;
-            isReadOnly = true;
-          };
-        })
         // (lib.optionalAttrs (cfg.typesenseApiKeyFile != null) {
           "/run/secrets/buzz-typesense-api-key" = {
             hostPath = cfg.typesenseApiKeyFile;

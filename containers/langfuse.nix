@@ -76,6 +76,9 @@ in
             serverPort = 3000;
           };
         };
+        # Bind-mounts to /run/secrets/langfuse.env — see factory.nix's
+        # secretsFile doc comment.
+        inherit (cfg) secretsFile;
         innerConfig = {
           imports = [ inputs.nix-packages.nixosModules.langfuse ];
           nixpkgs.overlays = [ inputs.nix-packages.overlays.default ];
@@ -95,12 +98,6 @@ in
 
           networking.firewall.allowedTCPPorts = [ 3000 ];
 
-        };
-        bindMounts = lib.optionalAttrs (cfg.secretsFile != null) {
-          "/run/secrets/langfuse.env" = {
-            hostPath = cfg.secretsFile;
-            isReadOnly = true;
-          };
         };
       })
 

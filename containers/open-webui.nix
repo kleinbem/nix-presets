@@ -49,6 +49,10 @@ in
     inherit config;
     name = "open-webui";
     inherit cfg;
+    # Bind-mounts to /run/secrets/openwebui.env (no hyphen, unlike this
+    # container's own name) — see factory.nix's secretsFile doc comment.
+    inherit (cfg) secretsFile;
+    secretsFilePath = "/run/secrets/openwebui.env";
     innerConfig = {
       nixpkgs.config.allowUnfree = true;
       services.open-webui = {
@@ -90,12 +94,6 @@ in
       "/var/lib/open-webui" = {
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
-      };
-    }
-    // lib.optionalAttrs (cfg.secretsFile != null) {
-      "/run/secrets/openwebui.env" = {
-        hostPath = cfg.secretsFile;
-        isReadOnly = true;
       };
     }
     // lib.optionalAttrs cfg.enableAudio {

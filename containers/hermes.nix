@@ -97,6 +97,9 @@ in
         inherit config;
         name = "hermes";
         inherit cfg;
+        # Bind-mounts to /run/secrets/hermes.env — see factory.nix's
+        # secretsFile doc comment.
+        inherit (cfg) secretsFile;
         innerConfig = {
           imports = [ inputs.hermes.nixosModules.default ];
 
@@ -153,21 +156,14 @@ in
 
           networking.firewall.enable = true;
         };
-        bindMounts =
-          (lib.optionalAttrs (cfg.secretsFile != null) {
-            "/run/secrets/hermes.env" = {
-              hostPath = cfg.secretsFile;
-              isReadOnly = true;
-            };
-          })
-          // {
-            # Container rootfs is ephemeral (recreated on rebuild) — state
-            # (memory, sessions, skills, cron) must live on the host.
-            "/var/lib/hermes" = {
-              hostPath = cfg.hostDataDir;
-              isReadOnly = false;
-            };
+        bindMounts = {
+          # Container rootfs is ephemeral (recreated on rebuild) — state
+          # (memory, sessions, skills, cron) must live on the host.
+          "/var/lib/hermes" = {
+            hostPath = cfg.hostDataDir;
+            isReadOnly = false;
           };
+        };
       })
     ]
   );

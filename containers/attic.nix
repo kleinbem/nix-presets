@@ -49,6 +49,11 @@ in
         inherit config;
         name = "attic";
         inherit cfg;
+        # atticd expects its env file at /etc/atticd-env, not the factory's
+        # default /run/secrets/attic.env — see factory.nix's secretsFile
+        # doc comment.
+        inherit (cfg) secretsFile;
+        secretsFilePath = "/etc/atticd-env";
         innerConfig = _: {
           services.atticd = {
             enable = true;
@@ -192,12 +197,6 @@ in
           "/var/lib/atticd" = {
             hostPath = cfg.hostDataDir;
             isReadOnly = false;
-          };
-        }
-        // lib.optionalAttrs (cfg.secretsFile != null) {
-          "/etc/atticd-env" = {
-            hostPath = cfg.secretsFile;
-            isReadOnly = true;
           };
         };
       })

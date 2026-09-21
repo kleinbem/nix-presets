@@ -111,6 +111,10 @@ in
 
     # rootless podman + user namespaces inside the container
     enableNesting = true;
+    # Bind-mounts to /run/secrets/github-runner-token (a bare token, not
+    # an .env file) — see factory.nix's secretsFile doc comment.
+    inherit (cfg) secretsFile;
+    secretsFilePath = "/run/secrets/github-runner-token";
 
     innerConfig =
       { pkgs, ... }:
@@ -195,10 +199,6 @@ in
       "/var/lib/github-runners" = {
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
-      };
-      "/run/secrets/github-runner-token" = {
-        hostPath = cfg.secretsFile;
-        isReadOnly = true;
       };
     };
   });

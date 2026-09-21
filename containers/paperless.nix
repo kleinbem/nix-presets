@@ -36,7 +36,7 @@ in
   };
 
   config = lib.mkIf cfg.enable (
-    lib.recursiveUpdate
+    lib.mkMerge [
       (mkContainer {
         inherit config;
         name = "paperless";
@@ -50,6 +50,9 @@ in
         # fix anythingllm.nix/monitoring.nix already needed for their own
         # slow first-time startups.
         timeout = "10m";
+        # Must pre-exist on the host before nspawn starts — see factory.nix's
+        # subDirs doc comment.
+        subDirs = [ "postgresql" ];
 
         innerConfig = _: {
           # Security Hardening for the container's NixOS system
@@ -159,13 +162,13 @@ in
         };
       })
       {
-        # Ensure host bind-mount directories exist
-        systemd.services."container@paperless".preStart = ''
-          mkdir -p ${cfg.hostDataDir}
-          mkdir -p ${cfg.hostDataDir}/postgresql
-          mkdir -p ${cfg.hostConsumptionDir}
-          # No chown here because nspawn handles it or we use non-private users
-        '';
+        # hostConsumptionDir is a standalone host path, not a subdirectory
+        # of hostDataDir — subDirs (mkContainer, above) doesn't cover it.
+        # No chown here because nspawn handles it or we use non-private users.
+        systemd.tmpfiles.rules = [
+          "d ${cfg.hostConsumptionDir} 0755 1000 100 - -"
+        ];
       }
+    ]
   );
 }
