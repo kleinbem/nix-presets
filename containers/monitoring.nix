@@ -8,6 +8,11 @@
 let
   cfg = config.my.containers.monitoring;
   inherit (self.lib) mkContainer;
+  # Fixed path the secret file is bind-mounted to *inside* the container
+  # (cfg.grafanaOidc.clientSecretFile holds the host-level sops-nix path,
+  # resolved on the deploying host) — same convention as vaultwarden.nix's
+  # adminTokenPath.
+  grafanaOidcClientSecretPath = "/run/secrets/grafana-oidc-client-secret";
 in
 {
   options.my.containers.monitoring = {
@@ -48,6 +53,24 @@ in
       scrapeInterval = lib.mkOption {
         type = lib.types.str;
         default = "60s";
+      };
+    };
+    grafanaOidc = {
+      enable = lib.mkEnableOption "Grafana login via Authentik OIDC (nix/infra/authentik.tf's grafana Provider), replacing Authelia forward-auth for this service";
+      clientId = lib.mkOption {
+        type = lib.types.str;
+        default = "grafana";
+      };
+      clientSecretFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          File containing the OAuth2 client secret (Authentik's
+          authentik_provider_oauth2.grafana output, sops-managed — see
+          hosts/core-pi/secrets.nix). null while grafanaOidc.enable is
+          true would leave Grafana unable to complete the OAuth exchange;
+          container-factory only needs this option to exist, not be set.
+        '';
       };
     };
   };
@@ -108,6 +131,30 @@ in
                 # "system" follows the browser's prefers-color-scheme
                 # (Grafana 10+); no need to hardcode a theme.
                 users.default_theme = "system";
+              }
+              // lib.optionalAttrs cfg.grafanaOidc.enable {
+                auth.disable_login_form = true;
+                "auth.generic_oauth" = {
+                  enabled = true;
+                  name = "Authentik";
+                  client_id = cfg.grafanaOidc.clientId;
+                  # Grafana's own $__file{} config syntax — resolved by
+                  # Grafana itself at startup, not a Nix/sops-nix mechanism
+                  # — reads the bind-mounted secret without it ever
+                  # touching the Nix store. Same reasoning as every other
+                  # secret in this fleet.
+                  client_secret = "$__file{${grafanaOidcClientSecretPath}}";
+                  scopes = "openid email profile";
+                  auth_url = "https://auth.kleinbem.dev/application/o/authorize/";
+                  token_url = "https://auth.kleinbem.dev/application/o/token/";
+                  api_url = "https://auth.kleinbem.dev/application/o/userinfo/";
+                  # Everyone who can reach this login screen at all is
+                  # already staff-only (the authentik_application's own
+                  # policy_binding, nix/infra/authentik.tf) — auto-assign
+                  # Admin rather than provisioning a second role layer on
+                  # top of that gate.
+                  role_attribute_path = "'Admin'";
+                };
               };
               provision = {
                 enable = true;
@@ -342,6 +389,12 @@ in
           "/var/lib/grafana" = {
             hostPath = "${cfg.hostDataDir}/grafana";
             isReadOnly = false;
+          };
+        }
+        // lib.optionalAttrs (cfg.grafanaOidc.enable && cfg.grafanaOidc.clientSecretFile != null) {
+          ${grafanaOidcClientSecretPath} = {
+            hostPath = cfg.grafanaOidc.clientSecretFile;
+            isReadOnly = true;
           };
         }
         // lib.optionalAttrs (cfg.githubMetrics.enable && cfg.githubMetrics.configFile != null) {

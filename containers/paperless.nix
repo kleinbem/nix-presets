@@ -98,10 +98,18 @@ in
               PAPERLESS_TIME_ZONE = "Europe/London";
               PAPERLESS_ADMIN_USER = "admin";
 
-              # --- SSO Integration (Authelia) ---
+              # --- SSO Integration (Authentik forward-auth, via Caddy's
+              # shared fleet_forward_auth Proxy Provider — see
+              # nix-presets/containers/caddy/helpers.nix and
+              # nix/infra/authentik.tf) ---
+              # Django maps a forwarded header to HTTP_<NAME-WITH-DASHES-AS-
+              # UNDERSCORES-UPPERCASED> in the WSGI environ — Caddy forwards
+              # the outpost's response header verbatim as
+              # `X-Authentik-Username`, hence HTTP_X_AUTHENTIK_USERNAME here
+              # (was HTTP_REMOTE_USER for Authelia's `Remote-User`).
               PAPERLESS_ENABLE_HTTP_REMOTE_USER = "true";
-              PAPERLESS_HTTP_REMOTE_USER_HEADER = "HTTP_REMOTE_USER";
-              PAPERLESS_LOGOUT_REDIRECT_URL = "https://authelia.local/"; # Adjust if your domain is different
+              PAPERLESS_HTTP_REMOTE_USER_HEADER = "HTTP_X_AUTHENTIK_USERNAME";
+              PAPERLESS_LOGOUT_REDIRECT_URL = "https://auth.kleinbem.dev/";
             };
             # NOT gated on cfg.passwordFile here — innerConfig gets evaluated
             # by container-factory (ADR-002: one shared closure, built

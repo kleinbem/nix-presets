@@ -44,7 +44,6 @@ in
       hostIP,
       isGlobalMaint,
       helpers,
-      authUrl ? "https://authelia.local/",
     }:
     mapAttrs' (
       name: node:
@@ -76,13 +75,21 @@ in
             else
               let
                 t = helpers.mkTransport node;
-                # Authelia Forward Auth Logic
+                # Authentik embedded-outpost forward-auth (replaces
+                # Authelia). One shared Proxy Provider in "forward_domain"
+                # mode covers every *.kleinbem.dev node with `auth = true`
+                # via a single cookie_domain session — see
+                # nix/infra/authentik.tf's fleet_forward_auth resources.
+                # No ?rd= param needed (unlike Authelia's /api/verify) —
+                # the outpost derives the post-login redirect from Caddy's
+                # own forwarded request headers.
                 authConfig =
                   if (node.auth or false) then
                     ''
-                      forward_auth 10.85.48.123:9091 {
-                        uri /api/verify?rd=${authUrl}
-                        copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
+                      forward_auth 10.85.48.142:9000 {
+                        uri /outpost.goauthentik.io/auth/caddy
+                        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt
+                        trusted_proxies private_ranges
                       }
                     ''
                   else
