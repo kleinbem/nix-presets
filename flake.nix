@@ -210,7 +210,6 @@
               loki = import ./containers/loki.nix { inherit self; };
               crowdsec = import ./containers/crowdsec.nix { inherit self; };
               netdata = import ./containers/netdata.nix { inherit self; };
-              authelia = import ./containers/authelia.nix { inherit self; };
               android-emulator = import ./nixosModules/android-emulator.nix;
               claude = import ./nixosModules/claude.nix;
 
