@@ -75,6 +75,16 @@ in
             else
               let
                 t = helpers.mkTransport node;
+                upstream = helpers.mkUpstream node;
+                reverseProxyBlock =
+                  if t != "" then
+                    ''
+                      reverse_proxy ${upstream} {
+                        ${t}
+                      }
+                    ''
+                  else
+                    "reverse_proxy ${upstream}";
                 # Authentik embedded-outpost forward-auth (replaces
                 # Authelia). One shared Proxy Provider in "forward_domain"
                 # mode covers every *.kleinbem.dev node with `auth = true`
@@ -83,29 +93,43 @@ in
                 # No ?rd= param needed (unlike Authelia's /api/verify) —
                 # the outpost derives the post-login redirect from Caddy's
                 # own forwarded request headers.
-                authConfig =
-                  if (node.auth or false) then
-                    ''
-                      forward_auth 10.85.48.142:9000 {
-                        uri /outpost.goauthentik.io/auth/caddy
-                        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt
-                        trusted_proxies private_ranges
-                      }
-                    ''
-                  else
-                    "";
+                authConfig = ''
+                  forward_auth 10.85.48.142:9000 {
+                    uri /outpost.goauthentik.io/auth/caddy
+                    copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt
+                    trusted_proxies private_ranges
+                  }
+                '';
+                # Paths that must stay reachable WITHOUT an interactive
+                # Authentik session — e.g. n8n's /webhook/* and
+                # /webhook-test/*, hit by external services (GitHub, Stripe,
+                # …) that can't complete a login redirect. Everything else
+                # on the same domain still requires forward_auth. Path-level
+                # only — the excluded paths get NO network-layer auth here
+                # at all, so anything listed must authenticate itself
+                # another way (n8n's own per-webhook Header Auth/HMAC
+                # signature verification — see the per-node comment in
+                # inventory.nix for why there's no Cloudflare WAF rule
+                # backing this up yet).
+                authExcludePaths = node.authExcludePaths or [ ];
               in
-              if t != "" then
+              if !(node.auth or false) then
+                reverseProxyBlock
+              else if authExcludePaths != [ ] then
                 ''
-                  ${authConfig}
-                  reverse_proxy ${helpers.mkUpstream node} {
-                    ${t}
+                  @auth_excluded path ${lib.concatStringsSep " " authExcludePaths}
+                  handle @auth_excluded {
+                    ${reverseProxyBlock}
+                  }
+                  handle {
+                    ${authConfig}
+                    ${reverseProxyBlock}
                   }
                 ''
               else
                 ''
                   ${authConfig}
-                  reverse_proxy ${helpers.mkUpstream node}
+                  ${reverseProxyBlock}
                 ''
           }
         '';
