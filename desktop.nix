@@ -115,13 +115,38 @@ in
     "d %h/.config/windsurf/extensions 0755 - - -"
   ];
 
-  # Force Qt apps to use GTK theme (fixes rclone-browser dark mode)
+  # Catppuccin Mocha (Blue accent) — same palette rofi's theme in
+  # nix-config/modules/home-manager/gnome.nix already hand-codes
+  # (bg #1e1e2e, fg #cdd6f4, accent #89b4fa), so this makes every GTK/Qt
+  # app match the launcher instead of clashing with it.
+  # Qt apps are forced onto this GTK theme below (fixes rclone-browser
+  # dark mode) — that bridge means Catppuccin covers Qt apps too, no
+  # separate Kvantum/qt5ct theme needed.
   gtk = {
     enable = true;
     theme = {
-      name = "Adwaita-dark";
-      package = pkgs.gnome-themes-extra;
+      name = "catppuccin-mocha-blue-standard";
+      package = pkgs.catppuccin-gtk.override {
+        accents = [ "blue" ];
+        variant = "mocha";
+        size = "standard";
+      };
     };
+    iconTheme = {
+      name = "Papirus-Dark";
+      package = pkgs.catppuccin-papirus-folders.override {
+        flavor = "mocha";
+        accent = "blue";
+      };
+    };
+  };
+
+  home.pointerCursor = {
+    package = pkgs.catppuccin-cursors.mochaBlue;
+    name = "catppuccin-mocha-blue-cursors";
+    size = 24;
+    gtk.enable = true;
+    x11.enable = true;
   };
 
   # Native GNOME setting to enable crisp window borders and contrast
