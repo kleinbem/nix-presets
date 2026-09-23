@@ -20,6 +20,7 @@ in
 
     serverIp = lib.mkOption {
       type = lib.types.str;
+      default = "10.0.0.5";
       description = "LAN IP or hostname of the machine running the herdr server.";
     };
 
