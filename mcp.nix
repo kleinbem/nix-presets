@@ -44,6 +44,13 @@
         description = "Enable OpenSCAD MCP Server for code-based CAD";
       };
     };
+    svelte = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable official Svelte 5 & SvelteKit documentation MCP server (@sveltejs/mcp)";
+      };
+    };
   };
 
   config = lib.mkIf config.modules.mcp.enable (
@@ -179,20 +186,34 @@
                     "openscad-mcp-server"
                   ];
                 };
+              })
+              // (lib.optionalAttrs config.modules.mcp.svelte.enable {
+                svelte = {
+                  command = "${pkgs.nodejs_22}/bin/npx";
+                  args = [
+                    "-y"
+                    "@sveltejs/mcp"
+                  ];
+                };
               });
             };
             mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
           in
           lib.hm.dag.entryAfter [ "writeBoundary" ] ''
             mkdir -p "${config.home.homeDirectory}/.gemini/antigravity"
+            mkdir -p "${config.home.homeDirectory}/.gemini/antigravity-ide"
             mkdir -p "${config.home.homeDirectory}/.gemini/config"
             mkdir -p "${config.home.homeDirectory}/.config/Claude"
+            mkdir -p "${config.home.homeDirectory}/.antigravity-ide/User/globalStorage/rooveterinaryinc.roo-cline/settings"
             mkdir -p "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
             mkdir -p "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
             mkdir -p "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
 
             cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
             chmod 644 "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
+
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/antigravity-ide/mcp_config.json"
+            chmod 644 "${config.home.homeDirectory}/.gemini/antigravity-ide/mcp_config.json"
 
             cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
             chmod 644 "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
@@ -201,6 +222,9 @@
             rm -f "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
             cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
             chmod 644 "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
+
+            cp -f "${mcpJson}" "${config.home.homeDirectory}/.antigravity-ide/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            chmod 644 "${config.home.homeDirectory}/.antigravity-ide/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
 
             cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
             chmod 644 "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
