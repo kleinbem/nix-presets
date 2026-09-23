@@ -8,6 +8,14 @@ let
   cfg = config.my.containers.ente;
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
+
+  # Fixed in-container paths the env-setup script writes to and reads
+  # from — the *File options below are host-side sops paths and only
+  # reach the container via the bindMounts further down (same pattern as
+  # authentik.nix).
+  postgresPasswordPath = "/run/secrets/ente-postgres-password";
+  minioRootPasswordPath = "/run/secrets/ente-minio-root-password";
+  jwtSecretPath = "/run/secrets/ente-jwt-secret";
 in
 {
   options.my.containers.ente = {
@@ -21,6 +29,29 @@ in
     memoryLimit = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = "1G";
+    };
+    postgresPasswordFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Host path (e.g. a sops secret's .path) to a file containing the
+        Postgres password. Only takes effect on Postgres's own first
+        start (initdb sets it once from the container's env) — rotating
+        this option's value afterward does NOT retroactively change a
+        live cluster's password; that also needs an `ALTER USER pguser
+        WITH PASSWORD ...` run against the running container. Generate
+        with: openssl rand -hex 32
+      '';
+    };
+    minioRootPasswordFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Host path (e.g. a sops secret's .path) to a file containing the MinIO root password. Same first-start-only caveat as postgresPasswordFile. Generate with: openssl rand -hex 32";
+    };
+    jwtSecretFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Host path (e.g. a sops secret's .path) to a file containing museum's credentials.jwt_secret — signs/verifies auth tokens, so a leaked or guessable value lets anyone forge them. Safe to rotate any time (just re-signs future tokens). Generate with: openssl rand -hex 32";
     };
   }
   // tlsOpts;
@@ -37,24 +68,52 @@ in
     # "no space left on device" crash loop authentik.nix hit.
     usesPodman = true;
     innerConfig = {
-      environment.etc."museum.yaml".text = ''
-        db:
-          host: postgres
-          port: 5432
-          user: pguser
-          password: pgpass
-          database: ente_db
-        s3:
-          endpoint: minio:3200
-          access_key: admin
-          secret_key: password123
-          bucket: ente
-          region: us-east-1
-          secure: false
-        credentials:
-          # JWT secret used for signing tokens (change this!)
-          jwt_secret: "change_me_to_a_random_string_32_chars"
-      '';
+      # Materialise museum.yaml + the Postgres/MinIO env file from sops
+      # secrets at activation instead of baking real credentials into
+      # environment.etc (world-readable, lands in the Nix store) — this
+      # file used to inline literal "pgpass" / "password123" and the
+      # upstream jwt_secret placeholder string directly into the repo.
+      # Missing *File options render as an empty secret rather than
+      # falling back to those old values, so the services fail closed
+      # instead of silently running on a known-weak default.
+      systemd.services.ente-env-setup = {
+        description = "Materialise Ente secrets from sops files";
+        before = [
+          "podman-postgres.service"
+          "podman-minio.service"
+          "podman-museum.service"
+        ];
+        serviceConfig.Type = "oneshot";
+        script = ''
+          umask 077
+          pgpass=$(${lib.optionalString (cfg.postgresPasswordFile != null) "cat ${postgresPasswordPath}"})
+          miniopass=$(${lib.optionalString (cfg.minioRootPasswordFile != null) "cat ${minioRootPasswordPath}"})
+          jwt=$(${lib.optionalString (cfg.jwtSecretFile != null) "cat ${jwtSecretPath}"})
+
+          {
+            printf 'POSTGRES_PASSWORD=%s\n' "$pgpass"
+            printf 'MINIO_ROOT_PASSWORD=%s\n' "$miniopass"
+          } > /run/ente.env
+
+          cat > /run/museum.yaml <<CFGEOF
+          db:
+            host: postgres
+            port: 5432
+            user: pguser
+            password: $pgpass
+            database: ente_db
+          s3:
+            endpoint: minio:3200
+            access_key: admin
+            secret_key: $miniopass
+            bucket: ente
+            region: us-east-1
+            secure: false
+          credentials:
+            jwt_secret: "$jwt"
+          CFGEOF
+        '';
+      };
 
       virtualisation.oci-containers = {
         backend = "podman";
@@ -66,9 +125,9 @@ in
             ];
             environment = {
               POSTGRES_USER = "pguser";
-              POSTGRES_PASSWORD = "pgpass";
               POSTGRES_DB = "ente_db";
             };
+            environmentFiles = [ "/run/ente.env" ];
           };
 
           minio = {
@@ -86,8 +145,8 @@ in
             ];
             environment = {
               MINIO_ROOT_USER = "admin";
-              MINIO_ROOT_PASSWORD = "password123";
             };
+            environmentFiles = [ "/run/ente.env" ];
           };
 
           museum = {
@@ -99,13 +158,26 @@ in
             ];
             volumes = [
               "/var/lib/ente/data:/data"
-              "/etc/museum.yaml:/museum.yaml:ro"
+              "/run/museum.yaml:/museum.yaml:ro"
             ];
             environment = {
               ENTE_API_ORIGIN = "https://${cfg.domain}";
             };
           };
         };
+      };
+
+      systemd.services."podman-postgres" = {
+        after = [ "ente-env-setup.service" ];
+        wants = [ "ente-env-setup.service" ];
+      };
+      systemd.services."podman-minio" = {
+        after = [ "ente-env-setup.service" ];
+        wants = [ "ente-env-setup.service" ];
+      };
+      systemd.services."podman-museum" = {
+        after = [ "ente-env-setup.service" ];
+        wants = [ "ente-env-setup.service" ];
       };
 
       networking.firewall.allowedTCPPorts = [ 8080 ];
@@ -121,6 +193,24 @@ in
       "/var/lib/ente" = {
         hostPath = cfg.hostDataDir;
         isReadOnly = false;
+      };
+    }
+    // lib.optionalAttrs (cfg.postgresPasswordFile != null) {
+      ${postgresPasswordPath} = {
+        hostPath = cfg.postgresPasswordFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs (cfg.minioRootPasswordFile != null) {
+      ${minioRootPasswordPath} = {
+        hostPath = cfg.minioRootPasswordFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs (cfg.jwtSecretFile != null) {
+      ${jwtSecretPath} = {
+        hostPath = cfg.jwtSecretFile;
+        isReadOnly = true;
       };
     };
   });

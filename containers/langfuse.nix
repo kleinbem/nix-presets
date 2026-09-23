@@ -39,6 +39,13 @@ in
           inherit (cfg) autoStart;
           ip = "10.85.46.124/24"; # Static IP for the DB container
           hostDataDir = "${cfg.hostDataDir}/db";
+          # postgres refuses to start against a data directory group/world
+          # can touch, so this can't use the factory's 1000:100 default —
+          # give it the real uid/gid the postgresql module assigns
+          # (config.ids.uids/gids.postgres, verified via `nix eval` against
+          # this flake's pinned nixpkgs: both 71).
+          dataDirOwner = 71;
+          dataDirGroup = 71;
         };
         innerConfig = {
           services.postgresql = {

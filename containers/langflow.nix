@@ -41,6 +41,11 @@ in
         "--network=cbr0"
         "--ip=${lib.head (lib.splitString "/" cfg.ip)}"
         "--security-opt=no-new-privileges"
+        # Run as the fleet-standard martin:users uid/gid instead of
+        # trusting langflowai/langflow's image default — makes
+        # hostDataDir ownership deterministic so it doesn't need to be
+        # world-writable (0777) for the sqlite db bind mount to work.
+        "--user=1000:100"
       ];
     };
 
@@ -52,5 +57,9 @@ in
         Environment = [ "TMPDIR=/var/lib/images/podman/tmp" ];
       };
     };
+
+    systemd.tmpfiles.rules = [
+      "d ${cfg.hostDataDir} 0755 1000 100 - -"
+    ];
   };
 }

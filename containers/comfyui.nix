@@ -55,6 +55,12 @@ in
         "--net=cbr0"
         "--ip=${lib.head (lib.splitString "/" cfg.ip)}"
         "--security-opt=no-new-privileges"
+        # Run as the fleet-standard martin:users uid/gid instead of
+        # trusting whatever UID yanwk/comfyui-boot's image happens to
+        # default to — makes hostDataDir ownership deterministic so it
+        # doesn't need to be world-writable (0777) for the bind mount to
+        # work.
+        "--user=1000:100"
       ]
       ++ (lib.optionals cfg.enableGPU [
         "--device=/dev/dri:/dev/dri"
@@ -76,5 +82,9 @@ in
         Environment = [ "TMPDIR=/var/lib/images/podman/tmp" ];
       };
     };
+
+    systemd.tmpfiles.rules = [
+      "d ${cfg.hostDataDir} 0755 1000 100 - -"
+    ];
   };
 }
