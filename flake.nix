@@ -27,6 +27,8 @@
     };
     nix-packages.url = "github:kleinbem/nix-packages";
     nix-packages.inputs.nixpkgs.follows = "nixpkgs";
+    nix-gantry.url = "github:kleinbem/nix-gantry";
+    nix-gantry.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -160,7 +162,12 @@
 
       flake = {
         lib = {
-          mkContainer = import ./lib/factory.nix { inherit (inputs.nixpkgs) lib; };
+          # Re-exported from nix-gantry, the standalone extraction of this
+          # mechanism (github:kleinbem/nix-gantry) -- lib/factory.nix no
+          # longer exists locally, this is a thin pass-through so every
+          # existing `self.lib.mkContainer` call site in containers/*.nix
+          # keeps working unchanged.
+          mkContainer = inputs.nix-gantry.lib.mkContainer;
         };
 
         nixosModules =
