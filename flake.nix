@@ -164,10 +164,25 @@
         lib = {
           # Re-exported from nix-gantry, the standalone extraction of this
           # mechanism (github:kleinbem/nix-gantry) -- lib/factory.nix no
-          # longer exists locally, this is a thin pass-through so every
-          # existing `self.lib.mkContainer` call site in containers/*.nix
-          # keeps working unchanged.
-          mkContainer = inputs.nix-gantry.lib.mkContainer;
+          # longer exists locally. nix-gantry's own mkContainer takes
+          # cfg.hostBridge/cfg.gpuRenderNode as plain required fields (it
+          # doesn't read any option path it doesn't own); this wrapper is
+          # where THIS fleet's own convention -- defaulting them from
+          # config.my.network.bridge/config.my.hardware.gpuRenderNode --
+          # lives, so every existing containers/*.nix preset's
+          # `self.lib.mkContainer` call keeps working unchanged without
+          # nix-gantry itself needing to know about my.* at all.
+          mkContainer =
+            args:
+            inputs.nix-gantry.lib.mkContainer (
+              args
+              // {
+                cfg = args.cfg // {
+                  hostBridge = args.cfg.hostBridge or args.config.my.network.bridge;
+                  gpuRenderNode = args.cfg.gpuRenderNode or args.config.my.hardware.gpuRenderNode;
+                };
+              }
+            );
         };
 
         nixosModules =
