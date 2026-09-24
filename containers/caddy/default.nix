@@ -2,7 +2,6 @@
 {
   config,
   lib,
-  myInventory,
   ...
 }:
 let
@@ -10,9 +9,6 @@ let
   # Import our clean helpers
   h = import ./helpers.nix { inherit lib; };
   tlsOpts = import ../../lib/tls-options.nix { inherit lib; };
-
-  inv = myInventory.network;
-  proxyTargets = lib.filterAttrs (_: v: v ? externalPort) inv.nodes;
 in
 {
   options.my.containers.caddy = {
@@ -30,8 +26,25 @@ in
     };
     hostIP = lib.mkOption {
       type = lib.types.str;
-      default = inv.nodes.caddy.ip;
       description = "The IP address of the Caddy container.";
+    };
+    proxyTargets = lib.mkOption {
+      type = lib.types.attrsOf lib.types.attrs;
+      default = { };
+      description = ''
+        Map of service name -> node config to reverse-proxy (the caller's
+        equivalent of an inventory filtered to entries with an
+        externalPort). Passed from host config, which computes it from
+        its own inventory -- this preset has no inventory of its own. See
+        helpers.nix's genVHosts for the fields read per entry (ip, port,
+        externalPort, domain, mtls, secure, auth, authExcludePaths,
+        maintenance).
+      '';
+    };
+    globalMaintenance = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "When true, every proxied vhost serves a maintenance page instead of reverse-proxying.";
     };
     memoryLimit = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
@@ -90,9 +103,8 @@ in
             # Restore the full generative logic with proven fixes
             virtualHosts =
               (h.genVHosts {
-                inherit proxyTargets;
-                inherit (cfg) hostIP;
-                isGlobalMaint = myInventory.globalMaintenance or false;
+                inherit (cfg) proxyTargets hostIP;
+                isGlobalMaint = cfg.globalMaintenance;
                 helpers = h;
               })
               // (
@@ -119,7 +131,7 @@ in
             80
             443
           ]
-          ++ (lib.mapAttrsToList (_: node: node.externalPort) proxyTargets);
+          ++ (lib.mapAttrsToList (_: node: node.externalPort) cfg.proxyTargets);
 
           # Ensure the bind-mount points exist inside the container
           systemd.tmpfiles.rules = [

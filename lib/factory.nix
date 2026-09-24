@@ -119,6 +119,18 @@ let
     (builtins.elem name updaterList)
     || (cfg.standaloneRunner or config.my.containers.standaloneRunner or false);
 
+  # This container's own /24, derived from cfg.ip — NOT a hardcoded
+  # build-host subnet. Shared by defaultGateway below and the zt-factory
+  # egress rule: a standalone closure is built once but runs on whichever
+  # host deploys it (mac-mini/.50, core-pi/.48, hass-pi/.49, nasbook/.47),
+  # so anything derived from the *build* host's own subnet is wrong on
+  # every other host. Same class of bug as the defaultGateway fix below
+  # (confirmed live 2026-08-05): a zero-trust egress rule hardcoded to
+  # 10.85.46.0/24 would block a container's own default-gateway hop
+  # (10.85.50.1, etc.) on any host other than the factory's own .46.
+  containerOctets = lib.splitString "." (lib.head (lib.splitString "/" cfg.ip));
+  containerSubnetCidr = lib.concatStringsSep "." (lib.take 3 containerOctets ++ [ "0" ]) + "/24";
+
 in
 {
   containers.${name} = {
@@ -218,11 +230,7 @@ in
                 # cross-host and no internet egress. Every fleet container
                 # host is .1 of its container /24, so this is exact.
                 defaultGateway = lib.mkForce (
-                  let
-                    addr = lib.head (lib.splitString "/" cfg.ip);
-                    o = lib.splitString "." addr;
-                  in
-                  lib.concatStringsSep "." (lib.take 3 o ++ [ "1" ])
+                  lib.concatStringsSep "." (lib.take 3 containerOctets ++ [ "1" ])
                 );
                 # NOT config.my.network.hostAddress: nothing on ANY host in
                 # the fleet actually answers DNS on the container-bridge
@@ -252,7 +260,7 @@ in
                     chain output {
                       type filter hook output priority filter; policy accept;
                       ct state { established, related } accept
-                      ip daddr 10.85.46.0/24 accept
+                      ip daddr ${containerSubnetCidr} accept
                       oifname "lo" accept
                       ${fwUpstreamRules}
                     }
