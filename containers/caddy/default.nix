@@ -129,7 +129,7 @@ in
         };
 
         bindMounts =
-          (lib.mkIf (cfg.hostDataDir != null) {
+          (lib.optionalAttrs (cfg.hostDataDir != null) {
             "/var/lib/caddy" = {
               hostPath = cfg.hostDataDir;
               isReadOnly = false;
