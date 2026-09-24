@@ -100,45 +100,6 @@ in
       imports = [ inputs.nix-packages.nixosModules.ente-museum ];
       nixpkgs.overlays = [ inputs.nix-packages.overlays.default ];
 
-      # Materialise the Postgres/MinIO/museum secrets env file from sops
-      # secrets at activation instead of baking real credentials into
-      # environment.etc (world-readable, lands in the Nix store) — this
-      # file used to inline literal "pgpass" / "password123" and the
-      # upstream jwt_secret placeholder string directly into the repo.
-      # Missing *File options render as an empty secret rather than
-      # falling back to those old values, so the services fail closed
-      # instead of silently running on a known-weak default. One shared
-      # env file: podman's environmentFiles and systemd's EnvironmentFile
-      # both just ignore keys they don't recognise, so there's no reason
-      # to split it three ways.
-      systemd.services.ente-env-setup = {
-        description = "Materialise Ente secrets from sops files";
-        before = [
-          "podman-postgres.service"
-          "podman-minio.service"
-          "ente-museum.service"
-        ];
-        serviceConfig.Type = "oneshot";
-        script = ''
-          umask 077
-          pgpass=$(${lib.optionalString (cfg.postgresPasswordFile != null) "cat ${postgresPasswordPath}"})
-          miniopass=$(${lib.optionalString (cfg.minioRootPasswordFile != null) "cat ${minioRootPasswordPath}"})
-          jwt=$(${lib.optionalString (cfg.jwtSecretFile != null) "cat ${jwtSecretPath}"})
-          keyenc=$(${lib.optionalString (cfg.keyEncryptionFile != null) "cat ${keyEncryptionPath}"})
-          keyhash=$(${lib.optionalString (cfg.keyHashFile != null) "cat ${keyHashPath}"})
-
-          {
-            printf 'POSTGRES_PASSWORD=%s\n' "$pgpass"
-            printf 'MINIO_ROOT_PASSWORD=%s\n' "$miniopass"
-            printf 'ENTE_DB_PASSWORD=%s\n' "$pgpass"
-            printf 'ENTE_S3_B2_EU_CEN_SECRET=%s\n' "$miniopass"
-            printf 'ENTE_JWT_SECRET=%s\n' "$jwt"
-            printf 'ENTE_KEY_ENCRYPTION=%s\n' "$keyenc"
-            printf 'ENTE_KEY_HASH=%s\n' "$keyhash"
-          } > /run/ente.env
-        '';
-      };
-
       # Native museum process. Reaches Postgres/MinIO via localhost, which
       # needs those podman containers on host networking (same reason
       # authentik.nix's native Postgres needs its podman containers on
@@ -153,19 +114,6 @@ in
           bucket = "ente";
         };
         environmentFile = "/run/ente.env";
-      };
-
-      systemd.services.ente-museum = {
-        after = [
-          "ente-env-setup.service"
-          "podman-postgres.service"
-          "podman-minio.service"
-        ];
-        wants = [
-          "ente-env-setup.service"
-          "podman-postgres.service"
-          "podman-minio.service"
-        ];
       };
 
       virtualisation.oci-containers = {
@@ -219,22 +167,87 @@ in
         };
       };
 
-      systemd.services."podman-postgres" = {
-        after = [ "ente-env-setup.service" ];
-        wants = [ "ente-env-setup.service" ];
-      };
-      systemd.services."podman-minio" = {
-        after = [ "ente-env-setup.service" ];
-        wants = [ "ente-env-setup.service" ];
-      };
-
       networking.firewall.allowedTCPPorts = [ 8080 ];
 
-      systemd.tmpfiles.rules = [
-        "d /var/lib/ente/postgres 0755 root root - -"
-        "d /var/lib/ente/minio 0755 root root - -"
-        "d /var/lib/ente/data 0755 root root - -"
-      ];
+      # Consolidated: statix flags repeated top-level `systemd.*`
+      # assignments (this file used to set systemd.services.<name>
+      # separately at 4 different points, plus systemd.tmpfiles.rules
+      # at a 5th). Functionally identical either way (Nix's dotted
+      # attrpath sugar already merges same-prefix, different-leaf
+      # assignments fine), just written as one block now.
+      systemd = {
+        services = {
+          # Materialises the Postgres/MinIO/museum secrets env file
+          # from sops secrets at activation instead of baking real
+          # credentials into environment.etc (world-readable, lands in
+          # the Nix store) — this file used to inline literal "pgpass"
+          # / "password123" and the upstream jwt_secret placeholder
+          # string directly into the repo. Missing *File options
+          # render as an empty secret rather than falling back to
+          # those old values, so the services fail closed instead of
+          # silently running on a known-weak default. One shared env
+          # file: podman's environmentFiles and systemd's
+          # EnvironmentFile both just ignore keys they don't
+          # recognise, so there's no reason to split it three ways.
+          ente-env-setup = {
+            description = "Materialise Ente secrets from sops files";
+            before = [
+              "podman-postgres.service"
+              "podman-minio.service"
+              "ente-museum.service"
+            ];
+            serviceConfig.Type = "oneshot";
+            script = ''
+              umask 077
+              pgpass=$(${lib.optionalString (cfg.postgresPasswordFile != null) "cat ${postgresPasswordPath}"})
+              miniopass=$(${
+                lib.optionalString (cfg.minioRootPasswordFile != null) "cat ${minioRootPasswordPath}"
+              })
+              jwt=$(${lib.optionalString (cfg.jwtSecretFile != null) "cat ${jwtSecretPath}"})
+              keyenc=$(${lib.optionalString (cfg.keyEncryptionFile != null) "cat ${keyEncryptionPath}"})
+              keyhash=$(${lib.optionalString (cfg.keyHashFile != null) "cat ${keyHashPath}"})
+
+              {
+                printf 'POSTGRES_PASSWORD=%s\n' "$pgpass"
+                printf 'MINIO_ROOT_PASSWORD=%s\n' "$miniopass"
+                printf 'ENTE_DB_PASSWORD=%s\n' "$pgpass"
+                printf 'ENTE_S3_B2_EU_CEN_SECRET=%s\n' "$miniopass"
+                printf 'ENTE_JWT_SECRET=%s\n' "$jwt"
+                printf 'ENTE_KEY_ENCRYPTION=%s\n' "$keyenc"
+                printf 'ENTE_KEY_HASH=%s\n' "$keyhash"
+              } > /run/ente.env
+            '';
+          };
+
+          ente-museum = {
+            after = [
+              "ente-env-setup.service"
+              "podman-postgres.service"
+              "podman-minio.service"
+            ];
+            wants = [
+              "ente-env-setup.service"
+              "podman-postgres.service"
+              "podman-minio.service"
+            ];
+          };
+
+          "podman-postgres" = {
+            after = [ "ente-env-setup.service" ];
+            wants = [ "ente-env-setup.service" ];
+          };
+          "podman-minio" = {
+            after = [ "ente-env-setup.service" ];
+            wants = [ "ente-env-setup.service" ];
+          };
+        };
+
+        tmpfiles.rules = [
+          "d /var/lib/ente/postgres 0755 root root - -"
+          "d /var/lib/ente/minio 0755 root root - -"
+          "d /var/lib/ente/data 0755 root root - -"
+        ];
+      };
     };
 
     bindMounts = {
