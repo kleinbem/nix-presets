@@ -131,7 +131,20 @@ in
           };
 
           minio = {
-            image = "minio/minio";
+            # docker.io/minio/minio (the unqualified default registry for
+            # this container per usesPodman's unqualified-search-registries)
+            # started refusing anonymous pulls entirely — MinIO Inc.
+            # restricted Docker Hub distribution of the community/AGPL
+            # image in their 2025 licensing changes. Confirmed live
+            # 2026-09-24: `docker.io/minio/minio:latest` → "requested
+            # access to the resource is denied"; quay.io/minio/minio still
+            # serves it, verified aarch64 manifest present (core-pi is a
+            # Pi 5). Pinned to a real release tag instead of floating
+            # `latest` again — quay.io's own `latest` could just as easily
+            # get orphaned the same way if MinIO changes distribution
+            # again; a pin at least fails loudly (image not found) instead
+            # of silently drifting.
+            image = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
             cmd = [
               "server"
               "/data"
