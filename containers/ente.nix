@@ -1,4 +1,4 @@
-{ self }:
+{ self, inputs }:
 {
   config,
   lib,
@@ -16,6 +16,8 @@ let
   postgresPasswordPath = "/run/secrets/ente-postgres-password";
   minioRootPasswordPath = "/run/secrets/ente-minio-root-password";
   jwtSecretPath = "/run/secrets/ente-jwt-secret";
+  keyEncryptionPath = "/run/secrets/ente-key-encryption";
+  keyHashPath = "/run/secrets/ente-key-hash";
 in
 {
   options.my.containers.ente = {
@@ -51,7 +53,28 @@ in
     jwtSecretFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Host path (e.g. a sops secret's .path) to a file containing museum's credentials.jwt_secret — signs/verifies auth tokens, so a leaked or guessable value lets anyone forge them. Safe to rotate any time (just re-signs future tokens). Generate with: openssl rand -hex 32";
+      description = "Host path (e.g. a sops secret's .path) to a file containing museum's jwt.secret — signs/verifies auth tokens, so a leaked or guessable value lets anyone forge them. Safe to rotate any time (just re-signs future tokens). Generate with: openssl rand -hex 32";
+    };
+    keyEncryptionFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Host path to a file containing museum's key.encryption — used to
+        encrypt customer emails before storing them in Postgres. Must be
+        base64, museum's own gen-random-keys tool format (32 random
+        bytes). Generate with:
+        `nix run nixpkgs#openssl -- rand -base64 32`
+      '';
+    };
+    keyHashFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Host path to a file containing museum's key.hash. Must be
+        base64, 64 random bytes (museum's gen-random-keys tool uses a
+        larger key here than key.encryption). Generate with:
+        `nix run nixpkgs#openssl -- rand -base64 64`
+      '';
     };
   }
   // tlsOpts;
@@ -62,26 +85,38 @@ in
     inherit cfg;
     # Bundles the 15m pull timeout, nesting caps/devices, podman's own
     # registries.conf, and persistent podman image storage — see
-    # factory.nix's usesPodman doc comment. This container pulls THREE
-    # images (postgres, minio, museum) into the same 2G ephemeral root —
-    # closest of the four podman-in-nspawn presets to tripping the
-    # "no space left on device" crash loop authentik.nix hit.
+    # factory.nix's usesPodman doc comment. Postgres + MinIO still run
+    # this way; museum itself no longer does (see below).
     usesPodman = true;
     innerConfig = {
-      # Materialise museum.yaml + the Postgres/MinIO env file from sops
+      # museum itself is a native Nix package (nix-packages' ente-museum),
+      # not a podman container — ghcr.io/ente-io/server went to a bare 403
+      # Forbidden (confirmed live 2026-09-24, even listing tags), and
+      # ente's own compose.yaml no longer references a prebuilt image at
+      # all (`build: context: .`). A source build sidesteps depending on
+      # any registry's continued goodwill entirely — see
+      # nix-packages/pkgs/ente-museum's own doc comment for the pin/bump
+      # procedure.
+      imports = [ inputs.nix-packages.nixosModules.ente-museum ];
+      nixpkgs.overlays = [ inputs.nix-packages.overlays.default ];
+
+      # Materialise the Postgres/MinIO/museum secrets env file from sops
       # secrets at activation instead of baking real credentials into
       # environment.etc (world-readable, lands in the Nix store) — this
       # file used to inline literal "pgpass" / "password123" and the
       # upstream jwt_secret placeholder string directly into the repo.
       # Missing *File options render as an empty secret rather than
       # falling back to those old values, so the services fail closed
-      # instead of silently running on a known-weak default.
+      # instead of silently running on a known-weak default. One shared
+      # env file: podman's environmentFiles and systemd's EnvironmentFile
+      # both just ignore keys they don't recognise, so there's no reason
+      # to split it three ways.
       systemd.services.ente-env-setup = {
         description = "Materialise Ente secrets from sops files";
         before = [
           "podman-postgres.service"
           "podman-minio.service"
-          "podman-museum.service"
+          "ente-museum.service"
         ];
         serviceConfig.Type = "oneshot";
         script = ''
@@ -89,30 +124,48 @@ in
           pgpass=$(${lib.optionalString (cfg.postgresPasswordFile != null) "cat ${postgresPasswordPath}"})
           miniopass=$(${lib.optionalString (cfg.minioRootPasswordFile != null) "cat ${minioRootPasswordPath}"})
           jwt=$(${lib.optionalString (cfg.jwtSecretFile != null) "cat ${jwtSecretPath}"})
+          keyenc=$(${lib.optionalString (cfg.keyEncryptionFile != null) "cat ${keyEncryptionPath}"})
+          keyhash=$(${lib.optionalString (cfg.keyHashFile != null) "cat ${keyHashPath}"})
 
           {
             printf 'POSTGRES_PASSWORD=%s\n' "$pgpass"
             printf 'MINIO_ROOT_PASSWORD=%s\n' "$miniopass"
+            printf 'ENTE_DB_PASSWORD=%s\n' "$pgpass"
+            printf 'ENTE_S3_B2_EU_CEN_SECRET=%s\n' "$miniopass"
+            printf 'ENTE_JWT_SECRET=%s\n' "$jwt"
+            printf 'ENTE_KEY_ENCRYPTION=%s\n' "$keyenc"
+            printf 'ENTE_KEY_HASH=%s\n' "$keyhash"
           } > /run/ente.env
-
-          cat > /run/museum.yaml <<CFGEOF
-          db:
-            host: postgres
-            port: 5432
-            user: pguser
-            password: $pgpass
-            database: ente_db
-          s3:
-            endpoint: minio:3200
-            access_key: admin
-            secret_key: $miniopass
-            bucket: ente
-            region: us-east-1
-            secure: false
-          credentials:
-            jwt_secret: "$jwt"
-          CFGEOF
         '';
+      };
+
+      # Native museum process. Reaches Postgres/MinIO via localhost, which
+      # needs those podman containers on host networking (same reason
+      # authentik.nix's native Postgres needs its podman containers on
+      # --network=host — a name-based podman-internal DNS lookup like
+      # "postgres"/"minio" only resolves between containers on podman's
+      # own bridge network, not from a plain host-side systemd service).
+      services.ente-museum = {
+        enable = true;
+        db.host = "localhost";
+        s3 = {
+          endpoint = "localhost:3200";
+          bucket = "ente";
+        };
+        environmentFile = "/run/ente.env";
+      };
+
+      systemd.services.ente-museum = {
+        after = [
+          "ente-env-setup.service"
+          "podman-postgres.service"
+          "podman-minio.service"
+        ];
+        wants = [
+          "ente-env-setup.service"
+          "podman-postgres.service"
+          "podman-minio.service"
+        ];
       };
 
       virtualisation.oci-containers = {
@@ -128,6 +181,7 @@ in
               POSTGRES_DB = "ente_db";
             };
             environmentFiles = [ "/run/ente.env" ];
+            extraOptions = [ "--network=host" ];
           };
 
           minio = {
@@ -160,22 +214,7 @@ in
               MINIO_ROOT_USER = "admin";
             };
             environmentFiles = [ "/run/ente.env" ];
-          };
-
-          museum = {
-            image = "ghcr.io/ente-io/server:latest";
-            ports = [ "8080:8080" ];
-            dependsOn = [
-              "postgres"
-              "minio"
-            ];
-            volumes = [
-              "/var/lib/ente/data:/data"
-              "/run/museum.yaml:/museum.yaml:ro"
-            ];
-            environment = {
-              ENTE_API_ORIGIN = "https://${cfg.domain}";
-            };
+            extraOptions = [ "--network=host" ];
           };
         };
       };
@@ -185,10 +224,6 @@ in
         wants = [ "ente-env-setup.service" ];
       };
       systemd.services."podman-minio" = {
-        after = [ "ente-env-setup.service" ];
-        wants = [ "ente-env-setup.service" ];
-      };
-      systemd.services."podman-museum" = {
         after = [ "ente-env-setup.service" ];
         wants = [ "ente-env-setup.service" ];
       };
@@ -223,6 +258,18 @@ in
     // lib.optionalAttrs (cfg.jwtSecretFile != null) {
       ${jwtSecretPath} = {
         hostPath = cfg.jwtSecretFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs (cfg.keyEncryptionFile != null) {
+      ${keyEncryptionPath} = {
+        hostPath = cfg.keyEncryptionFile;
+        isReadOnly = true;
+      };
+    }
+    // lib.optionalAttrs (cfg.keyHashFile != null) {
+      ${keyHashPath} = {
+        hostPath = cfg.keyHashFile;
         isReadOnly = true;
       };
     };
