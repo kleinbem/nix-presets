@@ -8,6 +8,10 @@
 let
   cfg = config.my.containers.langfuse;
   inherit (self.lib) mkContainer;
+
+  dbPasswordPath = "/run/secrets/langfuse-db-password";
+  # The app container is the only client allowed into Postgres.
+  appIp = builtins.head (lib.splitString "/" cfg.ip);
 in
 {
   options.my.containers.langfuse = {
@@ -25,6 +29,18 @@ in
     secretsFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
+    };
+    dbPasswordFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Host path (e.g. a sops secret's .path) to a file containing the
+        password of the `langfuse` Postgres role. Re-applied on every DB
+        container start. The same value must appear in secretsFile's
+        DATABASE_URL (postgresql://langfuse:<pw>@<db-ip>:5432/langfuse).
+        Unset = no password = the app's login fails closed. Generate
+        with: openssl rand -hex 32
+      '';
     };
   }
   // import ../lib/tls-options.nix { inherit lib; };
@@ -47,26 +63,72 @@ in
           dataDirOwner = 71;
           dataDirGroup = 71;
         };
+        # Used to be `trust` for all of 10.85.46.0/24 plus an
+        # initialScript creating a `postgres`/'postgres' superuser — i.e.
+        # every container on that bridge got passwordless superuser, and
+        # the app connected as superuser too. Now: a dedicated `langfuse`
+        # role owning only its own database, scram password, reachable
+        # only from the app container's IP; superuser is local-socket
+        # peer only.
+        #
+        # RE-ENABLING with the old (Apr 2026 trial) datadir still at
+        # ${cfg.hostDataDir}/db: its tables are owned by `postgres`, which
+        # the new `langfuse` role can't use. Either wipe that dir (it was
+        # only ever a trial), or pg_dump it first and restore with
+        # `pg_restore --no-owner --role=langfuse -d langfuse`.
         innerConfig = {
           services.postgresql = {
             enable = true;
             package = pkgs.postgresql_16;
             enableTCPIP = true;
+            ensureDatabases = [ "langfuse" ];
+            ensureUsers = [
+              {
+                name = "langfuse";
+                ensureDBOwnership = true;
+              }
+            ];
             authentication = lib.mkForce ''
-              local all all trust
-              host all all 10.85.46.0/24 trust
-            '';
-            initialScript = pkgs.writeText "init.sql" ''
-              CREATE DATABASE langfuse;
-              CREATE USER postgres WITH SUPERUSER PASSWORD 'postgres';
+              local all postgres peer
+              host langfuse langfuse ${appIp}/32 scram-sha-256
             '';
           };
+
+          # (Re-)applies the langfuse role's password from sops on every
+          # start — ensureUsers creates the role but never sets one. Same
+          # pattern as ente.nix's ente-db-setup: secret goes in via
+          # psql's environment (\getenv) + :'var' quoting, never argv;
+          # runs as root to read the root-only sops file.
+          systemd.services.langfuse-db-password = {
+            description = "Set Langfuse Postgres role password from sops";
+            after = [ "postgresql-setup.service" ];
+            requires = [ "postgresql-setup.service" ];
+            wantedBy = [ "multi-user.target" ];
+            serviceConfig = {
+              Type = "oneshot";
+              RemainAfterExit = true;
+            };
+            script = lib.optionalString (cfg.dbPasswordFile != null) ''
+              pw=$(cat ${dbPasswordPath})
+              [ -n "$pw" ] || exit 0
+              printf '%s\n' '\getenv pw LANGFUSE_PG_PASSWORD' "ALTER ROLE langfuse WITH PASSWORD :'pw';" \
+                | LANGFUSE_PG_PASSWORD="$pw" ${pkgs.util-linux}/bin/runuser -u postgres -- \
+                  ${pkgs.postgresql_16}/bin/psql -v ON_ERROR_STOP=1 -d postgres
+            '';
+          };
+
           networking.firewall.allowedTCPPorts = [ 5432 ];
         };
         bindMounts = {
           "/var/lib/postgresql" = {
             hostPath = "${cfg.hostDataDir}/db";
             isReadOnly = false;
+          };
+        }
+        // lib.optionalAttrs (cfg.dbPasswordFile != null) {
+          ${dbPasswordPath} = {
+            hostPath = cfg.dbPasswordFile;
+            isReadOnly = true;
           };
         };
       })
