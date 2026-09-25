@@ -18,6 +18,8 @@ let
   smtpPasswordPath = "/run/secrets/vaultwarden-smtp-password";
 in
 {
+  imports = [ ../nixosModules/backup-engine ];
+
   options.my.containers.vaultwarden = {
     enable = lib.mkEnableOption "Vaultwarden Container (self-hosted Bitwarden-compatible vault)";
     ip = lib.mkOption { type = lib.types.str; };
@@ -104,101 +106,120 @@ in
   }
   // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer {
-    inherit config;
-    name = "vaultwarden";
-    cfg = cfg // {
-      privateUsers = "no";
-      # Host dir is created root:root; the inner tmpfiles `Z` rule below
-      # recursively chowns it to the container's vaultwarden user before the
-      # service starts (same pattern as crowdsec.nix).
-      dataDirOwner = "root";
-      dataDirGroup = "root";
-    };
-    innerConfig = {
-      services.vaultwarden = {
-        enable = true;
-        dbBackend = "sqlite";
-        inherit (cfg) domain;
-        environmentFile = "/run/vaultwarden.env";
-        config = {
-          ROCKET_ADDRESS = "0.0.0.0";
-          ROCKET_PORT = cfg.port;
-          ROCKET_WORKERS = 4;
-          SIGNUPS_ALLOWED = cfg.signupsAllowed;
-          SIGNUPS_VERIFY = false; # needs SMTP; flip on once mail is wired
-          INVITATIONS_ALLOWED = cfg.invitationsAllowed;
-          WEB_VAULT_ENABLED = true;
-          # Favicon fetching is a server-side GET to a user-controlled URL —
-          # an SSRF primitive that, from this container's slice, can reach the
-          # rest of 10.85.48.0/24 (Caddy, Authentik, crowdsec LAPI, …).
-          # Kill it outright rather than delegate to an external ICON_SERVICE,
-          # which would leak the set of domains stored in the vault to a third
-          # party. Cost: new entries have no favicon; already-cached icons
-          # keep serving. (Fixed upstream in 1.37.0 / CVE batch, but removing
-          # the vector beats tracking the patch.)
-          DISABLE_ICON_DOWNLOAD = true;
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (mkContainer {
+        inherit config;
+        name = "vaultwarden";
+        cfg = cfg // {
+          privateUsers = "no";
+          # Host dir is created root:root; the inner tmpfiles `Z` rule below
+          # recursively chowns it to the container's vaultwarden user before the
+          # service starts (same pattern as crowdsec.nix).
+          dataDirOwner = "root";
+          dataDirGroup = "root";
+        };
+        innerConfig = {
+          services.vaultwarden = {
+            enable = true;
+            dbBackend = "sqlite";
+            inherit (cfg) domain;
+            environmentFile = "/run/vaultwarden.env";
+            config = {
+              ROCKET_ADDRESS = "0.0.0.0";
+              ROCKET_PORT = cfg.port;
+              ROCKET_WORKERS = 4;
+              SIGNUPS_ALLOWED = cfg.signupsAllowed;
+              SIGNUPS_VERIFY = false; # needs SMTP; flip on once mail is wired
+              INVITATIONS_ALLOWED = cfg.invitationsAllowed;
+              WEB_VAULT_ENABLED = true;
+              # Favicon fetching is a server-side GET to a user-controlled URL —
+              # an SSRF primitive that, from this container's slice, can reach the
+              # rest of 10.85.48.0/24 (Caddy, Authentik, crowdsec LAPI, …).
+              # Kill it outright rather than delegate to an external ICON_SERVICE,
+              # which would leak the set of domains stored in the vault to a third
+              # party. Cost: new entries have no favicon; already-cached icons
+              # keep serving. (Fixed upstream in 1.37.0 / CVE batch, but removing
+              # the vector beats tracking the patch.)
+              DISABLE_ICON_DOWNLOAD = true;
+            }
+            // lib.optionalAttrs hasSmtp {
+              SMTP_HOST = cfg.smtp.host;
+              SMTP_PORT = cfg.smtp.port;
+              SMTP_SECURITY = cfg.smtp.security;
+              SMTP_FROM = cfg.smtp.from;
+              SMTP_FROM_NAME = cfg.smtp.fromName;
+              SMTP_USERNAME = cfg.smtp.username;
+            };
+          };
+
+          systemd = {
+            services = {
+              # Compose the runtime env file (secrets) from the bind-mounted sops
+              # files — kept out of the world-readable Nix store.
+              vaultwarden-env-setup = {
+                description = "Materialise vaultwarden secret environment from sops files";
+                wantedBy = [ "vaultwarden.service" ];
+                before = [ "vaultwarden.service" ];
+                serviceConfig.Type = "oneshot";
+                script = ''
+                  umask 077
+                  {
+                    : # keep the group non-empty when no secrets are configured
+                    ${lib.optionalString hasAdminToken "printf 'ADMIN_TOKEN=%s\\n' \"$(cat ${adminTokenPath})\""}
+                    ${lib.optionalString hasSmtp "printf 'SMTP_PASSWORD=%s\\n' \"$(cat ${smtpPasswordPath})\""}
+                  } > /run/vaultwarden.env
+                '';
+              };
+
+              vaultwarden = {
+                after = [ "vaultwarden-env-setup.service" ];
+                wants = [ "vaultwarden-env-setup.service" ];
+              };
+            };
+
+            # Recursively hand the bind-mounted state dir to the vaultwarden user
+            # (the host creates it root:root).
+            tmpfiles.rules = [ "Z /var/lib/vaultwarden - vaultwarden vaultwarden - -" ];
+          };
+
+          networking.firewall.allowedTCPPorts = [ cfg.port ];
+        };
+
+        bindMounts = {
+          "/var/lib/vaultwarden" = {
+            hostPath = cfg.hostDataDir;
+            isReadOnly = false;
+          };
+        }
+        // lib.optionalAttrs hasAdminToken {
+          ${adminTokenPath} = {
+            hostPath = cfg.adminTokenFile;
+            isReadOnly = true;
+          };
         }
         // lib.optionalAttrs hasSmtp {
-          SMTP_HOST = cfg.smtp.host;
-          SMTP_PORT = cfg.smtp.port;
-          SMTP_SECURITY = cfg.smtp.security;
-          SMTP_FROM = cfg.smtp.from;
-          SMTP_FROM_NAME = cfg.smtp.fromName;
-          SMTP_USERNAME = cfg.smtp.username;
-        };
-      };
-
-      systemd = {
-        services = {
-          # Compose the runtime env file (secrets) from the bind-mounted sops
-          # files — kept out of the world-readable Nix store.
-          vaultwarden-env-setup = {
-            description = "Materialise vaultwarden secret environment from sops files";
-            wantedBy = [ "vaultwarden.service" ];
-            before = [ "vaultwarden.service" ];
-            serviceConfig.Type = "oneshot";
-            script = ''
-              umask 077
-              {
-                : # keep the group non-empty when no secrets are configured
-                ${lib.optionalString hasAdminToken "printf 'ADMIN_TOKEN=%s\\n' \"$(cat ${adminTokenPath})\""}
-                ${lib.optionalString hasSmtp "printf 'SMTP_PASSWORD=%s\\n' \"$(cat ${smtpPasswordPath})\""}
-              } > /run/vaultwarden.env
-            '';
-          };
-
-          vaultwarden = {
-            after = [ "vaultwarden-env-setup.service" ];
-            wants = [ "vaultwarden-env-setup.service" ];
+          ${smtpPasswordPath} = {
+            hostPath = cfg.smtp.passwordFile;
+            isReadOnly = true;
           };
         };
-
-        # Recursively hand the bind-mounted state dir to the vaultwarden user
-        # (the host creates it root:root).
-        tmpfiles.rules = [ "Z /var/lib/vaultwarden - vaultwarden vaultwarden - -" ];
-      };
-
-      networking.firewall.allowedTCPPorts = [ cfg.port ];
-    };
-
-    bindMounts = {
-      "/var/lib/vaultwarden" = {
-        hostPath = cfg.hostDataDir;
-        isReadOnly = false;
-      };
-    }
-    // lib.optionalAttrs hasAdminToken {
-      ${adminTokenPath} = {
-        hostPath = cfg.adminTokenFile;
-        isReadOnly = true;
-      };
-    }
-    // lib.optionalAttrs hasSmtp {
-      ${smtpPasswordPath} = {
-        hostPath = cfg.smtp.passwordFile;
-        isReadOnly = true;
-      };
-    };
-  });
+      })
+      {
+        # sqlite `.backup` for the live DB; everything else it persists (RSA
+        # key, attachments, sends, config.json) as files. Tiny + catastrophic
+        # to lose → secure tier.
+        my.backup.items.vaultwarden = {
+          tier = "secure";
+          sqlite = [ "${cfg.hostDataDir}/db.sqlite3" ];
+          paths = [ cfg.hostDataDir ];
+          exclude = [
+            "${cfg.hostDataDir}/db.sqlite3*"
+            "${cfg.hostDataDir}/icon_cache"
+            "${cfg.hostDataDir}/tmp"
+          ];
+        };
+      }
+    ]
+  );
 }

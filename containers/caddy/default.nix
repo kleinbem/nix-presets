@@ -11,6 +11,8 @@ let
   tlsOpts = import ../../lib/tls-options.nix { inherit lib; };
 in
 {
+  imports = [ ../../nixosModules/backup-engine ];
+
   options.my.containers.caddy = {
     enable = lib.mkEnableOption "Caddy Reverse Proxy Container";
     ip = lib.mkOption { type = lib.types.str; }; # Passed from host config (which gets it from inventory)
@@ -171,7 +173,15 @@ in
         systemd.tmpfiles.rules = lib.mkIf (cfg.hostDataDir != null) [
           "Z ${cfg.hostDataDir} 0755 3000 3000 - -"
         ];
-      }
+      } # Caddy's local CA — every fleet browser/NSS store trusts this root,
+      # so losing it means re-trusting fleet-wide. ACME certs themselves are
+      # re-issuable and deliberately not included.
+      (lib.mkIf (cfg.hostDataDir != null) {
+        my.backup.items.caddy-pki = {
+          tier = "secure";
+          paths = [ "${cfg.hostDataDir}/.local/share/caddy/pki" ];
+        };
+      })
     ]
   );
 }

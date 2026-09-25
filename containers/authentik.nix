@@ -47,6 +47,8 @@ let
   bootstrapApiTokenPath = "/run/secrets/authentik-bootstrap-api-token";
 in
 {
+  imports = [ ../nixosModules/backup-engine ];
+
   options.my.containers.authentik = {
     enable = lib.mkEnableOption "Authentik IdP Container (persona OIDC, Matrix federation, sigstore — Phase 3+)";
     ip = lib.mkOption {
@@ -96,170 +98,182 @@ in
   }
   // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer {
-    inherit config;
-    name = "authentik";
-    inherit cfg;
-    # Bundles the 15m pull timeout, nesting caps/devices, and podman's
-    # own registries.conf — see factory.nix's usesPodman doc comment.
-    usesPodman = true;
-    # Must pre-exist on the host before nspawn starts — see factory.nix's
-    # subDirs doc comment.
-    subDirs = [ "postgresql" ];
-    innerConfig =
-      { pkgs, ... }:
-      {
-        virtualisation = {
-          oci-containers = {
-            backend = "podman";
-            containers = {
-              authentik-server = {
-                inherit image;
-                cmd = [ "server" ];
-                environmentFiles = [ "/run/authentik.env" ];
-                # host networking: reaches native Postgres via
-                # 127.0.0.1, and the app's own 0.0.0.0:9000/9443 bind
-                # becomes directly reachable on this container's own
-                # bridge IP — no port mapping needed.
-                extraOptions = [ "--network=host" ];
-              };
-              authentik-worker = {
-                inherit image;
-                cmd = [ "worker" ];
-                environmentFiles = [ "/run/authentik.env" ];
-                extraOptions = [ "--network=host" ];
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (mkContainer {
+        inherit config;
+        name = "authentik";
+        inherit cfg;
+        # Bundles the 15m pull timeout, nesting caps/devices, and podman's
+        # own registries.conf — see factory.nix's usesPodman doc comment.
+        usesPodman = true;
+        # Must pre-exist on the host before nspawn starts — see factory.nix's
+        # subDirs doc comment.
+        subDirs = [ "postgresql" ];
+        innerConfig =
+          { pkgs, ... }:
+          {
+            virtualisation = {
+              oci-containers = {
+                backend = "podman";
+                containers = {
+                  authentik-server = {
+                    inherit image;
+                    cmd = [ "server" ];
+                    environmentFiles = [ "/run/authentik.env" ];
+                    # host networking: reaches native Postgres via
+                    # 127.0.0.1, and the app's own 0.0.0.0:9000/9443 bind
+                    # becomes directly reachable on this container's own
+                    # bridge IP — no port mapping needed.
+                    extraOptions = [ "--network=host" ];
+                  };
+                  authentik-worker = {
+                    inherit image;
+                    cmd = [ "worker" ];
+                    environmentFiles = [ "/run/authentik.env" ];
+                    extraOptions = [ "--network=host" ];
+                  };
+                };
               };
             };
+
+            # Postgres has a real native NixOS module, unlike authentik
+            # itself — no reason to also podman-ize it. Local-only, trust
+            # auth (this container is the only tenant), same precedent as
+            # langfuse.nix/paperless.nix. enableTCPIP + a loopback-only
+            # trust rule so the podman containers (host-networked, so they
+            # see this container's own 127.0.0.1) can reach it.
+            services.postgresql = {
+              enable = true;
+              enableTCPIP = true;
+              ensureDatabases = [ "authentik" ];
+              ensureUsers = [
+                {
+                  name = "authentik";
+                  ensureDBOwnership = true;
+                }
+              ];
+              authentication = lib.mkForce ''
+                local all all trust
+                host all all 127.0.0.1/32 trust
+              '';
+            };
+
+            # Compose the environment file the podman containers load via
+            # environmentFiles, from sops-templated secrets plus the fixed
+            # local-Postgres/base-URL settings that don't need to be secret;
+            # then extend oci-containers' auto-generated
+            # podman-authentik-{server,worker} units with the dependency
+            # ordering podman's own module doesn't expose as a
+            # container-level option.
+            systemd.services = {
+              authentik-env-setup = {
+                description = "Materialise authentik environment from sops files";
+                before = [
+                  "podman-authentik-server.service"
+                  "podman-authentik-worker.service"
+                ];
+                serviceConfig.Type = "oneshot";
+                script = ''
+                  umask 077
+                  {
+                    ${lib.optionalString (
+                      cfg.secretKeyFile != null
+                    ) ''printf "AUTHENTIK_SECRET_KEY=%s\n" "$(cat ${secretKeyPath})"''}
+                    ${lib.optionalString (
+                      cfg.postgresPasswordFile != null
+                    ) ''printf "AUTHENTIK_POSTGRESQL__PASSWORD=%s\n" "$(cat ${postgresPasswordPath})"''}
+                    ${lib.optionalString (
+                      cfg.bootstrapAdminPasswordFile != null
+                    ) ''printf "AUTHENTIK_BOOTSTRAP_PASSWORD=%s\n" "$(cat ${bootstrapAdminPasswordPath})"''}
+                    ${lib.optionalString (
+                      cfg.bootstrapApiTokenFile != null
+                    ) ''printf "AUTHENTIK_BOOTSTRAP_TOKEN=%s\n" "$(cat ${bootstrapApiTokenPath})"''}
+                    printf "AUTHENTIK_POSTGRESQL__HOST=127.0.0.1\n"
+                    printf "AUTHENTIK_POSTGRESQL__NAME=authentik\n"
+                    printf "AUTHENTIK_POSTGRESQL__USER=authentik\n"
+                    printf "AUTHENTIK_POSTGRESQL__SSLMODE=disable\n"
+                    printf "AUTHENTIK_WEB__BASE_URL=https://%s\n" "${cfg.domain}"
+                  } > /run/authentik.env
+                '';
+              };
+
+              "podman-authentik-server" = {
+                after = [
+                  "postgresql.service"
+                  "authentik-env-setup.service"
+                  "network.target"
+                ];
+                wants = [
+                  "postgresql.service"
+                  "authentik-env-setup.service"
+                ];
+              };
+
+              "podman-authentik-worker" = {
+                after = [
+                  "postgresql.service"
+                  "authentik-env-setup.service"
+                ];
+                wants = [
+                  "postgresql.service"
+                  "authentik-env-setup.service"
+                ];
+              };
+            };
+
+            networking.firewall.allowedTCPPorts = [
+              9000 # HTTP
+              9443 # HTTPS (used internally; Caddy fronts publicly)
+            ];
+
+            environment.systemPackages = [ pkgs.podman ];
+          };
+
+        bindMounts = {
+          # Postgres — static NixOS system uid, ownership stays consistent
+          # across independently-built container closures (same note as
+          # paperless.nix).
+          "/var/lib/postgresql" = {
+            hostPath = "${cfg.hostDataDir}/postgresql";
+            isReadOnly = false;
+          };
+          # Podman's own image/layer storage is bind-mounted automatically
+          # by usesPodman (factory.nix) — see its doc comment for why.
+        }
+        // lib.optionalAttrs (cfg.secretKeyFile != null) {
+          ${secretKeyPath} = {
+            hostPath = cfg.secretKeyFile;
+            isReadOnly = true;
+          };
+        }
+        // lib.optionalAttrs (cfg.postgresPasswordFile != null) {
+          ${postgresPasswordPath} = {
+            hostPath = cfg.postgresPasswordFile;
+            isReadOnly = true;
+          };
+        }
+        // lib.optionalAttrs (cfg.bootstrapAdminPasswordFile != null) {
+          ${bootstrapAdminPasswordPath} = {
+            hostPath = cfg.bootstrapAdminPasswordFile;
+            isReadOnly = true;
+          };
+        }
+        // lib.optionalAttrs (cfg.bootstrapApiTokenFile != null) {
+          ${bootstrapApiTokenPath} = {
+            hostPath = cfg.bootstrapApiTokenFile;
+            isReadOnly = true;
           };
         };
-
-        # Postgres has a real native NixOS module, unlike authentik
-        # itself — no reason to also podman-ize it. Local-only, trust
-        # auth (this container is the only tenant), same precedent as
-        # langfuse.nix/paperless.nix. enableTCPIP + a loopback-only
-        # trust rule so the podman containers (host-networked, so they
-        # see this container's own 127.0.0.1) can reach it.
-        services.postgresql = {
-          enable = true;
-          enableTCPIP = true;
-          ensureDatabases = [ "authentik" ];
-          ensureUsers = [
-            {
-              name = "authentik";
-              ensureDBOwnership = true;
-            }
-          ];
-          authentication = lib.mkForce ''
-            local all all trust
-            host all all 127.0.0.1/32 trust
-          '';
+      })
+      {
+        # The IdP's whole state lives in its native Postgres (no media dir in
+        # use) → one pg_dumpall inside the `authentik` machine.
+        my.backup.items.authentik = {
+          tier = "secure";
+          postgres = [ { machine = "authentik"; } ];
         };
-
-        # Compose the environment file the podman containers load via
-        # environmentFiles, from sops-templated secrets plus the fixed
-        # local-Postgres/base-URL settings that don't need to be secret;
-        # then extend oci-containers' auto-generated
-        # podman-authentik-{server,worker} units with the dependency
-        # ordering podman's own module doesn't expose as a
-        # container-level option.
-        systemd.services = {
-          authentik-env-setup = {
-            description = "Materialise authentik environment from sops files";
-            before = [
-              "podman-authentik-server.service"
-              "podman-authentik-worker.service"
-            ];
-            serviceConfig.Type = "oneshot";
-            script = ''
-              umask 077
-              {
-                ${lib.optionalString (
-                  cfg.secretKeyFile != null
-                ) ''printf "AUTHENTIK_SECRET_KEY=%s\n" "$(cat ${secretKeyPath})"''}
-                ${lib.optionalString (
-                  cfg.postgresPasswordFile != null
-                ) ''printf "AUTHENTIK_POSTGRESQL__PASSWORD=%s\n" "$(cat ${postgresPasswordPath})"''}
-                ${lib.optionalString (
-                  cfg.bootstrapAdminPasswordFile != null
-                ) ''printf "AUTHENTIK_BOOTSTRAP_PASSWORD=%s\n" "$(cat ${bootstrapAdminPasswordPath})"''}
-                ${lib.optionalString (
-                  cfg.bootstrapApiTokenFile != null
-                ) ''printf "AUTHENTIK_BOOTSTRAP_TOKEN=%s\n" "$(cat ${bootstrapApiTokenPath})"''}
-                printf "AUTHENTIK_POSTGRESQL__HOST=127.0.0.1\n"
-                printf "AUTHENTIK_POSTGRESQL__NAME=authentik\n"
-                printf "AUTHENTIK_POSTGRESQL__USER=authentik\n"
-                printf "AUTHENTIK_POSTGRESQL__SSLMODE=disable\n"
-                printf "AUTHENTIK_WEB__BASE_URL=https://%s\n" "${cfg.domain}"
-              } > /run/authentik.env
-            '';
-          };
-
-          "podman-authentik-server" = {
-            after = [
-              "postgresql.service"
-              "authentik-env-setup.service"
-              "network.target"
-            ];
-            wants = [
-              "postgresql.service"
-              "authentik-env-setup.service"
-            ];
-          };
-
-          "podman-authentik-worker" = {
-            after = [
-              "postgresql.service"
-              "authentik-env-setup.service"
-            ];
-            wants = [
-              "postgresql.service"
-              "authentik-env-setup.service"
-            ];
-          };
-        };
-
-        networking.firewall.allowedTCPPorts = [
-          9000 # HTTP
-          9443 # HTTPS (used internally; Caddy fronts publicly)
-        ];
-
-        environment.systemPackages = [ pkgs.podman ];
-      };
-
-    bindMounts = {
-      # Postgres — static NixOS system uid, ownership stays consistent
-      # across independently-built container closures (same note as
-      # paperless.nix).
-      "/var/lib/postgresql" = {
-        hostPath = "${cfg.hostDataDir}/postgresql";
-        isReadOnly = false;
-      };
-      # Podman's own image/layer storage is bind-mounted automatically
-      # by usesPodman (factory.nix) — see its doc comment for why.
-    }
-    // lib.optionalAttrs (cfg.secretKeyFile != null) {
-      ${secretKeyPath} = {
-        hostPath = cfg.secretKeyFile;
-        isReadOnly = true;
-      };
-    }
-    // lib.optionalAttrs (cfg.postgresPasswordFile != null) {
-      ${postgresPasswordPath} = {
-        hostPath = cfg.postgresPasswordFile;
-        isReadOnly = true;
-      };
-    }
-    // lib.optionalAttrs (cfg.bootstrapAdminPasswordFile != null) {
-      ${bootstrapAdminPasswordPath} = {
-        hostPath = cfg.bootstrapAdminPasswordFile;
-        isReadOnly = true;
-      };
-    }
-    // lib.optionalAttrs (cfg.bootstrapApiTokenFile != null) {
-      ${bootstrapApiTokenPath} = {
-        hostPath = cfg.bootstrapApiTokenFile;
-        isReadOnly = true;
-      };
-    };
-  });
+      }
+    ]
+  );
 }
