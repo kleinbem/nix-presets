@@ -130,6 +130,11 @@
               ) (inputs.nixpkgs.lib.filterAttrs (n: _: !(builtins.elem n excludedModules)) self.nixosModules);
             in
             {
+              backup-engine = import ./checks/backup-engine.nix {
+                inherit pkgs;
+                module = ./nixosModules/backup-engine;
+              };
+
               pre-commit-check = inputs.git-hooks.lib.${system}.run {
                 src = ./.;
                 hooks = {
@@ -238,6 +243,11 @@
               home-assistant = import ./containers/home-assistant.nix { inherit self; };
               syncthing = import ./containers/syncthing.nix { inherit self; };
               backup = import ./containers/backup.nix { inherit self; };
+              # Host-level backup engine + `my.backup` interface (supersedes the
+              # `backup` container above; presets register their own data).
+              # A path (not `import`), so it dedups with the presets' own
+              # `imports = [ ../nixosModules/backup-engine ]`.
+              backup-engine = ./nixosModules/backup-engine;
               paperless = import ./containers/paperless.nix { inherit self; };
               anythingllm = import ./containers/anythingllm.nix { inherit self; };
               ente = import ./containers/ente.nix { inherit self inputs; };
