@@ -18,6 +18,11 @@ let
   jwtSecretPath = "/run/secrets/ente-jwt-secret";
   keyEncryptionPath = "/run/secrets/ente-key-encryption";
   keyHashPath = "/run/secrets/ente-key-hash";
+
+  # Postgres role: created by the postgres container (POSTGRES_USER) and
+  # used by museum (services.ente-museum.db.user) — one binding so they
+  # can't drift.
+  pgUser = "pguser";
 in
 {
   imports = [ ../nixosModules/backup-engine ];
@@ -112,7 +117,10 @@ in
           # own bridge network, not from a plain host-side systemd service).
           services.ente-museum = {
             enable = true;
-            db.host = "localhost";
+            db = {
+              host = "localhost";
+              user = pgUser;
+            };
             s3 = {
               endpoint = "localhost:3200";
               bucket = "ente";
@@ -129,7 +137,7 @@ in
                   "/var/lib/ente/postgres:/var/lib/postgresql/data"
                 ];
                 environment = {
-                  POSTGRES_USER = "pguser";
+                  POSTGRES_USER = pgUser;
                   POSTGRES_DB = "ente_db";
                 };
                 environmentFiles = [ "/run/ente.env" ];
@@ -309,7 +317,7 @@ in
               {
                 machine = "ente";
                 podman = "postgres";
-                user = "pguser";
+                user = pgUser;
               }
             ];
           };
