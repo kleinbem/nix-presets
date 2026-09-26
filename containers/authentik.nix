@@ -131,6 +131,23 @@ in
                     inherit image;
                     cmd = [ "worker" ];
                     environmentFiles = [ "/run/authentik.env" ];
+                    # Same host network namespace as authentik-server (it
+                    # needs 127.0.0.1 Postgres too), and since 2026.8 the
+                    # worker's Rust arbiter also binds the default listeners
+                    # (:9000/:9443/:9300). Whichever container starts first
+                    # wins; when the worker did (core-pi 2026-09-26, after a
+                    # flake.lock bump restarted every container) the server
+                    # crash-looped on "Address already in use (os error 98)"
+                    # and :9000 answered with the worker's health-only
+                    # listener — 404 on the whole UI/API. Park the worker's
+                    # listeners on distinct loopback ports so the race can't
+                    # exist. Comma-separated lists per ak-common's
+                    # KEYS_TO_PARSE_AS_LIST.
+                    environment = {
+                      AUTHENTIK_LISTEN__HTTP = "127.0.0.1:9001";
+                      AUTHENTIK_LISTEN__HTTPS = "127.0.0.1:9444";
+                      AUTHENTIK_LISTEN__METRICS = "127.0.0.1:9301";
+                    };
                     extraOptions = [ "--network=host" ];
                   };
                 };
