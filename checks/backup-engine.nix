@@ -43,7 +43,26 @@ pkgs.testers.runNixOSTest {
         pkgs.gnutar
         pkgs.gzip
       ];
+      # Fake healthchecks endpoint: logs every request path, answers 200.
+      systemd.services.fake-hc = {
+        wantedBy = [ "multi-user.target" ];
+        script = ''
+          ${pkgs.python3}/bin/python3 - <<'PY'
+          import http.server
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  with open("/var/log/hc-pings", "a") as f:
+                      f.write(self.path + "\n")
+                  self.send_response(200); self.end_headers()
+              do_POST = do_GET
+              def log_message(self, *a): pass
+          http.server.HTTPServer(("127.0.0.1", 8321), H).serve_forever()
+          PY
+        '';
+      };
+
       environment.etc = {
+        "backup-test/hc-key".text = "test-ping-key\n";
         "backup-test/rclone.conf".text = ''
           [dest]
           type = local
@@ -97,6 +116,10 @@ pkgs.testers.runNixOSTest {
           "age1yubikey1q2lhmqc0h6verf025hn62tkjkz25d760h54pdej7a55q4m2hszm8kwssfn0"
         ];
         bulk.passwordFile = "/etc/backup-test/restic-pw";
+        heartbeat = {
+          pingKeyFile = "/etc/backup-test/hc-key";
+          baseUrl = "http://127.0.0.1:8321";
+        };
         notify.command = toString (
           pkgs.writeShellScript "notify-to-file" ''
             echo "$@" >> /var/log/backup-notify
@@ -109,6 +132,7 @@ pkgs.testers.runNixOSTest {
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("postgresql.service")
     machine.succeed("setup-fixtures")
+    machine.wait_for_open_port(8321)
 
     with subtest("secure tier: backup, decrypt, restore"):
         machine.succeed("systemctl start backup-secure.service")
@@ -147,5 +171,13 @@ pkgs.testers.runNixOSTest {
         machine.succeed("grep 'bulk-flaky: no successful run yet' /var/log/backup-notify")
         machine.fail("grep 'secure: no successful' /var/log/backup-notify")
         machine.fail("grep 'bulk-primary: no successful' /var/log/backup-notify")
+
+    with subtest("external heartbeat pings"):
+        # success pings (trailing newline in the key file must be stripped)
+        machine.succeed("grep -x /test-ping-key/machine-backup-secure /var/log/hc-pings")
+        machine.succeed("grep -x /test-ping-key/machine-backup-bulk-primary /var/log/hc-pings")
+        # failure → /fail from the OnFailure unit; never a success ping
+        machine.wait_until_succeeds("grep -x /test-ping-key/machine-backup-bulk-flaky/fail /var/log/hc-pings")
+        machine.fail("grep -x /test-ping-key/machine-backup-bulk-flaky /var/log/hc-pings")
   '';
 }

@@ -209,6 +209,22 @@ let
     lib.optional hasSecure "secure"
     ++ lib.optionals hasBulk (map (d: "bulk-${d}") (lib.attrNames bulkDests));
 
+  # External dead-man's switch (healthchecks.io-style ping URLs):
+  #   <baseUrl>/<ping key>/<host>-backup-<job>        on success
+  #   <baseUrl>/<ping key>/<host>-backup-<job>/fail   from the OnFailure unit
+  # Best-effort: a failed ping never fails the backup itself — the external
+  # service alerting on the *missing* ping is the whole point.
+  hb = cfg.heartbeat;
+  heartbeat = pkgs.writeShellScript "backup-heartbeat" ''
+    set -u
+    key=$(${pkgs.coreutils}/bin/tr -d '[:space:]' < ${esc (toString hb.pingKeyFile)} 2>/dev/null) || exit 0
+    [ -n "$key" ] || exit 0
+    url="${hb.baseUrl}/$key/${host}-backup-$1''${2:+/$2}"
+    ${pkgs.curl}/bin/curl -fsS -m 10 --retry 3 -o /dev/null "$url" \
+      || echo "WARN: heartbeat ping for $1''${2:+ ($2)} failed" >&2
+  '';
+  hbPing = job: lib.optionalString (hb.pingKeyFile != null) "${heartbeat} ${job}";
+
   secureScript =
     let
       paths = allOf "paths" secureItems;
@@ -272,6 +288,7 @@ let
       )}
       [ "$failed" -eq 0 ]
       ${touchMarker "secure"}
+      ${hbPing "secure"}
       echo "secure backup $ts ok ($(du -h "$work/$name" | cut -f1))"
     '';
 
@@ -363,6 +380,29 @@ in
       description = "Executable called as `<cmd> <high|default> <title> <message>` on failures/staleness. null = syslog only.";
     };
 
+    heartbeat = {
+      pingKeyFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          File holding a healthchecks.io-style project ping key. When set,
+          every job pings <baseUrl>/<key>/<host>-backup-<job> on success and
+          …/fail on failure — an external dead-man's switch that still
+          alerts when the host itself (and its local notify path) is dead.
+        '';
+      };
+      baseUrl = mkOption {
+        type = types.str;
+        default = "https://hc-ping.com";
+      };
+    };
+
+    jobs = mkOption {
+      type = types.listOf types.str;
+      readOnly = true;
+      description = "Backup jobs this host runs (secure, bulk-<dest>) — for external check provisioning; slugs are <hostName>-backup-<job>.";
+    };
+
     freshness = {
       maxAgeHours = mkOption {
         type = types.ints.positive;
@@ -377,6 +417,7 @@ in
 
   config = lib.mkMerge [
     {
+      my.backup.jobs = if cfg.enable then jobs else [ ];
       warnings = lib.optional (!cfg.enable && cfg.warnIfDisabled && cfg.items != { }) (
         "my.backup: services on this host registered backup items ("
         + lib.concatStringsSep ", " (lib.attrNames cfg.items)
@@ -430,7 +471,10 @@ in
               # upstream's unit only has ssh on PATH; restic execs `rclone`.
               path = [ pkgs.rclone ];
               onFailure = [ "backup-notify-failure@restic-backups-bulk-${d}.service" ];
-              serviceConfig.ExecStartPost = [ (touchMarker "bulk-${d}") ];
+              serviceConfig.ExecStartPost = [
+                (touchMarker "bulk-${d}")
+              ]
+              ++ lib.optional (hb.pingKeyFile != null) "${heartbeat} bulk-${d}";
             }
           ) (lib.optionalAttrs hasBulk bulkDests))
 
@@ -483,6 +527,15 @@ in
               scriptArgs = "%i";
               script = ''
                 ${notifyCmd} high ${esc "${host} backup FAILED"} "unit $1 failed — journalctl -u $1"
+                ${lib.optionalString (hb.pingKeyFile != null) ''
+                  # %i is the instance name — no ".service" suffix
+                  case "$1" in
+                    backup-secure | backup-secure.service) job=secure ;;
+                    restic-backups-bulk-*) job=''${1#restic-backups-}; job=''${job%.service} ;;
+                    *) job= ;;
+                  esac
+                  [ -z "$job" ] || ${heartbeat} "$job" fail
+                ''}
               '';
             };
           })
