@@ -207,9 +207,16 @@ in
                   miniopass=$(${
                     lib.optionalString (cfg.minioRootPasswordFile != null) "cat ${minioRootPasswordPath}"
                   })
-                  jwt=$(${lib.optionalString (cfg.jwtSecretFile != null) "cat ${jwtSecretPath}"})
-                  keyenc=$(${lib.optionalString (cfg.keyEncryptionFile != null) "cat ${keyEncryptionPath}"})
-                  keyhash=$(${lib.optionalString (cfg.keyHashFile != null) "cat ${keyHashPath}"})
+                  # base64 values: strip ALL whitespace, not just the trailing
+                  # newline $(cat) drops. `openssl rand -base64 64` wraps at 64
+                  # chars, and the stored ente_key_hash kept that wrap — museum's
+                  # strict decoder then crash-looped ("Could not decode
+                  # email-hash-key: illegal base64 data at input byte 64", core-pi
+                  # 2026-09-26, ~940 restarts). Base64 never contains whitespace.
+                  b64() { tr -d '[:space:]' < "$1"; }
+                  jwt=$(${lib.optionalString (cfg.jwtSecretFile != null) "b64 ${jwtSecretPath}"})
+                  keyenc=$(${lib.optionalString (cfg.keyEncryptionFile != null) "b64 ${keyEncryptionPath}"})
+                  keyhash=$(${lib.optionalString (cfg.keyHashFile != null) "b64 ${keyHashPath}"})
 
                   {
                     printf 'POSTGRES_PASSWORD=%s\n' "$pgpass"
