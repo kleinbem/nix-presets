@@ -89,7 +89,13 @@ pkgs.testers.runNixOSTest {
             pruneSecureAfterDays = 30;
           };
         };
-        secure.recipients = [ agePub ];
+        # Second recipient is a real (public) YubiKey recipient: proves the
+        # engine puts age-plugin-yubikey on PATH — wrapping to it needs the
+        # plugin but no hardware (caught live on core-pi 2026-09-26).
+        secure.recipients = [
+          agePub
+          "age1yubikey1q2lhmqc0h6verf025hn62tkjkz25d760h54pdej7a55q4m2hszm8kwssfn0"
+        ];
         bulk.passwordFile = "/etc/backup-test/restic-pw";
         notify.command = toString (
           pkgs.writeShellScript "notify-to-file" ''
