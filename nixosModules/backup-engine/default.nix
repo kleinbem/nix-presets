@@ -127,6 +127,9 @@ let
   };
 
   host = cfg.hostName;
+  agePluginPkgs =
+    lib.optional (lib.any (lib.hasPrefix "age1yubikey1") cfg.secure.recipients) pkgs.age-plugin-yubikey
+    ++ cfg.secure.agePlugins;
   itemsOf = tier: lib.filterAttrs (_: i: i.tier == tier) cfg.items;
   secureItems = itemsOf "secure";
   bulkItems = itemsOf "bulk";
@@ -313,6 +316,16 @@ in
         default = [ ];
         description = "age recipients the secure bundle is encrypted to.";
       };
+      agePlugins = mkOption {
+        type = types.listOf types.package;
+        default = [ ];
+        description = ''
+          Extra age plugins put on the secure unit's PATH. Plugin recipients
+          (`age1<name>1…`) need the plugin binary even just to ENCRYPT — the
+          hardware is only needed to decrypt. age-plugin-yubikey is added
+          automatically for `age1yubikey1…` recipients; list others here.
+        '';
+      };
       schedule = mkOption {
         type = types.str;
         default = "*-*-* 02:30:00";
@@ -433,7 +446,8 @@ in
                 pkgs.gzip
                 pkgs.age
                 pkgs.rclone
-              ];
+              ]
+              ++ agePluginPkgs;
               serviceConfig = {
                 Type = "oneshot";
                 PrivateTmp = true;
