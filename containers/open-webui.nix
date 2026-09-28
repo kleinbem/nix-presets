@@ -23,6 +23,11 @@ in
       type = lib.types.str;
       default = "";
     };
+    openaiUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      description = "OpenAI-compatible API base URL (e.g. http://10.0.0.15:11434/v1).";
+    };
     vllmUrl = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -67,7 +72,9 @@ in
         environmentFile = lib.mkIf (cfg.secretsFile != null) "/run/secrets/openwebui.env";
         environment = {
           OLLAMA_BASE_URL = cfg.ollamaUrl;
-          OPENAI_API_BASE_URL = "https://litellm.internal"; # Use the new "Pro" gateway
+          ENABLE_OLLAMA_API = if (cfg.ollamaUrl != "") then "True" else "False";
+          OPENAI_API_BASE_URL = cfg.openaiUrl;
+          ENABLE_OPENAI_API = if (cfg.openaiUrl != "") then "True" else "False";
           WEBUI_AUTH = "True";
         }
         // lib.optionalAttrs cfg.oidc.enable {
