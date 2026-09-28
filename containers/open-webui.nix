@@ -9,6 +9,10 @@ let
   cfg = config.my.containers.open-webui;
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
+  oidcOpts = import ../lib/oidc-options.nix {
+    inherit lib;
+    defaultName = "open-webui";
+  };
 in
 {
   options.my.containers.open-webui = {
@@ -42,21 +46,9 @@ in
       default = false;
       description = "Enable /dev/video* hardware pass-through for direct webcam integration.";
     };
-    oidc = {
-      enable = lib.mkEnableOption "Open WebUI login via Authentik OIDC (nix/infra/authentik.tf's open_webui Provider)";
-      clientId = lib.mkOption {
-        type = lib.types.str;
-        default = "open-webui";
-        description = "OAuth2 Client ID registered with Authentik";
-      };
-      issuerUrl = lib.mkOption {
-        type = lib.types.str;
-        default = "https://auth.kleinbem.dev/application/o/open-webui/.well-known/openid-configuration";
-        description = "OpenID Connect discovery endpoint URL";
-      };
-    };
   }
-  // tlsOpts;
+  // tlsOpts
+  // oidcOpts;
 
   config = lib.mkIf cfg.enable (mkContainer {
     inherit config;
