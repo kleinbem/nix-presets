@@ -42,13 +42,35 @@ in
       default = "6G";
       description = "systemd MemoryMax for the container (e.g. \"6G\"). null = unbounded.";
     };
+    port = lib.mkOption {
+      type = lib.types.nullOr lib.types.int;
+      default = 11434;
+      description = "Host port to forward to the container.";
+    };
   }
   // tlsOpts;
 
   config = lib.mkIf cfg.enable (mkContainer {
     inherit config;
     name = "llama-cpp";
-    inherit cfg;
+    cfg = cfg // {
+      extraAllowedDevices = [
+        { node = "/dev/nvmap"; modifier = "rw"; }
+        { node = "/dev/dri"; modifier = "rw"; }
+        { node = "/dev/dri/renderD128"; modifier = "rw"; }
+        { node = "/dev/dri/card0"; modifier = "rw"; }
+        { node = "/dev/nvgpu/igpu0/as"; modifier = "rw"; }
+        { node = "/dev/nvgpu/igpu0/channel"; modifier = "rw"; }
+        { node = "/dev/nvgpu/igpu0/ctrl"; modifier = "rw"; }
+        { node = "/dev/nvgpu/igpu0/power"; modifier = "rw"; }
+        { node = "/dev/nvgpu/igpu0/sched"; modifier = "rw"; }
+        { node = "/dev/nvgpu/igpu0/tsg"; modifier = "rw"; }
+        { node = "/dev/nvhost-ctrl-gpu"; modifier = "rw"; }
+        { node = "/dev/nvhost-gpu"; modifier = "rw"; }
+        { node = "/dev/nvhost-as-gpu"; modifier = "rw"; }
+        { node = "/dev/nvhost-prof-gpu"; modifier = "rw"; }
+      ];
+    };
 
     enableGPU = true;
     timeout = "5m";
@@ -84,21 +106,19 @@ in
             + "--port 11434 "
             + "--n-gpu-layers ${toString cfg.gpuLayers} "
             + "--ctx-size ${toString cfg.contextSize} "
-            + "--flash-attn "
+            + "--flash-attn auto "
             + "--cache-type-k q4_0 " # KV Cache quantization (essential for 8GB)
-            + "--cache-type-v q4_0 "
-            + "--no-mmap"; # Force load into RAM for predictable performance on Jetson
+            + "--cache-type-v q4_0";
 
           Restart = "always";
           RestartSec = "5s";
 
           # Hardening & Minimalism
           DynamicUser = true;
+          SupplementaryGroups = [ "video" "render" ];
           PrivateTmp = true;
           ProtectSystem = "strict";
           ProtectHome = true;
-          NoNewPrivileges = true;
-          CapabilityBoundingSet = ""; # No special caps needed
         };
       };
 
@@ -110,6 +130,28 @@ in
         hostPath = cfg.modelPath;
         isReadOnly = true;
       };
+      "/run/opengl-driver" = {
+        hostPath = "/run/opengl-driver";
+        isReadOnly = true;
+      };
+      "/dev/dri" = {
+        hostPath = "/dev/dri";
+        isReadOnly = false;
+      };
+      "/dev/nvmap" = {
+        hostPath = "/dev/nvmap";
+        isReadOnly = false;
+      };
+      "/dev/nvgpu/igpu0/as" = { hostPath = "/dev/nvgpu/igpu0/as"; isReadOnly = false; };
+      "/dev/nvgpu/igpu0/channel" = { hostPath = "/dev/nvgpu/igpu0/channel"; isReadOnly = false; };
+      "/dev/nvgpu/igpu0/ctrl" = { hostPath = "/dev/nvgpu/igpu0/ctrl"; isReadOnly = false; };
+      "/dev/nvgpu/igpu0/power" = { hostPath = "/dev/nvgpu/igpu0/power"; isReadOnly = false; };
+      "/dev/nvgpu/igpu0/sched" = { hostPath = "/dev/nvgpu/igpu0/sched"; isReadOnly = false; };
+      "/dev/nvgpu/igpu0/tsg" = { hostPath = "/dev/nvgpu/igpu0/tsg"; isReadOnly = false; };
+      "/dev/nvhost-ctrl-gpu" = { hostPath = "/dev/nvhost-ctrl-gpu"; isReadOnly = false; };
+      "/dev/nvhost-gpu" = { hostPath = "/dev/nvhost-gpu"; isReadOnly = false; };
+      "/dev/nvhost-as-gpu" = { hostPath = "/dev/nvhost-as-gpu"; isReadOnly = false; };
+      "/dev/nvhost-prof-gpu" = { hostPath = "/dev/nvhost-prof-gpu"; isReadOnly = false; };
     };
   });
 }
