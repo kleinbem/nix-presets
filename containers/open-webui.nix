@@ -42,6 +42,19 @@ in
       default = false;
       description = "Enable /dev/video* hardware pass-through for direct webcam integration.";
     };
+    oidc = {
+      enable = lib.mkEnableOption "Open WebUI login via Authentik OIDC (nix/infra/authentik.tf's open_webui Provider)";
+      clientId = lib.mkOption {
+        type = lib.types.str;
+        default = "open-webui";
+        description = "OAuth2 Client ID registered with Authentik";
+      };
+      issuerUrl = lib.mkOption {
+        type = lib.types.str;
+        default = "https://auth.kleinbem.dev/application/o/open-webui/.well-known/openid-configuration";
+        description = "OpenID Connect discovery endpoint URL";
+      };
+    };
   }
   // tlsOpts;
 
@@ -64,6 +77,15 @@ in
           OLLAMA_BASE_URL = cfg.ollamaUrl;
           OPENAI_API_BASE_URL = "https://litellm.internal"; # Use the new "Pro" gateway
           WEBUI_AUTH = "True";
+        }
+        // lib.optionalAttrs cfg.oidc.enable {
+          WEBUI_URL = "https://chat.kleinbem.dev";
+          ENABLE_OAUTH_SIGNUP = "true";
+          OAUTH_MERGE_ACCOUNTS_BY_EMAIL = "true";
+          OPENID_PROVIDER_URL = cfg.oidc.issuerUrl;
+          OAUTH_CLIENT_ID = cfg.oidc.clientId;
+          OAUTH_PROVIDER_NAME = "Authentik";
+          OAUTH_SCOPES = "openid email profile";
         };
       };
       systemd.services.open-webui.serviceConfig = {
