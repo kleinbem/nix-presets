@@ -60,20 +60,62 @@ in
     name = "llama-cpp";
     cfg = cfg // {
       extraAllowedDevices = [
-        { node = "/dev/nvmap"; modifier = "rw"; }
-        { node = "/dev/dri"; modifier = "rw"; }
-        { node = "/dev/dri/renderD128"; modifier = "rw"; }
-        { node = "/dev/dri/card0"; modifier = "rw"; }
-        { node = "/dev/nvgpu/igpu0/as"; modifier = "rw"; }
-        { node = "/dev/nvgpu/igpu0/channel"; modifier = "rw"; }
-        { node = "/dev/nvgpu/igpu0/ctrl"; modifier = "rw"; }
-        { node = "/dev/nvgpu/igpu0/power"; modifier = "rw"; }
-        { node = "/dev/nvgpu/igpu0/sched"; modifier = "rw"; }
-        { node = "/dev/nvgpu/igpu0/tsg"; modifier = "rw"; }
-        { node = "/dev/nvhost-ctrl-gpu"; modifier = "rw"; }
-        { node = "/dev/nvhost-gpu"; modifier = "rw"; }
-        { node = "/dev/nvhost-as-gpu"; modifier = "rw"; }
-        { node = "/dev/nvhost-prof-gpu"; modifier = "rw"; }
+        {
+          node = "/dev/nvmap";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/dri";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/dri/renderD128";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/dri/card0";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvgpu/igpu0/as";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvgpu/igpu0/channel";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvgpu/igpu0/ctrl";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvgpu/igpu0/power";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvgpu/igpu0/sched";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvgpu/igpu0/tsg";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvhost-ctrl-gpu";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvhost-gpu";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvhost-as-gpu";
+          modifier = "rw";
+        }
+        {
+          node = "/dev/nvhost-prof-gpu";
+          modifier = "rw";
+        }
       ];
     };
 
@@ -123,7 +165,10 @@ in
 
           # Hardening & Minimalism
           DynamicUser = true;
-          SupplementaryGroups = [ "video" "render" ];
+          SupplementaryGroups = [
+            "video"
+            "render"
+          ];
           PrivateTmp = true;
           ProtectSystem = "strict";
           ProtectHome = true;
@@ -150,16 +195,46 @@ in
         hostPath = "/dev/nvmap";
         isReadOnly = false;
       };
-      "/dev/nvgpu/igpu0/as" = { hostPath = "/dev/nvgpu/igpu0/as"; isReadOnly = false; };
-      "/dev/nvgpu/igpu0/channel" = { hostPath = "/dev/nvgpu/igpu0/channel"; isReadOnly = false; };
-      "/dev/nvgpu/igpu0/ctrl" = { hostPath = "/dev/nvgpu/igpu0/ctrl"; isReadOnly = false; };
-      "/dev/nvgpu/igpu0/power" = { hostPath = "/dev/nvgpu/igpu0/power"; isReadOnly = false; };
-      "/dev/nvgpu/igpu0/sched" = { hostPath = "/dev/nvgpu/igpu0/sched"; isReadOnly = false; };
-      "/dev/nvgpu/igpu0/tsg" = { hostPath = "/dev/nvgpu/igpu0/tsg"; isReadOnly = false; };
-      "/dev/nvhost-ctrl-gpu" = { hostPath = "/dev/nvhost-ctrl-gpu"; isReadOnly = false; };
-      "/dev/nvhost-gpu" = { hostPath = "/dev/nvhost-gpu"; isReadOnly = false; };
-      "/dev/nvhost-as-gpu" = { hostPath = "/dev/nvhost-as-gpu"; isReadOnly = false; };
-      "/dev/nvhost-prof-gpu" = { hostPath = "/dev/nvhost-prof-gpu"; isReadOnly = false; };
+      "/dev/nvgpu/igpu0/as" = {
+        hostPath = "/dev/nvgpu/igpu0/as";
+        isReadOnly = false;
+      };
+      "/dev/nvgpu/igpu0/channel" = {
+        hostPath = "/dev/nvgpu/igpu0/channel";
+        isReadOnly = false;
+      };
+      "/dev/nvgpu/igpu0/ctrl" = {
+        hostPath = "/dev/nvgpu/igpu0/ctrl";
+        isReadOnly = false;
+      };
+      "/dev/nvgpu/igpu0/power" = {
+        hostPath = "/dev/nvgpu/igpu0/power";
+        isReadOnly = false;
+      };
+      "/dev/nvgpu/igpu0/sched" = {
+        hostPath = "/dev/nvgpu/igpu0/sched";
+        isReadOnly = false;
+      };
+      "/dev/nvgpu/igpu0/tsg" = {
+        hostPath = "/dev/nvgpu/igpu0/tsg";
+        isReadOnly = false;
+      };
+      "/dev/nvhost-ctrl-gpu" = {
+        hostPath = "/dev/nvhost-ctrl-gpu";
+        isReadOnly = false;
+      };
+      "/dev/nvhost-gpu" = {
+        hostPath = "/dev/nvhost-gpu";
+        isReadOnly = false;
+      };
+      "/dev/nvhost-as-gpu" = {
+        hostPath = "/dev/nvhost-as-gpu";
+        isReadOnly = false;
+      };
+      "/dev/nvhost-prof-gpu" = {
+        hostPath = "/dev/nvhost-prof-gpu";
+        isReadOnly = false;
+      };
     };
   });
 }

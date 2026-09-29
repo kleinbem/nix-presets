@@ -14,6 +14,10 @@ in
         "systemd"
         "processes"
       ];
+      extraFlags = [
+        "--collector.systemd.enable-restarts-metrics"
+        "--collector.systemd.enable-start-time-metrics"
+      ];
       port = 9100;
     };
 

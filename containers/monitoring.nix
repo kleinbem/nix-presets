@@ -73,6 +73,23 @@ in
         '';
       };
     };
+    ntfy = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Forward Alertmanager alerts to ntfy via alertmanager-ntfy";
+      };
+      url = lib.mkOption {
+        type = lib.types.str;
+        default = "https://ntfy.kleinbem.dev";
+        description = "ntfy server URL";
+      };
+      topic = lib.mkOption {
+        type = lib.types.str;
+        default = "alerts";
+        description = "ntfy topic for monitoring alerts";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable (
@@ -184,31 +201,60 @@ in
               };
             };
 
-            prometheus.alertmanager = {
-              enable = true;
-              port = 9093;
-              configuration = {
-                route = {
-                  receiver = "default";
-                  group_by = [ "alertname" ];
-                  group_wait = "30s";
-                  group_interval = "5m";
-                  repeat_interval = "12h";
+            prometheus = {
+              alertmanager-ntfy = lib.mkIf cfg.ntfy.enable {
+                enable = true;
+                settings = {
+                  http.addr = "127.0.0.1:8000";
+                  ntfy = {
+                    baseurl = cfg.ntfy.url;
+                    notification = {
+                      topic = cfg.ntfy.topic;
+                    };
+                  };
                 };
-                receivers = [
-                  {
-                    name = "default";
-                  }
-                ];
               };
-            };
 
-            # GitHub Actions metrics: json-exporter scrapes the GitHub REST API
-            # (config + bearer token come from cfg.githubMetrics.configFile, bind-mounted).
-            prometheus.exporters.json = lib.mkIf cfg.githubMetrics.enable {
-              enable = true;
-              inherit (cfg.githubMetrics) port;
-              configFile = "/etc/json-exporter.yml";
+              alertmanager = {
+                enable = true;
+                port = 9093;
+                configuration = {
+                  route = {
+                    receiver = if cfg.ntfy.enable then "ntfy" else "default";
+                    group_by = [
+                      "alertname"
+                      "instance"
+                    ];
+                    group_wait = "30s";
+                    group_interval = "5m";
+                    repeat_interval = "4h";
+                  };
+                  receivers = [
+                    {
+                      name = "default";
+                    }
+                  ]
+                  ++ lib.optionals cfg.ntfy.enable [
+                    {
+                      name = "ntfy";
+                      webhook_configs = [
+                        {
+                          url = "http://127.0.0.1:8000/";
+                          send_resolved = true;
+                        }
+                      ];
+                    }
+                  ];
+                };
+              };
+
+              # GitHub Actions metrics: json-exporter scrapes the GitHub REST API
+              # (config + bearer token come from cfg.githubMetrics.configFile, bind-mounted).
+              exporters.json = lib.mkIf cfg.githubMetrics.enable {
+                enable = true;
+                inherit (cfg.githubMetrics) port;
+                configFile = "/etc/json-exporter.yml";
+              };
             };
           };
 
@@ -330,6 +376,24 @@ in
                       annotations:
                         summary: "High load on {{ $labels.instance }}"
                         description: "1-min load above 6 for 10 minutes."
+                - name: systemd-services
+                  rules:
+                    - alert: ServiceFlapping
+                      expr: 'increase(node_systemd_service_restart_total[10m]) > 3'
+                      for: 1m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Service {{ $labels.name }} is crash-looping on {{ $labels.instance }}"
+                        description: "Service {{ $labels.name }} has restarted {{ $value | printf \"%.0f\" }} times in the last 10 minutes."
+                    - alert: SystemdUnitFailed
+                      expr: 'node_systemd_unit_state{state="failed"} == 1'
+                      for: 2m
+                      labels:
+                        severity: critical
+                      annotations:
+                        summary: "Systemd unit {{ $labels.name }} failed on {{ $labels.instance }}"
+                        description: "Systemd unit {{ $labels.name }} on {{ $labels.instance }} has entered failed state."
             '';
           };
 
