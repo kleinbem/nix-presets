@@ -47,6 +47,11 @@ in
       default = 11434;
       description = "Host port to forward to the container.";
     };
+    enableCuda = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Enable CUDA acceleration. Defaults to false on Jetson to avoid PTX toolchain mismatch between CUDA 12.9 and driver 540.5.0.";
+    };
   }
   // tlsOpts;
 
@@ -96,6 +101,9 @@ in
         description = "Ultra-lean llama.cpp server";
         after = [ "network.target" ];
         wantedBy = [ "multi-user.target" ];
+        environment = lib.optionalAttrs (!cfg.enableCuda) {
+          CUDA_VISIBLE_DEVICES = "";
+        };
 
         serviceConfig = {
           # Run directly with optimized flags
@@ -104,7 +112,7 @@ in
             + "--model /models/model.gguf "
             + "--host 0.0.0.0 "
             + "--port 11434 "
-            + "--n-gpu-layers ${toString cfg.gpuLayers} "
+            + (if cfg.enableCuda then "--n-gpu-layers ${toString cfg.gpuLayers} " else "--n-gpu-layers 0 ")
             + "--ctx-size ${toString cfg.contextSize} "
             + "--flash-attn auto "
             + "--cache-type-k q4_0 " # KV Cache quantization (essential for 8GB)
