@@ -23,8 +23,9 @@ let
   # nix-presets is a store-fetched flake input; (2) those fields live in
   # kleinbem-secrets/personas/contact.nix, not the public manifest.
   # Accounts are instead created imperatively by
-  # nix-config/scripts/persona-scaffold.sh (step 6:
-  # `stalwart-cli account create <email> <full-name>`). The internal
+  # nix-config/scripts/persona-scaffold.sh (step 6: POST /api/principal
+  # inside the container via curl — NOT stalwart-cli, which is
+  # schema-driven and incompatible with this pinned 0.15.5). The internal
   # directory is persistent by default — the NixOS `services.stalwart`
   # module already sets `storage.data = "db"` (RocksDB under the data
   # dir), `directory.internal.type = "internal"`, `.store = "db"` and
