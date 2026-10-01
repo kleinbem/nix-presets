@@ -1,6 +1,6 @@
 # Buzz (Block/Jack Dorsey) — Nostr-based team chat + git + AI-agent
 # workspace, self-hosted natively (no Docker/Podman): the relay binary is
-# built from source (pkgs/buzz-relay.nix) and Postgres/Redis/Typesense/Garage
+# built from pkgs.buzz-relay and Postgres/Redis/Typesense/Garage
 # all run as ordinary NixOS services inside this one container. Deliberately
 # NOT using enableNesting + Podman's dockerCompat the way langfuse/anythingllm/
 # ente do — Buzz is ~10 days old at time of writing (2026-07-31) and pulling
@@ -26,7 +26,7 @@ let
   cfg = config.my.containers.buzz;
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
-  buzzRelay = pkgs.callPackage ../pkgs/buzz-relay.nix { };
+  buzzRelay = cfg.package;
 
   # Evaluated by the CONSUMING host (nixos-nvme, etc.), not baked into the
   # container-factory build — see the comment on RELAY_URL's removal from
@@ -38,6 +38,7 @@ in
 {
   options.my.containers.buzz = {
     enable = lib.mkEnableOption "Buzz (Nostr chat/git/agent workspace) Container";
+    package = lib.mkPackageOption pkgs "buzz-relay" { };
     ip = lib.mkOption { type = lib.types.str; };
     hostDataDir = lib.mkOption { type = lib.types.str; };
     memoryLimit = lib.mkOption {
