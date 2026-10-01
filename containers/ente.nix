@@ -1,4 +1,4 @@
-{ self, inputs }:
+{ self, ... }:
 {
   config,
   lib,
@@ -98,34 +98,32 @@ in
         # this way; museum itself no longer does (see below).
         usesPodman = true;
         innerConfig = {
-          # museum itself is a native Nix package (nix-packages' ente-museum),
-          # not a podman container — ghcr.io/ente-io/server went to a bare 403
-          # Forbidden (confirmed live 2026-09-24, even listing tags), and
-          # ente's own compose.yaml no longer references a prebuilt image at
-          # all (`build: context: .`). A source build sidesteps depending on
-          # any registry's continued goodwill entirely — see
-          # nix-packages/pkgs/ente-museum's own doc comment for the pin/bump
-          # procedure.
-          imports = [ inputs.nix-packages.nixosModules.ente-museum ];
-          nixpkgs.overlays = [ inputs.nix-packages.overlays.default ];
-
-          # Native museum process. Reaches Postgres/MinIO via localhost, which
-          # needs those podman containers on host networking (same reason
-          # authentik.nix's native Postgres needs its podman containers on
-          # --network=host — a name-based podman-internal DNS lookup like
-          # "postgres"/"minio" only resolves between containers on podman's
-          # own bridge network, not from a plain host-side systemd service).
-          services.ente-museum = {
+          # Native museum process from nixpkgs (services.ente.api / pkgs.museum).
+          # Reaches Postgres/MinIO via localhost, which needs those podman
+          # containers on host networking (same reason authentik.nix's native
+          # Postgres needs its podman containers on --network=host).
+          services.ente.api = {
             enable = true;
-            db = {
-              host = "localhost";
-              user = pgUser;
+            inherit (cfg) domain;
+            settings = {
+              db = {
+                host = "localhost";
+                port = 5432;
+                name = "ente_db";
+                user = pgUser;
+                sslmode = "disable";
+              };
+              s3 = {
+                are_local_buckets = true;
+                use_path_style_urls = true;
+                b2-eu-cen = {
+                  endpoint = "http://localhost:3200";
+                  region = "us-east-1";
+                  bucket = "ente";
+                  key = "admin";
+                };
+              };
             };
-            s3 = {
-              endpoint = "localhost:3200";
-              bucket = "ente";
-            };
-            environmentFile = "/run/ente.env";
           };
 
           virtualisation.oci-containers = {
@@ -206,7 +204,7 @@ in
                 before = [
                   "podman-postgres.service"
                   "podman-minio.service"
-                  "ente-museum.service"
+                  "ente.service"
                 ];
                 serviceConfig.Type = "oneshot";
                 script = ''
@@ -238,7 +236,7 @@ in
                 '';
               };
 
-              ente-museum = {
+              ente = {
                 after = [
                   "ente-env-setup.service"
                   "podman-postgres.service"
@@ -249,6 +247,7 @@ in
                   "podman-postgres.service"
                   "podman-minio.service"
                 ];
+                serviceConfig.EnvironmentFile = [ "-/run/ente.env" ];
               };
 
               "podman-postgres" = {
