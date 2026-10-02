@@ -25,9 +25,12 @@ in
     enable = lib.mkEnableOption "Ente Auth Container";
     ip = lib.mkOption { type = lib.types.str; };
     hostDataDir = lib.mkOption { type = lib.types.str; };
+    # No default: the old "auth.kleinbem.dev" one went stale when Authentik
+    # took that hostname (ente moved to 2fa.kleinbem.dev, 2026-09-21) and
+    # silently baked the wrong origin into museum's WebAuthn config.
     domain = lib.mkOption {
       type = lib.types.str;
-      default = "auth.kleinbem.dev";
+      description = "Public hostname of the museum API (e.g. 2fa.example.com); also its WebAuthn RP ID.";
     };
     memoryLimit = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
@@ -125,6 +128,16 @@ in
               enableLocalDB = true;
               inherit (cfg) domain;
               settings = {
+                # Upstream only sets webauthn from services.ente.web's
+                # accounts domain; without the web app it stays empty and
+                # museum panics on start ("the field 'RPID' must be
+                # configured"). Its generated local.yaml replaces museum's
+                # bundled one wholesale, so the bundled localhost defaults
+                # don't apply either.
+                webauthn = {
+                  rpid = cfg.domain;
+                  rporigins = [ "https://${cfg.domain}" ];
+                };
                 s3 = {
                   are_local_buckets = true;
                   use_path_style_urls = true;
