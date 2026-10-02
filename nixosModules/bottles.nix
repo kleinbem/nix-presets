@@ -9,17 +9,9 @@ let
   cfg = config.my.desktop.bottles;
 in
 {
+  # Tuned for running Windows *applications*, not games: no GameMode/renice.
   options.my.desktop.bottles = {
     enable = lib.mkEnableOption "Bottles (Wine prefix manager) for running Windows executables";
-
-    gamemodeUsers = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ ];
-      description = ''
-        Users added to the `gamemode` group, which gamemoded requires before it
-        will renice processes. Toggle GameMode per bottle in its settings.
-      '';
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -32,24 +24,16 @@ in
       pkgs.vulkan-tools # vulkaninfo, to check DXVK/VKD3D have a usable device
     ];
 
-    # Most Windows software is still 32-bit, and DXVK/VKD3D need the 32-bit
-    # Vulkan ICD too.
+    # Many installers and older apps are 32-bit, and Wine's Direct3D-on-Vulkan
+    # layers (DXVK/VKD3D) need the 32-bit Vulkan ICD for them.
     hardware.graphics = {
       enable = true;
       enable32Bit = true;
     };
 
     # Wine 10+ runners use /dev/ntsync for NT sync primitives (faster and more
-    # correct than esync/fsync). Harmless where it's built in (=y).
+    # correct than esync/fsync for multithreaded apps). Harmless where it's
+    # built in (=y).
     boot.kernelModules = [ "ntsync" ];
-
-    programs.gamemode = {
-      enable = true;
-      settings.general = {
-        renice = 10;
-        inhibit_screensaver = 1;
-      };
-    };
-    users.groups.gamemode.members = cfg.gamemodeUsers;
   };
 }
