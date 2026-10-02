@@ -162,6 +162,10 @@ in
             # see this container's own 127.0.0.1) can reach it.
             services.postgresql = {
               enable = true;
+              # Major pinned: an unpinned default changes under a nixpkgs bump
+              # and Postgres then refuses to start on the existing datadir
+              # (live datadir is 17, checked 2026-10-02).
+              package = pkgs.postgresql_17;
               enableTCPIP = true;
               ensureDatabases = [ "authentik" ];
               ensureUsers = [

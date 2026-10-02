@@ -36,6 +36,8 @@ let
   relayUrlEnvFile = pkgs.writeText "buzz-relay-url.env" "RELAY_URL=${cfg.relayUrl}\n";
 in
 {
+  imports = [ ../nixosModules/backup-engine ];
+
   options.my.containers.buzz = {
     enable = lib.mkEnableOption "Buzz (Nostr chat/git/agent workspace) Container";
     package = lib.mkPackageOption pkgs "buzz-relay" { };
@@ -434,6 +436,27 @@ in
           };
         };
       })
+      {
+        # db → secure. Git repos + Garage objects → bulk; Garage's metadata
+        # is a live SQLite db (db_engine = "sqlite" above), so it's copied
+        # via .backup and the live files are excluded. Redis (cache) and
+        # Typesense (search index, rebuildable from Postgres) are skipped.
+        my.backup.items = {
+          buzz-db = {
+            tier = "secure";
+            postgres = [ { machine = "buzz"; } ];
+          };
+          buzz-data = {
+            tier = "bulk";
+            paths = [
+              "${cfg.hostDataDir}/relay"
+              "${cfg.hostDataDir}/garage"
+            ];
+            exclude = [ "${cfg.hostDataDir}/garage/meta/db.sqlite*" ];
+            sqlite = [ "${cfg.hostDataDir}/garage/meta/db.sqlite" ];
+          };
+        };
+      }
     ]
   );
 }
