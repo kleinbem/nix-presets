@@ -101,9 +101,15 @@
 
       # GIMP 3 only loads plugins that are executable and live in a folder of
       # the same name; pull the plugin out of the sdist and mark it executable.
+      # nixpkgs GIMP ships no pygimp.interp, so `#!/usr/bin/env python3` would
+      # pick up a Python without PyGObject and GIMP silently drops the plugin.
+      # Pin the shebang to the same python+pygobject3 env GIMP's bundled
+      # plugins use; GIMP's wrapper supplies GI_TYPELIB_PATH for Gimp-3.0.
+      gimpPython = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
       gimp3McpPlugin = pkgs.runCommand "gimp3-mcp-plugin" { } ''
         mkdir -p $out
         tar -xzf ${gimp3McpPkg.src} --strip-components=1 -C $out gimp3_mcp-${gimp3McpPkg.version}/gimp-mcp-plugin.py
+        sed -i '1s|^#!.*|#!${gimpPython.interpreter}|' $out/gimp-mcp-plugin.py
         chmod 755 $out/gimp-mcp-plugin.py
       '';
     in
