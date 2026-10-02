@@ -58,7 +58,15 @@
         description = "Enable official Svelte 5 & SvelteKit documentation MCP server (@sveltejs/mcp)";
       };
     };
+    buzz = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable Buzz developer MCP server (buzz-dev-mcp) for workspace AI coding agents";
+      };
+    };
   };
+
 
   config = lib.mkIf config.modules.mcp.enable (
     let
@@ -247,8 +255,15 @@
                     "@sveltejs/mcp"
                   ];
                 };
+              })
+              // (lib.optionalAttrs config.modules.mcp.buzz.enable {
+                buzz = {
+                  command = lib.getExe pkgs.buzz-dev-mcp;
+                  args = [ ];
+                };
               });
             };
+
             mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
           in
           lib.hm.dag.entryAfter [ "writeBoundary" ] ''
