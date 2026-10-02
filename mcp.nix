@@ -67,7 +67,6 @@
     };
   };
 
-
   config = lib.mkIf config.modules.mcp.enable (
     let
       freecad-mcp-src = pkgs.fetchFromGitHub {
