@@ -100,27 +100,11 @@ in
             # version is pinned: an unpinned default changes under a nixpkgs
             # bump and Postgres then refuses to start on the old datadir.
             #
-            # ONE-TIME MIGRATION from the legacy podman datadir
-            # (/var/lib/ente/postgres — PG15 on musl; not reusable in place:
-            # different major, and musl→glibc collation differences can
-            # silently corrupt text indexes, so dump+restore, never copy).
-            # `ente` refuses to start while that dir still has a PG_VERSION
-            # (ExecStartPre guard below), so museum can never run its
-            # migrations against the new, empty cluster by accident.
-            #
-            # Done on core-pi 2026-10-02 as a FRESH START, not a restore: the
-            # legacy db had 0 users/0 authenticator entries, and its schema
-            # was at migration 146 (from the old self-built museum) while
-            # nixpkgs' museum 1.3.63 only ships up to 140 — golang-migrate
-            # then panics "setupDatabase file does not exist", which is what
-            # had museum crash-looping since the nixpkgs switch. Restoring
-            # that dump would re-create the same crash. Archive dump:
-            # /var/lib/ente/postgres.legacy-pg15/ente_db.pgdump.
-            #
-            # If this ever has to be redone WITH data: pg_dump from the old
-            # cluster, then `runuser -u postgres -- pg_restore --no-owner
-            # --role=ente -d ente < dump` — but only if the packaged museum's
-            # migrations reach the dump's schema_migrations version.
+            # Migrated 2026-10-02 as a fresh db (the old one had no users).
+            # Trap for any future museum package swap: museum refuses to start
+            # ("setupDatabase file does not exist") when the db's
+            # schema_migrations version is newer than the highest file in the
+            # package's share/museum/migrations — check before downgrading.
             services.postgresql.package = pkgs.postgresql_17;
 
             services.ente.api = {
@@ -253,23 +237,7 @@ in
                     "ente-env-setup.service"
                     "podman-minio.service"
                   ];
-                  serviceConfig = {
-                    EnvironmentFile = [ "-/run/ente.env" ];
-                    # Legacy-datadir guard — see the migration notes above
-                    # services.ente.api. "+" = runs as root, outside the unit's
-                    # sandbox: the legacy dir is 0700 to the alpine image's
-                    # uid, so as museum's own user the -e test would always be
-                    # false and the guard a silent no-op.
-                    ExecStartPre = lib.mkBefore [
-                      "+${pkgs.writeShellScript "ente-legacy-pg-guard" ''
-                        if [ -e /var/lib/ente/postgres/PG_VERSION ]; then
-                          echo "ente: legacy podman Postgres datadir /var/lib/ente/postgres still present;" >&2
-                          echo "ente: migrate it first (containers/ente.nix migration notes), then move it aside." >&2
-                          exit 1
-                        fi
-                      ''}"
-                    ];
-                  };
+                  serviceConfig.EnvironmentFile = [ "-/run/ente.env" ];
                 };
                 "podman-minio" = {
                   after = [ "ente-env-setup.service" ];
