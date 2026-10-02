@@ -37,6 +37,13 @@
         description = "Enable Blender MCP Server for organic 3D modeling";
       };
     };
+    gimp = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable GIMP 3 MCP Server (gimp3-mcp) for AI-driven photo editing";
+      };
+    };
     openscad = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -74,6 +81,31 @@
         ];
         meta.mainProgram = "freecad-mcp";
       };
+
+      # Two halves: the MCP server (stdio, started by the AI client) and a
+      # GIMP plugin that listens on localhost:9877 once started via
+      # Tools > MCP > Start MCP Server.
+      gimp3McpPkg = pkgs.python3.pkgs.buildPythonPackage rec {
+        pname = "gimp3-mcp";
+        version = "0.2.0";
+        pyproject = true;
+        src = pkgs.fetchPypi {
+          pname = "gimp3_mcp";
+          inherit version;
+          sha256 = "39514a83dabb29941c4e8891a5a829850dee71707fca6b91b0fcec1304818879";
+        };
+        nativeBuildInputs = [ pkgs.python3.pkgs.hatchling ];
+        propagatedBuildInputs = [ pkgs.python3.pkgs.mcp ];
+        meta.mainProgram = "gimp3-mcp";
+      };
+
+      # GIMP 3 only loads plugins that are executable and live in a folder of
+      # the same name; pull the plugin out of the sdist and mark it executable.
+      gimp3McpPlugin = pkgs.runCommand "gimp3-mcp-plugin" { } ''
+        mkdir -p $out
+        tar -xzf ${gimp3McpPkg.src} --strip-components=1 -C $out gimp3_mcp-${gimp3McpPkg.version}/gimp-mcp-plugin.py
+        chmod 755 $out/gimp-mcp-plugin.py
+      '';
     in
     {
       home = {
@@ -93,10 +125,18 @@
               psutil
             ]
           ))
-        ];
+        ]
+        ++ lib.optional config.modules.mcp.gimp.enable pkgs.gimp3;
 
-        # Install FreeCAD MCP Addon declaratively
-        file.".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecad-mcp-src}/addon/FreeCADMCP";
+        file = {
+          # Install FreeCAD MCP Addon declaratively
+          ".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecad-mcp-src}/addon/FreeCADMCP";
+        }
+        // lib.optionalAttrs config.modules.mcp.gimp.enable {
+          # GIMP keeps a settings folder per minor version (e.g. 3.2)
+          ".config/GIMP/${lib.versions.majorMinor pkgs.gimp3.version}/plug-ins/gimp-mcp-plugin/gimp-mcp-plugin.py".source =
+            "${gimp3McpPlugin}/gimp-mcp-plugin.py";
+        };
 
         # ---------------------------------------------------------
         # Editor & AI Assistant (Claude, Antigravity, Roo-Cline, etc.) Integration
@@ -176,6 +216,12 @@
                     "-y"
                     "blender-mcp"
                   ];
+                };
+              })
+              // (lib.optionalAttrs config.modules.mcp.gimp.enable {
+                gimp = {
+                  command = lib.getExe gimp3McpPkg;
+                  args = [ ];
                 };
               })
               // (lib.optionalAttrs config.modules.mcp.openscad.enable {
