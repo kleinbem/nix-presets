@@ -217,7 +217,6 @@
               ntfy = import ./containers/ntfy.nix { inherit self; };
               stalwart = import ./containers/stalwart.nix { inherit self; };
               authentik = import ./containers/authentik.nix { inherit self; };
-              odoo = import ./containers/odoo.nix { inherit self; };
               nextcloud = import ./containers/nextcloud.nix { inherit self; };
               playground = import ./containers/playground.nix { inherit self; };
               frigate = import ./containers/frigate.nix { inherit self; };
