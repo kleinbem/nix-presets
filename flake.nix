@@ -239,6 +239,7 @@
               netdata = import ./containers/netdata.nix { inherit self; };
               android-emulator = import ./nixosModules/android-emulator.nix;
               claude = import ./nixosModules/claude.nix;
+              bottles = import ./nixosModules/bottles.nix;
 
               home-assistant = import ./containers/home-assistant.nix { inherit self; };
               syncthing = import ./containers/syncthing.nix { inherit self; };
