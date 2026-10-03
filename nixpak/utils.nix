@@ -78,11 +78,14 @@ rec {
           gpu.enable = true;
           bubblewrap.bind.ro = [ "/sys/class/drm" ];
         };
+        # pulse/native (pipewire-pulse) is what Chromium/Electron actually
+        # play and record through; pipewire-0 alone means silent apps.
         audio =
           { sloth, ... }:
           {
             bubblewrap.bind.rw = [
               (sloth.concat' sloth.runtimeDir "/pipewire-0")
+              (sloth.concat' sloth.runtimeDir "/pulse/native")
             ];
           };
         usb = {
