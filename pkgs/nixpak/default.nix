@@ -14,6 +14,7 @@ in
 {
   bitwarden = call ./bitwarden.nix;
   discord = call ./discord.nix;
+  element-desktop = call ./element.nix;
   github-desktop = call ./github-desktop.nix;
   lmstudio = call ./lmstudio.nix;
   mpv = call ./mpv.nix;

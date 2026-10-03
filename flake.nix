@@ -27,6 +27,9 @@
     };
     nix-packages.url = "github:kleinbem/nix-packages";
     nix-packages.inputs.nixpkgs.follows = "nixpkgs";
+    # bubblewrap sandboxes for desktop apps (pkgs/nixpak/, desktop.nix)
+    nixpak.url = "github:nixpak/nixpak";
+    nixpak.inputs.nixpkgs.follows = "nixpkgs";
     nix-gantry.url = "github:kleinbem/nix-gantry";
     nix-gantry.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -162,6 +165,12 @@
             antigravity-extensions-bundle = bundles.antigravity;
             cursor-extensions-bundle = bundles.cursor;
             windsurf-extensions-bundle = bundles.windsurf;
+            # Standalone build target for the sandbox desktop.nix installs.
+            element-desktop-sandboxed =
+              (import ./nixpak/apps.nix {
+                inherit pkgs;
+                inherit (inputs) nixpak;
+              }).element-desktop;
           };
         };
 
@@ -278,7 +287,12 @@
           opencode = import ./opencode.nix;
           terminal = import ./terminal.nix;
           vcs = import ./vcs.nix;
-          desktop = import ./desktop.nix;
+          # nixpak handed in as a module arg: desktop.nix installs nixpak
+          # sandboxes, and home-manager modules can't see flake inputs.
+          desktop = {
+            imports = [ ./desktop.nix ];
+            _module.args.nixpak = inputs.nixpak;
+          };
           dx = import ./dx.nix;
           herdr = import ./herdr.nix;
           mcp = import ./mcp.nix;

@@ -1,10 +1,13 @@
 {
   pkgs,
   lib,
+  nixpak,
   ...
 }:
 
 let
+  sandboxed = import ./nixpak/apps.nix { inherit pkgs nixpak; };
+
   commonData = import ./code-common/settings.nix;
 
   # The Unified "Code Family" — bundles are built and synced independently
@@ -75,6 +78,7 @@ in
       # --- Communication ---
       discord
       signal-desktop
+      sandboxed.element-desktop # nixpak (bubblewrap) sandbox, see pkgs/nixpak/element.nix
 
       # -- Apps (Sandboxed via Firejail on host) --
       obsidian

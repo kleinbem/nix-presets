@@ -41,17 +41,22 @@ rec {
         network = {
           bubblewrap.network = true;
         };
+        # Native Wayland only: just the compositor socket, no X11
+        # (/tmp is a private tmpfs, so /tmp/.X11-unix isn't reachable).
         wayland =
           { sloth, ... }:
           {
             bubblewrap.bind.rw = [
-              "/tmp/.X11-unix"
+              (sloth.concat [
+                sloth.runtimeDir
+                "/"
+                (sloth.env "WAYLAND_DISPLAY")
+              ])
             ];
             bubblewrap.env = {
               NIXOS_OZONE_WL = "1";
               XDG_SESSION_TYPE = "wayland";
               WAYLAND_DISPLAY = sloth.env "WAYLAND_DISPLAY";
-              DISPLAY = sloth.env "DISPLAY";
             };
           };
         dbus =
@@ -61,14 +66,12 @@ rec {
               DBUS_SESSION_BUS_ADDRESS = sloth.env "DBUS_SESSION_BUS_ADDRESS";
             };
           };
+        # nixpak's own module (provider "nixos"): /dev/dri plus the
+        # /sys/dev/char + /sys/devices/pci0000:00 entries libdrm needs to
+        # enumerate devices — /sys/class/drm alone is just dangling symlinks.
         gpu = {
-          bubblewrap.bind = {
-            dev = [ "/dev/dri" ];
-            ro = [
-              "/run/opengl-driver"
-              "/sys/class/drm"
-            ];
-          };
+          gpu.enable = true;
+          bubblewrap.bind.ro = [ "/sys/class/drm" ];
         };
         audio =
           { sloth, ... }:
@@ -120,20 +123,44 @@ rec {
                   app.binPath = binPath;
                   flatpak.appId = "com.sandboxed.${name}";
 
-                  # Base binds that everyone needs
-                  bubblewrap.bind.ro = [
-                    "/etc/fonts"
-                    "/etc/ssl/certs"
-                    "/etc/profiles/per-user"
-                    "/run/dbus"
-                    (sloth.concat' sloth.homeDir "/.icons")
-                  ];
+                  bubblewrap = {
+                    # Base binds that everyone needs
+                    bind.ro = [
+                      "/etc/fonts"
+                      "/etc/ssl/certs"
+                      "/etc/profiles/per-user"
+                      "/run/dbus"
+                      (sloth.concat' sloth.homeDir "/.icons")
+                    ];
 
-                  bubblewrap.bind.rw = [
-                    (sloth.env "XDG_RUNTIME_DIR")
-                    "/tmp"
-                    (sloth.concat' sloth.homeDir "/.config/${configDir}")
-                  ];
+                    # Deliberately NOT the whole $XDG_RUNTIME_DIR: it holds the
+                    # raw session bus (bypassing nixpak's filtered xdg-dbus-proxy,
+                    # which is on by default — grant names via dbus.policies),
+                    # ssh-agent, gnupg and podman sockets. Presets bind the
+                    # individual sockets an app needs. /doc is the document
+                    # portal's FUSE mount: file-chooser results land there.
+                    bind.rw = [
+                      (sloth.concat' sloth.runtimeDir "/doc")
+                      (sloth.mkdir (sloth.concat' sloth.homeDir "/.config/${configDir}"))
+                      # Persistent per-app data/cache, the Flatpak layout
+                      # (~/.var/app/<appId>/), since $HOME is otherwise a tmpfs.
+                      # Load-bearing for secrets: inside the flatpak shim libsecret
+                      # goes through the Secret portal, which keeps a per-app
+                      # keyring file under $XDG_DATA_HOME — lose it and apps
+                      # using it (Element's session-key safeStorage) start over.
+                      [
+                        (sloth.mkdir sloth.appDataDir)
+                        sloth.xdgDataHome
+                      ]
+                      [
+                        (sloth.mkdir sloth.appCacheDir)
+                        sloth.xdgCacheHome
+                      ]
+                    ];
+
+                    # Private /tmp instead of the host's shared one.
+                    tmpfs = [ "/tmp" ];
+                  };
                 }
               )
               extraPerms
