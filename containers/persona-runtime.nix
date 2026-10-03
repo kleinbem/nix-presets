@@ -10,6 +10,24 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
+  # Bridge for NixOS/nixpkgs#569679 (merged 2026-10-03): litellm >= 1.101
+  # exports VectorStoreSearchError, and aider's LiteLLMExceptions raises on
+  # any litellm *Error it doesn't list — on every send, not just in its
+  # tests (which is where the build fails). Same patch as upstream; it drops
+  # itself once the pinned nixpkgs carries it, so no cleanup needed.
+  # nix-devshells' shells/default carries the same bridge.
+  aider-chat =
+    if
+      lib.any (p: lib.hasSuffix "add-vector-store-search-error.patch" (toString p)) (
+        pkgs.aider-chat.patches or [ ]
+      )
+    then
+      pkgs.aider-chat
+    else
+      pkgs.aider-chat.overridePythonAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./patches/aider-vector-store-search-error.patch ];
+      });
+
   # tool → {binary inside the container, env var its API key needs to land
   # in}. This is internal knowledge of what this container's own package
   # set provides — the consumer host just says which `tool` a persona
@@ -367,7 +385,7 @@ in
           # wrapper above, which is what actually gets it there.
           environment.systemPackages = [
             pkgs.claude-code
-            pkgs.aider-chat
+            aider-chat
           ];
 
           # NOT programs.git — that bakes a static /etc/gitconfig at build
