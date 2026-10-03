@@ -20,6 +20,11 @@ rec {
       extraBinNames ? [ ],
       resourceLimits ? null,
       displayName ? null,
+      # xdg-dbus-proxy rules (--see/--talk/--call/--broadcast) for a filtered
+      # SYSTEM bus. nixpak only proxies the session bus, and the raw system
+      # socket (system-bus preset) is all-or-nothing; this is the Flatpak
+      # --system-talk-name equivalent, but with method-level rules.
+      systemDbusArgs ? [ ],
     }:
     let
       # Use provided displayName or fallback to package description/name + (Secure)
@@ -117,6 +122,19 @@ rec {
       # Select requested presets
       activePresets = map (p: availablePresets.${p}) presets;
 
+      # The launcher below starts the proxy and exports its socket path.
+      systemBusPerms = pkgs.lib.optional (systemDbusArgs != [ ]) (
+        { sloth, ... }:
+        {
+          bubblewrap.bind.rw = [
+            [
+              (sloth.env "NIXPAK_SYSTEM_BUS")
+              "/run/dbus/system_bus_socket"
+            ]
+          ];
+        }
+      );
+
       sandbox = mkNixPak {
         config =
           { ... }:
@@ -175,33 +193,57 @@ rec {
               )
               extraPerms
             ]
-            ++ activePresets;
+            ++ activePresets
+            ++ systemBusPerms;
           };
       };
 
       # Fixed W04: Assignment instead of inherit
       inherit (sandbox.config) script;
 
+      sandboxCommand =
+        if resourceLimits != null then
+          ''
+            /run/current-system/sw/bin/systemd-run --user --scope \
+              -p CPUQuota=${resourceLimits.cpu} \
+              -p MemoryMax=${resourceLimits.mem} \
+              --description="${name} (Restricted)" \
+              ${script}/bin/${executableName} "$@"''
+        else
+          ''${script}/bin/${executableName} "$@"'';
+
+      # Filtered system bus proxy, living exactly as long as the app: its
+      # --fd end of a fifo is also held by the app (inherited), so the proxy
+      # stops once both the launcher and the app are gone — even on SIGKILL.
+      # The same fd delivers its "ready" byte, so no polling for the socket.
+      launcher = pkgs.writeShellScript "${name}-launcher" (
+        if systemDbusArgs == [ ] then
+          "exec ${sandboxCommand}"
+        else
+          ''
+            dir=$(${pkgs.coreutils}/bin/mktemp -d "$XDG_RUNTIME_DIR/nixpak-system-bus-${name}.XXXXXX")
+            trap '${pkgs.coreutils}/bin/rm -rf "$dir"' EXIT
+            trap 'exit 129' HUP
+            trap 'exit 130' INT
+            trap 'exit 143' TERM
+            ${pkgs.coreutils}/bin/mkfifo "$dir/ready"
+            ${pkgs.xdg-dbus-proxy}/bin/xdg-dbus-proxy --fd=3 \
+              unix:path=/run/dbus/system_bus_socket "$dir/bus" --filter \
+              ${pkgs.lib.escapeShellArgs systemDbusArgs} 3>"$dir/ready" &
+            exec 4<"$dir/ready"
+            ${pkgs.coreutils}/bin/head -c1 <&4 >/dev/null
+            NIXPAK_SYSTEM_BUS="$dir/bus" ${sandboxCommand}
+          ''
+      );
+
     in
     pkgs.runCommand "${name}-sandboxed" { } ''
       mkdir -p $out/bin
       ${
-        if resourceLimits != null then
-          ''
-            cat > $out/bin/${name} <<EOF
-            #!/bin/sh
-            exec /run/current-system/sw/bin/systemd-run --user --scope \\
-              -p CPUQuota=${resourceLimits.cpu} \\
-              -p MemoryMax=${resourceLimits.mem} \\
-              --description="${name} (Restricted)" \\
-              ${script}/bin/${executableName} "\$@"
-            EOF
-            chmod +x $out/bin/${name}
-          ''
+        if resourceLimits == null && systemDbusArgs == [ ] then
+          "ln -s ${script}/bin/${executableName} $out/bin/${name}"
         else
-          ''
-            ln -s ${script}/bin/${executableName} $out/bin/${name}
-          ''
+          "ln -s ${launcher} $out/bin/${name}"
       }
 
       for extraBin in ${toString extraBinNames}; do

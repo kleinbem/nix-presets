@@ -77,7 +77,7 @@ in
 
       # --- Communication ---
       discord
-      signal-desktop
+      sandboxed.signal-desktop # nixpak (bubblewrap) sandbox, see pkgs/nixpak/signal.nix
       sandboxed.element-desktop # nixpak (bubblewrap) sandbox, see pkgs/nixpak/element.nix
 
       # -- Apps (Sandboxed via Firejail on host) --

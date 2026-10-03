@@ -58,6 +58,10 @@
           };
           pkgsWithExts = pkgsUnfree.extend inputs.nix-vscode-extensions.overlays.default;
           bundles = import ./code-common/bundles.nix { pkgs = pkgsWithExts; };
+          sandboxedApps = import ./nixpak/apps.nix {
+            inherit pkgs;
+            inherit (inputs) nixpak;
+          };
         in
         # Custom pkgs for standalone app building (needs unfree + stable alias)
         {
@@ -166,11 +170,8 @@
             cursor-extensions-bundle = bundles.cursor;
             windsurf-extensions-bundle = bundles.windsurf;
             # Standalone build target for the sandbox desktop.nix installs.
-            element-desktop-sandboxed =
-              (import ./nixpak/apps.nix {
-                inherit pkgs;
-                inherit (inputs) nixpak;
-              }).element-desktop;
+            element-desktop-sandboxed = sandboxedApps.element-desktop;
+            signal-desktop-sandboxed = sandboxedApps.signal-desktop;
           };
         };
 
