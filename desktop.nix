@@ -1,13 +1,10 @@
 {
   pkgs,
   lib,
-  nixpak,
   ...
 }:
 
 let
-  sandboxed = import ./nixpak/apps.nix { inherit pkgs nixpak; };
-
   commonData = import ./code-common/settings.nix;
 
   # The Unified "Code Family" — bundles are built and synced independently
@@ -75,10 +72,8 @@ in
       restic-browser # GUI for Restic Backups
       restic # CLI Tool (Required for Restic Browser)
 
-      # --- Communication ---
-      discord
-      sandboxed.signal-desktop # nixpak (bubblewrap) sandbox, see pkgs/nixpak/signal.nix
-      sandboxed.element-desktop # nixpak (bubblewrap) sandbox, see pkgs/nixpak/element.nix
+      # Discord, Signal, Element: nixpak sandboxes, installed system-wide
+      # by nixosModules/sandboxed-apps.nix (my.desktop.sandboxedApps).
 
       # -- Apps (Sandboxed via Firejail on host) --
       obsidian

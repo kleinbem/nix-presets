@@ -59,7 +59,7 @@
           pkgsWithExts = pkgsUnfree.extend inputs.nix-vscode-extensions.overlays.default;
           bundles = import ./code-common/bundles.nix { pkgs = pkgsWithExts; };
           sandboxedApps = import ./nixpak/apps.nix {
-            inherit pkgs;
+            pkgs = pkgsUnfree; # discord
             inherit (inputs) nixpak;
           };
         in
@@ -172,6 +172,7 @@
             # Standalone build target for the sandbox desktop.nix installs.
             element-desktop-sandboxed = sandboxedApps.element-desktop;
             signal-desktop-sandboxed = sandboxedApps.signal-desktop;
+            discord-sandboxed = sandboxedApps.discord;
           };
         };
 
@@ -249,6 +250,7 @@
               android-emulator = import ./nixosModules/android-emulator.nix;
               claude = import ./nixosModules/claude.nix;
               bottles = import ./nixosModules/bottles.nix;
+              sandboxed-apps = import ./nixosModules/sandboxed-apps.nix { inherit inputs; };
 
               home-assistant = import ./containers/home-assistant.nix { inherit self; };
               syncthing = import ./containers/syncthing.nix { inherit self; };
@@ -288,12 +290,7 @@
           opencode = import ./opencode.nix;
           terminal = import ./terminal.nix;
           vcs = import ./vcs.nix;
-          # nixpak handed in as a module arg: desktop.nix installs nixpak
-          # sandboxes, and home-manager modules can't see flake inputs.
-          desktop = {
-            imports = [ ./desktop.nix ];
-            _module.args.nixpak = inputs.nixpak;
-          };
+          desktop = import ./desktop.nix;
           dx = import ./dx.nix;
           herdr = import ./herdr.nix;
           mcp = import ./mcp.nix;
