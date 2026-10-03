@@ -101,6 +101,12 @@ rec {
             ];
           };
         };
+        # Unfiltered system bus (NetworkManager, logind, systemd, ...): many
+        # methods there are allowed for the active session without auth.
+        # Opt-in only; nixpak's proxy filters the session bus, not this one.
+        system-bus = {
+          bubblewrap.bind.ro = [ "/run/dbus" ];
+        };
         discovery = {
           bubblewrap.bind.ro = [
             "/run/avahi-daemon/socket"
@@ -124,12 +130,16 @@ rec {
                   flatpak.appId = "com.sandboxed.${name}";
 
                   bubblewrap = {
+                    # The host PATH (/run/current-system/sw/bin, ...) isn't
+                    # mounted; this makes extraPackages (e.g. the portal
+                    # xdg-open) reachable for apps that exec helpers by name.
+                    env.PATH = "${envPackage}/bin";
+
                     # Base binds that everyone needs
                     bind.ro = [
                       "/etc/fonts"
                       "/etc/ssl/certs"
                       "/etc/profiles/per-user"
-                      "/run/dbus"
                       (sloth.concat' sloth.homeDir "/.icons")
                     ];
 
