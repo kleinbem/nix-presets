@@ -85,6 +85,36 @@ in
     name = "stalwart";
     inherit cfg;
     innerConfig = {
+      # trunk 0.21.14 (builds stalwart's webadmin) fails with GCC 16:
+      # its vendored libdeflate-sys 1.23.1 uses the `evex512` target
+      # attribute GCC 16 removed (NixOS/nixpkgs#569854). Backport of the
+      # upstream fix NixOS/nixpkgs#569964 (Cargo.lock bump to 1.25.2).
+      # Containers evaluate their own nixpkgs, so this can't live in a
+      # host overlay. Self-retiring: skipped once nixpkgs' trunk carries
+      # its own cargoPatches or moves past 0.21.14 — delete this block then.
+      nixpkgs.overlays = [
+        (_final: prev: {
+          trunk =
+            if prev.trunk.version != "0.21.14" || (prev.trunk.cargoPatches or [ ]) != [ ] then
+              prev.trunk
+            else
+              # buildRustPackage folds cargoPatches into `patches` and derives
+              # cargoDeps at call time, so overrideAttrs must set both
+              # explicitly — setting cargoPatches/cargoHash alone is a no-op.
+              prev.trunk.overrideAttrs (
+                finalAttrs: old: {
+                  cargoPatches = [ ./patches/trunk-libdeflate-gcc16.patch ];
+                  patches = (old.patches or [ ]) ++ finalAttrs.cargoPatches;
+                  cargoDeps = prev.rustPlatform.fetchCargoVendor {
+                    inherit (finalAttrs) pname version src;
+                    patches = finalAttrs.cargoPatches;
+                    hash = "sha256-8HwfZ9dyplxc405rM33uNnjNt5JBFGWcmDNZJGMha9s=";
+                  };
+                }
+              );
+        })
+      ];
+
       services.stalwart = {
         enable = true;
 
