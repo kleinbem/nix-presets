@@ -33,7 +33,26 @@ let
   # systemd.services.buzz-relay.environment above. bindMounts (below) is a
   # host-level option, so this derivation and its content genuinely differ
   # per real deploying host, unlike anything inside innerConfig.
-  relayUrlEnvFile = pkgs.writeText "buzz-relay-url.env" "RELAY_URL=${cfg.relayUrl}\n";
+  # Same reason for the membership settings: they are per-host, so they ride
+  # this host-evaluated file too instead of the factory-built unit. The file
+  # keeps its old name (relay-url.env): containers are pulled independently of
+  # host switches, and a renamed EnvironmentFile would stop the relay in between.
+  hexPubkey = lib.types.strMatching "[0-9a-f]{64}";
+  relayHostEnvFile = pkgs.writeText "buzz-relay-host.env" (
+    lib.concatStringsSep "\n" (
+      [ "RELAY_URL=${cfg.relayUrl}" ]
+      ++ lib.optional (cfg.pairingRelayUrl != null) "BUZZ_PAIRING_RELAY_URL=${cfg.pairingRelayUrl}"
+      ++ lib.optionals cfg.membership.require [
+        "BUZZ_REQUIRE_RELAY_MEMBERSHIP=true"
+        # Agents attested by a member (NIP-OA) get in without their own entry.
+        "BUZZ_ALLOW_NIP_OA_AUTH=true"
+        "RELAY_OWNER_PUBKEY=${cfg.membership.ownerPubkey}"
+      ]
+      # Read by buzz-relay-members below.
+      ++ [ "BUZZ_RELAY_MEMBERS=${lib.concatStringsSep " " cfg.membership.members}" ]
+    )
+    + "\n"
+  );
 in
 {
   imports = [ ../nixosModules/backup-engine ];
@@ -76,6 +95,43 @@ in
       example = "wss://buzz.kleinbem.dev";
       description = "Public WebSocket URL — used in NIP-42 auth challenges.";
     };
+    pairingRelayUrl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "wss://pair.buzz.kleinbem.dev";
+      description = ''
+        URL clients reach the container's buzz-pair-relay (port 3001) at,
+        advertised in NIP-11 as `pairing_relay_url`. Needed with
+        `membership.require`: clients then pair via the advertised URL (or
+        `<relay>/pair`, which buzz-relay doesn't serve).
+      '';
+    };
+    membership = {
+      require = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Run a members-only relay (BUZZ_REQUIRE_RELAY_MEMBERSHIP). Only then
+          does the relay publish the NIP-43 membership snapshot (kind 13534)
+          that mesh-llm compute sharing uses as its roster. Also allows agents
+          attested by a member (BUZZ_ALLOW_NIP_OA_AUTH).
+        '';
+      };
+      ownerPubkey = lib.mkOption {
+        type = lib.types.nullOr hexPubkey;
+        default = null;
+        description = "Relay owner (RELAY_OWNER_PUBKEY), 64-char hex. Required with `require`.";
+      };
+      members = lib.mkOption {
+        type = lib.types.listOf hexPubkey;
+        default = [ ];
+        description = ''
+          Pubkeys (64-char hex) added as members on every start via
+          `buzz-admin add-member` (idempotent). Removing one here does not
+          remove it from the relay; use `buzz-admin remove-member` for that.
+        '';
+      };
+    };
     egress = {
       restrictLan = lib.mkOption {
         type = lib.types.bool;
@@ -100,6 +156,18 @@ in
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
+      {
+        assertions = [
+          {
+            assertion = cfg.membership.require -> cfg.membership.ownerPubkey != null;
+            message = "my.containers.buzz.membership.require needs membership.ownerPubkey, or nobody can administer the relay.";
+          }
+          {
+            assertion = cfg.membership.require -> cfg.pairingRelayUrl != null;
+            message = "my.containers.buzz.membership.require needs pairingRelayUrl: a members-only relay advertises NIP-43, and clients then pair via <relay>/pair, which buzz-relay doesn't serve.";
+          }
+        ];
+      }
       # ─── Host-side egress containment (mirrors openclaw.nix/hermes.nix) ─
       (lib.mkIf cfg.egress.restrictLan (
         let
@@ -134,7 +202,10 @@ in
         innerConfig = {
           networking.firewall = {
             enable = true;
-            allowedTCPPorts = [ 3000 ];
+            allowedTCPPorts = [
+              3000 # buzz-relay
+              3001 # buzz-pair-relay
+            ];
           };
 
           users = {
@@ -331,7 +402,7 @@ in
                   # bindMounts (below) is a HOST-level option, evaluated by
                   # each consuming host's OWN config, not baked into the
                   # shared factory build — so RELAY_URL needs the same
-                  # bind-mounted-file treatment, see relayUrlEnvFile below.
+                  # bind-mounted-file treatment, see relayHostEnvFile below.
 
                   # Schema was never created — the one-time init never ran
                   # this. Without it every background job (push matching,
@@ -390,6 +461,77 @@ in
                   RestartSec = 5;
                 };
               };
+
+              # NIP-AB device pairing (QR / pairing code). Stateless, no auth;
+              # advertised only when the host sets pairingRelayUrl.
+              buzz-pair-relay = {
+                description = "Buzz device-pairing relay";
+                after = [ "network.target" ];
+                wantedBy = [ "multi-user.target" ];
+                environment.BUZZ_PAIR_RELAY_BIND_ADDR = "0.0.0.0:3001";
+                # Conservative hardening: no extra namespaces or kernel
+                # protections, which conflict with the container runtime here
+                # (see attic.nix, qdrant.nix).
+                serviceConfig = {
+                  ExecStart = "${buzzRelay}/bin/buzz-pair-relay";
+                  DynamicUser = true;
+                  Restart = "always";
+                  RestartSec = 5;
+                  CapabilityBoundingSet = "";
+                  NoNewPrivileges = true;
+                  ProtectSystem = "strict";
+                  ProtectHome = true;
+                  PrivateTmp = true;
+                  RestrictAddressFamilies = [
+                    "AF_INET"
+                    "AF_INET6"
+                  ];
+                  RestrictSUIDSGID = true;
+                  RestrictRealtime = true;
+                  LockPersonality = true;
+                  SystemCallArchitectures = "native";
+                  SystemCallFilter = [ "@system-service" ];
+                  UMask = "0077";
+                };
+              };
+
+              # Applies membership.members (via relay-url.env, so it stays
+              # per-host). buzz-admin needs the community the relay seeds at
+              # startup, hence the retry; add-member is idempotent.
+              buzz-relay-members = {
+                description = "Apply declared Buzz relay members";
+                after = [ "buzz-relay.service" ];
+                wants = [ "buzz-relay.service" ];
+                wantedBy = [ "multi-user.target" ];
+                # Same database identity as buzz-relay (peer-mapped to role buzz).
+                environment = {
+                  DATABASE_URL = "postgres:///buzz?host=/run/postgresql";
+                  PGHOST = "/run/postgresql";
+                  PGUSER = "buzz";
+                  PGDATABASE = "buzz";
+                  REDIS_URL = "redis://127.0.0.1:6379";
+                };
+                serviceConfig = {
+                  Type = "oneshot";
+                  RemainAfterExit = true;
+                  User = "buzz-relay";
+                  Group = "buzz-relay";
+                  EnvironmentFile = [
+                    "/run/secrets/buzz.env"
+                    "/run/secrets/relay-url.env"
+                  ];
+                };
+                script = ''
+                  for pubkey in $BUZZ_RELAY_MEMBERS; do
+                    for _ in $(seq 30); do
+                      ${buzzRelay}/bin/buzz-admin add-member --pubkey "$pubkey" && continue 2
+                      sleep 2
+                    done
+                    echo "could not add member $pubkey" >&2
+                    exit 1
+                  done
+                '';
+              };
             };
 
             tmpfiles.rules = [
@@ -403,7 +545,7 @@ in
         };
         bindMounts = {
           "/run/secrets/relay-url.env" = {
-            hostPath = "${relayUrlEnvFile}";
+            hostPath = "${relayHostEnvFile}";
             isReadOnly = true;
           };
         }
