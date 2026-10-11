@@ -119,8 +119,11 @@ in
                 # bundled one wholesale, so the bundled localhost defaults
                 # don't apply either.
                 webauthn = {
-                  rpid = cfg.domain;
-                  rporigins = [ "https://${cfg.domain}" ];
+                  rpid = "kleinbem.dev";
+                  rporigins = [
+                    "https://${cfg.domain}"
+                    "https://2fa.kleinbem.dev"
+                  ];
                 };
                 s3 = {
                   are_local_buckets = true;
@@ -170,10 +173,23 @@ in
                   environmentFiles = [ "/run/ente.env" ];
                   extraOptions = [ "--network=host" ];
                 };
+                web = {
+                  # Serves Ente SPAs via internal nginx; port 3003 is the Auth web app.
+                  # On container boot, entrypoint replaces ENTE_API_ORIGIN_PLACEHOLDER
+                  # in all bundles with ENTE_API_ORIGIN. Supports amd64 + arm64.
+                  image = "ghcr.io/ente/web:b4d22996c85e8080b487db1475f98487b9b10840";
+                  environment = {
+                    ENTE_API_ORIGIN = "https://${cfg.domain}";
+                  };
+                  extraOptions = [ "--network=host" ];
+                };
               };
             };
 
-            networking.firewall.allowedTCPPorts = [ 8080 ];
+            networking.firewall.allowedTCPPorts = [
+              8080
+              3003
+            ];
 
             # Consolidated: statix flags repeated top-level `systemd.*`
             # assignments (this file used to set systemd.services.<name>
