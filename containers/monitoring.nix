@@ -34,6 +34,11 @@ in
       default = [ ];
       description = "List of Ollama container IPs to scrape for metrics.";
     };
+    lokiUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "http://10.85.47.116:3100";
+      description = "Loki endpoint for log queries.";
+    };
     githubMetrics = {
       enable = lib.mkEnableOption "GitHub Actions metrics (prometheus-json-exporter scraping the GitHub API)";
       repos = lib.mkOption {
@@ -185,8 +190,9 @@ in
                   }
                   {
                     name = "Loki";
+                    uid = "loki";
                     type = "loki";
-                    url = "http://10.85.46.116:3100";
+                    url = cfg.lokiUrl;
                   }
                 ];
                 # Always provision the dashboards dir (was gated on githubMetrics;

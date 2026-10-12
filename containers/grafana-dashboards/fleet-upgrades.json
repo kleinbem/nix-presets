@@ -1,0 +1,276 @@
+{
+  "uid": "fleet-upgrades",
+  "title": "Fleet / Upgrades & Deployments",
+  "tags": ["fleet", "nixos", "deployments", "auto-upgrade"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h"]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "node",
+        "label": "Node (Metrics)",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+        "definition": "label_values(up{job=\"node-exporters\"}, instance)",
+        "query": {
+          "query": "label_values(up{job=\"node-exporters\"}, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "hide": 0
+      },
+      {
+        "name": "host",
+        "label": "Host (Loki Logs)",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "definition": "label_values(host)",
+        "query": "label_values(host)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "hide": 0
+      }
+    ]
+  },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Monitored Fleet Nodes",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(up{job=\"node-exporters\"})",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Upgrades In Progress",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(node_systemd_unit_state{name=\"nixos-upgrade.service\", state=\"active\"} == 1) or vector(0)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed Upgrade Units",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(node_systemd_unit_state{name=~\"nixos-upgrade.*\", state=\"failed\"} == 1) or vector(0)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Push Listeners Active",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "purple" }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "count(node_systemd_unit_state{name=\"nixos-upgrade-listener.service\", state=\"active\"} == 1) or vector(0)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "state-timeline",
+      "title": "Upgrade Services Activity Timeline",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 70, "lineWidth": 0 },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": { "text": "ACTIVE", "color": "green" },
+                "0": { "text": "INACTIVE", "color": "text" }
+              }
+            }
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "node_systemd_unit_state{name=~\"nixos-upgrade.*\", state=~\"active|failed\", instance=~\"$node\"} == 1",
+          "legendFormat": "{{instance}} - {{name}} ({{state}})"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Scheduled Upgrade Timers Active",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": { "text": "ARMED", "color": "green" },
+                "0": { "text": "INACTIVE", "color": "red" }
+              }
+            }
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "victoriametrics" },
+          "expr": "node_systemd_unit_state{name=\"nixos-upgrade.timer\", state=\"active\", instance=~\"$node\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "NixOS Generation Switch Events (systemd-cat -t nix-config-deploy)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{job=\"systemd-journal\", host=~\"$host\"} | json | line_format \"{{.MESSAGE}}\" |= \"event=switch\""
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Fleet Upgrade Logs & Rebuild Journal (nixos-upgrade.service)",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{job=\"systemd-journal\", SYSTEMD_UNIT=~\"nixos-upgrade.*\", host=~\"$host\"} | json | line_format \"{{.MESSAGE}}\""
+        }
+      ]
+    }
+  ]
+}
