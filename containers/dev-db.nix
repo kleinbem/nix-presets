@@ -83,7 +83,7 @@ in
             '';
           };
 
-          services.redis = {
+          services.redis.servers."" = {
             enable = true;
             bind = "0.0.0.0";
             port = cfg.redisPort;
