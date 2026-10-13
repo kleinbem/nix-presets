@@ -2,6 +2,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -12,6 +13,11 @@ in
 {
   options.my.containers.qdrant = {
     enable = lib.mkEnableOption "Qdrant Vector Database Container";
+    package = lib.mkOption {
+      type = lib.types.package;
+      default = pkgs.qdrant;
+      description = "The qdrant package to run.";
+    };
     ip = lib.mkOption { type = lib.types.str; };
     hostDataDir = lib.mkOption { type = lib.types.str; };
     memoryLimit = lib.mkOption {
@@ -28,6 +34,7 @@ in
     innerConfig = {
       services.qdrant = {
         enable = true;
+        inherit (cfg) package;
         settings = {
           service = {
             host = "0.0.0.0";
