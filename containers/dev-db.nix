@@ -67,14 +67,13 @@ in
             ensureDatabases = cfg.initialDatabases;
             ensureUsers = [
               {
-                name = "postgres";
-                ensureDBOwnership = true;
-                superuser = true;
-              }
-              {
                 name = "dev";
                 ensureDBOwnership = true;
-                superuser = true;
+                ensureClauses = {
+                  superuser = true;
+                  login = true;
+                  createdb = true;
+                };
               }
             ];
             # Local trust for dev environment
