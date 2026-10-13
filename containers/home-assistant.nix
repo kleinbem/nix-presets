@@ -80,7 +80,7 @@ in
                 name = "Home";
                 unit_system = "metric";
                 time_zone = "Europe/Dublin";
-                external_url = "https://hass.internal"; # Adjust based on your domain
+                external_url = "https://hass.kleinbem.dev";
                 internal_url = "http://${cfg.ip}:8123";
               };
 
@@ -119,8 +119,14 @@ in
               http = {
                 use_x_forwarded_for = true;
                 trusted_proxies = [
-                  "10.85.46.1" # Gateway/Bridge
-                  "10.85.46.107" # Caddy Container
+                  "127.0.0.1"
+                  "::1"
+                  "10.85.49.1" # Hass-Pi Gateway/Bridge
+                  "10.85.48.107" # Caddy Container (Core-Pi)
+                  "10.0.0.22" # Core-Pi LAN
+                  "100.117.146.201" # Core-Pi NetBird Mesh IP
+                  "10.85.46.1" # Legacy Gateway/Bridge
+                  "10.85.46.107" # Legacy Caddy
                 ];
               };
 
