@@ -33,6 +33,8 @@ let
   # needs listeners + admin + (optional) outbound relay.
 in
 {
+  imports = [ ../nixosModules/backup-engine ];
+
   options.my.containers.stalwart = {
     enable = lib.mkEnableOption "Stalwart Mail Server Container";
     ip = lib.mkOption {
@@ -80,143 +82,153 @@ in
   }
   // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer {
-    inherit config;
-    name = "stalwart";
-    inherit cfg;
-    innerConfig = {
-      # trunk 0.21.14 (builds stalwart's webadmin) fails with GCC 16:
-      # its vendored libdeflate-sys 1.23.1 uses the `evex512` target
-      # attribute GCC 16 removed (NixOS/nixpkgs#569854). Backport of the
-      # upstream fix NixOS/nixpkgs#569964 (Cargo.lock bump to 1.25.2).
-      # Containers evaluate their own nixpkgs, so this can't live in a
-      # host overlay. Self-retiring: skipped once nixpkgs' trunk carries
-      # its own cargoPatches or moves past 0.21.14 — delete this block then.
-      nixpkgs.overlays = [
-        (_final: prev: {
-          trunk =
-            if prev.trunk.version != "0.21.14" || (prev.trunk.cargoPatches or [ ]) != [ ] then
-              prev.trunk
-            else
-              # buildRustPackage folds cargoPatches into `patches` and derives
-              # cargoDeps at call time, so overrideAttrs must set both
-              # explicitly — setting cargoPatches/cargoHash alone is a no-op.
-              prev.trunk.overrideAttrs (
-                finalAttrs: old: {
-                  cargoPatches = [ ./patches/trunk-libdeflate-gcc16.patch ];
-                  patches = (old.patches or [ ]) ++ finalAttrs.cargoPatches;
-                  cargoDeps = prev.rustPlatform.fetchCargoVendor {
-                    inherit (finalAttrs) pname version src;
-                    patches = finalAttrs.cargoPatches;
-                    hash = "sha256-8HwfZ9dyplxc405rM33uNnjNt5JBFGWcmDNZJGMha9s=";
-                  };
-                }
-              );
-        })
-      ];
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (mkContainer {
+        inherit config;
+        name = "stalwart";
+        inherit cfg;
+        innerConfig = {
+          # trunk 0.21.14 (builds stalwart's webadmin) fails with GCC 16:
+          # its vendored libdeflate-sys 1.23.1 uses the `evex512` target
+          # attribute GCC 16 removed (NixOS/nixpkgs#569854). Backport of the
+          # upstream fix NixOS/nixpkgs#569964 (Cargo.lock bump to 1.25.2).
+          # Containers evaluate their own nixpkgs, so this can't live in a
+          # host overlay. Self-retiring: skipped once nixpkgs' trunk carries
+          # its own cargoPatches or moves past 0.21.14 — delete this block then.
+          nixpkgs.overlays = [
+            (_final: prev: {
+              trunk =
+                if prev.trunk.version != "0.21.14" || (prev.trunk.cargoPatches or [ ]) != [ ] then
+                  prev.trunk
+                else
+                  # buildRustPackage folds cargoPatches into `patches` and derives
+                  # cargoDeps at call time, so overrideAttrs must set both
+                  # explicitly — setting cargoPatches/cargoHash alone is a no-op.
+                  prev.trunk.overrideAttrs (
+                    finalAttrs: old: {
+                      cargoPatches = [ ./patches/trunk-libdeflate-gcc16.patch ];
+                      patches = (old.patches or [ ]) ++ finalAttrs.cargoPatches;
+                      cargoDeps = prev.rustPlatform.fetchCargoVendor {
+                        inherit (finalAttrs) pname version src;
+                        patches = finalAttrs.cargoPatches;
+                        hash = "sha256-8HwfZ9dyplxc405rM33uNnjNt5JBFGWcmDNZJGMha9s=";
+                      };
+                    }
+                  );
+            })
+          ];
 
-      services.stalwart = {
-        enable = true;
+          services.stalwart = {
+            enable = true;
 
-        # Required (no module default). "26.05" ⇒ modern identity: data
-        # dir /var/lib/stalwart, journal tracer, user/group `stalwart` —
-        # matches the bind mount below. Do NOT lower this after first
-        # start (it's a data-compat marker, like system.stateVersion).
-        stateVersion = "26.05";
+            # Required (no module default). "26.05" ⇒ modern identity: data
+            # dir /var/lib/stalwart, journal tracer, user/group `stalwart` —
+            # matches the bind mount below. Do NOT lower this after first
+            # start (it's a data-compat marker, like system.stateVersion).
+            stateVersion = "26.05";
 
-        # Fallback administrator — loaded via systemd LoadCredential (see
-        # `credentials` below), referenced by macro. Lets `stalwart-cli`
-        # authenticate to create persona accounts. TODO(phase1): confirm
-        # `authentication.fallback-admin` is still the 0.15 key on first
-        # deploy (it has been since ~0.9); the rest of this block is
-        # straight off nixos/tests/stalwart/stalwart-config.nix.
-        credentials = lib.mkIf hasAdmin {
-          admin_secret = "/run/secrets/stalwart-admin-secret";
-        };
-
-        settings = {
-          server.hostname = "mail.${cfg.domain}";
-
-          # Plaintext-capable on the trusted cbr0 bridge; STARTTLS offered
-          # opportunistically with Stalwart's self-signed cert. TODO: wire
-          # a real cert (fleet step-ca / ACME) before any non-bridge
-          # exposure.
-          server.listener = {
-            smtp = {
-              bind = [ "[::]:25" ];
-              protocol = "smtp";
+            # Fallback administrator — loaded via systemd LoadCredential (see
+            # `credentials` below), referenced by macro. Lets `stalwart-cli`
+            # authenticate to create persona accounts. TODO(phase1): confirm
+            # `authentication.fallback-admin` is still the 0.15 key on first
+            # deploy (it has been since ~0.9); the rest of this block is
+            # straight off nixos/tests/stalwart/stalwart-config.nix.
+            credentials = lib.mkIf hasAdmin {
+              admin_secret = "/run/secrets/stalwart-admin-secret";
             };
-            submission = {
-              bind = [ "[::]:587" ];
-              protocol = "smtp";
-            };
-            imap = {
-              bind = [ "[::]:143" ];
-              protocol = "imap";
-            };
-            # HTTP surface: JMAP + the webadmin UI (module wires
-            # webadmin.resource automatically when an http listener
-            # exists). Reached directly on the container IP — not
-            # Caddy-proxied.
-            http = {
-              bind = [ "[::]:8080" ];
-              protocol = "http";
+
+            settings = {
+              server.hostname = "mail.${cfg.domain}";
+
+              # Plaintext-capable on the trusted cbr0 bridge; STARTTLS offered
+              # opportunistically with Stalwart's self-signed cert. TODO: wire
+              # a real cert (fleet step-ca / ACME) before any non-bridge
+              # exposure.
+              server.listener = {
+                smtp = {
+                  bind = [ "[::]:25" ];
+                  protocol = "smtp";
+                };
+                submission = {
+                  bind = [ "[::]:587" ];
+                  protocol = "smtp";
+                };
+                imap = {
+                  bind = [ "[::]:143" ];
+                  protocol = "imap";
+                };
+                # HTTP surface: JMAP + the webadmin UI (module wires
+                # webadmin.resource automatically when an http listener
+                # exists). Reached directly on the container IP — not
+                # Caddy-proxied.
+                http = {
+                  bind = [ "[::]:8080" ];
+                  protocol = "http";
+                };
+              };
+
+              session.auth.mechanisms = "[plain]";
+
+              authentication.fallback-admin = lib.mkIf hasAdmin {
+                user = "admin";
+                secret = "%{file:/run/credentials/stalwart.service/admin_secret}%";
+              };
+            }
+            // lib.optionalAttrs hasRelay {
+              # Outbound relay (smart host). Only emitted when relaySecretFile
+              # is set — otherwise Stalwart delivers directly (its built-in
+              # default). v0.13+ uses "virtual queue" routing
+              # (`queue.strategy.route` + `queue.route.<id>`); the old
+              # `queue.*.next-hop` is now a build-time assertion failure.
+              # TODO(phase1): validate this route shape against pkgs.stalwart
+              # 0.15 once SES/relay creds actually exist.
+              queue.strategy.route = "'relay'";
+              queue.route.relay = {
+                type = "relay";
+                host = "email-smtp.eu-central-1.amazonaws.com";
+                port = 587;
+                protocol = "smtp";
+                tls.implicit = false;
+                auth.username = "%{file:/run/secrets/stalwart-relay}%{env:USERNAME}";
+                auth.secret = "%{file:/run/secrets/stalwart-relay}%{env:PASSWORD}";
+              };
             };
           };
 
-          session.auth.mechanisms = "[plain]";
+          networking.firewall.allowedTCPPorts = [
+            25
+            143
+            587
+            8080
+          ];
+        };
 
-          authentication.fallback-admin = lib.mkIf hasAdmin {
-            user = "admin";
-            secret = "%{file:/run/credentials/stalwart.service/admin_secret}%";
+        bindMounts = {
+          "/var/lib/stalwart" = {
+            hostPath = cfg.hostDataDir;
+            isReadOnly = false;
+          };
+        }
+        // lib.optionalAttrs hasAdmin {
+          "/run/secrets/stalwart-admin-secret" = {
+            hostPath = cfg.adminPasswordFile;
+            isReadOnly = true;
           };
         }
         // lib.optionalAttrs hasRelay {
-          # Outbound relay (smart host). Only emitted when relaySecretFile
-          # is set — otherwise Stalwart delivers directly (its built-in
-          # default). v0.13+ uses "virtual queue" routing
-          # (`queue.strategy.route` + `queue.route.<id>`); the old
-          # `queue.*.next-hop` is now a build-time assertion failure.
-          # TODO(phase1): validate this route shape against pkgs.stalwart
-          # 0.15 once SES/relay creds actually exist.
-          queue.strategy.route = "'relay'";
-          queue.route.relay = {
-            type = "relay";
-            host = "email-smtp.eu-central-1.amazonaws.com";
-            port = 587;
-            protocol = "smtp";
-            tls.implicit = false;
-            auth.username = "%{file:/run/secrets/stalwart-relay}%{env:USERNAME}";
-            auth.secret = "%{file:/run/secrets/stalwart-relay}%{env:PASSWORD}";
+          "/run/secrets/stalwart-relay" = {
+            hostPath = cfg.relaySecretFile;
+            isReadOnly = true;
           };
         };
-      };
-
-      networking.firewall.allowedTCPPorts = [
-        25
-        143
-        587
-        8080
-      ];
-    };
-
-    bindMounts = {
-      "/var/lib/stalwart" = {
-        hostPath = cfg.hostDataDir;
-        isReadOnly = false;
-      };
-    }
-    // lib.optionalAttrs hasAdmin {
-      "/run/secrets/stalwart-admin-secret" = {
-        hostPath = cfg.adminPasswordFile;
-        isReadOnly = true;
-      };
-    }
-    // lib.optionalAttrs hasRelay {
-      "/run/secrets/stalwart-relay" = {
-        hostPath = cfg.relaySecretFile;
-        isReadOnly = true;
-      };
-    };
-  });
+      })
+      {
+        my.backup.items.stalwart = {
+          tier = "secure";
+          paths = [ cfg.hostDataDir ];
+        };
+      }
+    ]
+  );
 }
