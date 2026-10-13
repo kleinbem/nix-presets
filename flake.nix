@@ -265,6 +265,9 @@
               ente = import ./containers/ente.nix { inherit self inputs; };
               vaultwarden = import ./containers/vaultwarden.nix { inherit self; };
               gatus = import ./containers/gatus.nix { inherit self; };
+              dev-db = import ./containers/dev-db.nix { inherit self; };
+              qbittorrent = import ./containers/qbittorrent.nix { inherit self; };
+              caido = import ./containers/caido.nix { inherit self; };
             };
 
             # dashboard-homer redeclares the same my.containers.dashboard
