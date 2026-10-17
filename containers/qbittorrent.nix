@@ -62,6 +62,9 @@ in
             openFirewall = true;
           };
 
+          # The bind-mount source is created root-owned on the host (below);
+          # hand it to the service user from inside, where the name resolves.
+          systemd.tmpfiles.rules = [ "d /data/downloads 0755 qbittorrent qbittorrent - -" ];
           systemd.services.qbittorrent.serviceConfig = {
             ReadWritePaths = [
               "/var/lib/qBittorrent"
@@ -87,6 +90,13 @@ in
           };
         };
       })
+      {
+        # downloadsDir is a standalone host path, not under hostDataDir, so
+        # subDirs doesn't create it. Without it the container fails with
+        # "Failed to clone /mnt/data/Downloads" (nasbook, since its data disk
+        # was recreated). Ownership is left to the container's own rule.
+        systemd.tmpfiles.rules = [ "d ${cfg.downloadsDir} 0755 - - - -" ];
+      }
       {
         my.backup.items.qbittorrent = {
           tier = "secure";
