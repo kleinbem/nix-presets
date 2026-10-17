@@ -162,8 +162,10 @@ in
               };
             };
           };
+          # The NixOS frigate module serves the UI/API through nginx on 80;
+          # 5000 is nothing here (the API itself is on localhost only).
           networking.firewall.allowedTCPPorts = [
-            5000
+            80
             8554
             8555
           ];
