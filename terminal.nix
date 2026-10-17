@@ -13,6 +13,10 @@
 
         # History Sync
         export HISTCONTROL=ignoreboth:erasedups
+        # Never record commands carrying a credential (JWTs, GitHub/Anthropic/
+        # AWS/Slack tokens, age keys, token/password args). A leading space
+        # also skips a line (ignoreboth).
+        export HISTIGNORE='*eyJhbGci*:*ghp_*:*gho_*:*ghs_*:*ghu_*:*github_pat_*:*sk-ant-*:*AKIA*:*xoxb-*:*xoxp-*:*AGE-SECRET-KEY*:*--token=*:*--token *:*PASSWORD=*:*_TOKEN=*'
         export HISTSIZE=100000
         export HISTFILESIZE=100000
         shopt -s histappend
