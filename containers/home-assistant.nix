@@ -59,6 +59,23 @@ in
                     paho-mqtt = pyprev.paho-mqtt.overridePythonAttrs (_: {
                       doCheck = false;
                     });
+                    # Home Assistant (2026.10, and still dev) pins
+                    # pywizlight==0.6.3; nixpkgs moved the package to 0.6.6,
+                    # whose multi-zone API turns `bulb.state` into a list and
+                    # breaks every WiZ entity ("'list' object has no attribute
+                    # 'get_brightness'", seen in the restore dry run). HA closed
+                    # its own bump PRs (home-assistant/core#186933) until
+                    # dual-zone support lands, so pin the library back to what HA
+                    # expects. REMOVE once HA's wiz manifest requires >= 0.6.6.
+                    pywizlight = pyprev.pywizlight.overridePythonAttrs (_: {
+                      version = "0.6.3";
+                      src = prev.fetchFromGitHub {
+                        owner = "sbidy";
+                        repo = "pywizlight";
+                        tag = "v0.6.3";
+                        hash = "sha256-rCoWdqvFLSLNBAHeFJ6f9kZpIg4WyE8VJLpmsYl+gJM=";
+                      };
+                    });
                   })
                 ];
               })
@@ -102,6 +119,11 @@ in
                 "thread"
                 "otbr"
                 "homeassistant_sky_connect"
+                # Discovery flows HA tried to load during the restore dry run
+                # (ssdp found a QNAP switch, dhcp a Google device); without the
+                # libs each one logs an import error on every start.
+                "nest"
+                "qnap_qsw"
               ];
 
               # Was HACS-installed on HAOS; nixpkgs packages both, so HACS
