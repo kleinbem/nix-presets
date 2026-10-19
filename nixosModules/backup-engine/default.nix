@@ -485,6 +485,9 @@ in
               wants = [ "network-online.target" ];
               after = [ "network-online.target" ];
               path = [
+                # tar starts its -z compressor through `sh -c`, so the unit
+                # needs a shell on PATH, not just gzip (broke 2026-10-18).
+                pkgs.bash
                 pkgs.coreutils
                 pkgs.gnutar
                 pkgs.gzip
