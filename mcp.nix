@@ -65,6 +65,35 @@
         description = "Enable Buzz developer MCP server (buzz-dev-mcp) for workspace AI coding agents";
       };
     };
+    servers = lib.mkOption {
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            command = lib.mkOption {
+              type = lib.types.str;
+              description = "Program that serves MCP over stdio.";
+            };
+            args = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+              description = "Arguments for `command`.";
+            };
+            env = lib.mkOption {
+              type = lib.types.attrsOf lib.types.str;
+              default = { };
+              description = "Environment for the server process.";
+            };
+          };
+        }
+      );
+      readOnly = true;
+      description = ''
+        The stdio MCP servers this module registers, keyed by server name:
+        the enabled set above in the `mcpServers` shape every client here
+        gets. Read-only; other modules translate it for clients with another
+        config format (goose extensions in nix-config's ai-agents.nix).
+      '';
+    };
   };
 
   config = lib.mkIf config.modules.mcp.enable (
@@ -119,25 +148,123 @@
         sed -i '1s|^#!.*|#!${gimpPython.interpreter}|' $out/gimp-mcp-plugin.py
         chmod 755 $out/gimp-mcp-plugin.py
       '';
+
+      pythonWithMcp = pkgs.python3.withPackages (
+        ps: with ps; [
+          mcp
+          pydantic
+          pydantic-core
+          google-auth
+          google-auth-oauthlib
+          google-api-python-client
+          requests
+          psutil
+        ]
+      );
+
+      # One table for every client: the activation below copies it as
+      # mcp_config.json, modules.mcp.servers exposes it for the rest.
+      servers = {
+        workspace-atlas = {
+          command = "${pythonWithMcp}/bin/python3";
+          args = [
+            "-u"
+            "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/tools/workspace-mcp.py"
+          ];
+        };
+        github = {
+          command = "atlas";
+          args = [
+            "mcp"
+            "launch"
+            "github"
+            (lib.getExe pkgs.github-mcp-server)
+            "stdio"
+          ];
+        };
+        filesystem = {
+          command = lib.getExe pkgs.mcp-server-filesystem;
+          args = [ "${config.home.homeDirectory}/Develop" ];
+        };
+
+        memory = {
+          command = lib.getExe pkgs.mcp-server-memory;
+          args = [ ];
+        };
+
+        "sequential-thinking" = {
+          command = lib.getExe pkgs.mcp-server-sequential-thinking;
+          args = [ ];
+        };
+
+        freecad = {
+          command = lib.getExe freecadMcpPkg;
+          args = [ ];
+        };
+      }
+      // (lib.optionalAttrs config.modules.mcp.bambu.enable {
+        bambu-printer = {
+          command = "${pkgs.nodejs_22}/bin/npx";
+          args = [
+            "-y"
+            "@griches/bambu-mcp"
+          ];
+          env = {
+            BAMBU_PRINTER_IP = config.modules.mcp.bambu.printerIp;
+            BAMBU_SERIAL = config.modules.mcp.bambu.serialNumber;
+            BAMBU_ACCESS_CODE = config.modules.mcp.bambu.accessCode;
+          };
+        };
+      })
+      // (lib.optionalAttrs config.modules.mcp.blender.enable {
+        blender = {
+          command = "${pkgs.nodejs_22}/bin/npx";
+          args = [
+            "-y"
+            "blender-mcp"
+          ];
+        };
+      })
+      // (lib.optionalAttrs config.modules.mcp.gimp.enable {
+        gimp = {
+          command = lib.getExe gimp3McpPkg;
+          args = [ ];
+        };
+      })
+      // (lib.optionalAttrs config.modules.mcp.openscad.enable {
+        openscad = {
+          command = "${pkgs.nodejs_22}/bin/npx";
+          args = [
+            "-y"
+            "openscad-mcp-server"
+          ];
+        };
+      })
+      // (lib.optionalAttrs config.modules.mcp.svelte.enable {
+        svelte = {
+          command = "${pkgs.nodejs_22}/bin/npx";
+          args = [
+            "-y"
+            "@sveltejs/mcp"
+          ];
+        };
+      })
+      // (lib.optionalAttrs config.modules.mcp.buzz.enable {
+        buzz = {
+          command = lib.getExe pkgs.buzz-dev-mcp;
+          args = [ ];
+        };
+      });
     in
     {
+      modules.mcp.servers = servers;
+
       home = {
         # Ensure Atlas and Python with MCP are available in the home environment
         packages = [
           (pkgs.callPackage ./atlas/default.nix { })
           freecadMcpPkg
-          (pkgs.python3.withPackages (
-            ps: with ps; [
-              mcp
-              pydantic
-              pydantic-core
-              google-auth
-              google-auth-oauthlib
-              google-api-python-client
-              requests
-              psutil
-            ]
-          ))
+          pythonWithMcp
         ]
         ++ lib.optional config.modules.mcp.gimp.enable pkgs.gimp3;
 
@@ -157,110 +284,12 @@
         # This automatically registers the MCP servers in your editors and standalone clients
         activation.setupMcpConfigs =
           let
-            pythonWithMcp = pkgs.python3.withPackages (
-              ps: with ps; [
-                mcp
-                pydantic
-                pydantic-core
-                google-auth
-                google-auth-oauthlib
-                google-api-python-client
-                requests
-                psutil
-              ]
-            );
+            # Same JSON as before the option existed: the submodule fills in
+            # env = { }, which no server here sets, so drop it again.
             mcpConfig = {
-              mcpServers = {
-                workspace-atlas = {
-                  command = "${pythonWithMcp}/bin/python3";
-                  args = [
-                    "-u"
-                    "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/tools/workspace-mcp.py"
-                  ];
-                };
-                github = {
-                  command = "atlas";
-                  args = [
-                    "mcp"
-                    "launch"
-                    "github"
-                    (lib.getExe pkgs.github-mcp-server)
-                    "stdio"
-                  ];
-                };
-                filesystem = {
-                  command = lib.getExe pkgs.mcp-server-filesystem;
-                  args = [ "${config.home.homeDirectory}/Develop" ];
-                };
-
-                memory = {
-                  command = lib.getExe pkgs.mcp-server-memory;
-                  args = [ ];
-                };
-
-                "sequential-thinking" = {
-                  command = lib.getExe pkgs.mcp-server-sequential-thinking;
-                  args = [ ];
-                };
-
-                freecad = {
-                  command = lib.getExe freecadMcpPkg;
-                  args = [ ];
-                };
-              }
-              // (lib.optionalAttrs config.modules.mcp.bambu.enable {
-                bambu-printer = {
-                  command = "${pkgs.nodejs_22}/bin/npx";
-                  args = [
-                    "-y"
-                    "@griches/bambu-mcp"
-                  ];
-                  env = {
-                    BAMBU_PRINTER_IP = config.modules.mcp.bambu.printerIp;
-                    BAMBU_SERIAL = config.modules.mcp.bambu.serialNumber;
-                    BAMBU_ACCESS_CODE = config.modules.mcp.bambu.accessCode;
-                  };
-                };
-              })
-              // (lib.optionalAttrs config.modules.mcp.blender.enable {
-                blender = {
-                  command = "${pkgs.nodejs_22}/bin/npx";
-                  args = [
-                    "-y"
-                    "blender-mcp"
-                  ];
-                };
-              })
-              // (lib.optionalAttrs config.modules.mcp.gimp.enable {
-                gimp = {
-                  command = lib.getExe gimp3McpPkg;
-                  args = [ ];
-                };
-              })
-              // (lib.optionalAttrs config.modules.mcp.openscad.enable {
-                openscad = {
-                  command = "${pkgs.nodejs_22}/bin/npx";
-                  args = [
-                    "-y"
-                    "openscad-mcp-server"
-                  ];
-                };
-              })
-              // (lib.optionalAttrs config.modules.mcp.svelte.enable {
-                svelte = {
-                  command = "${pkgs.nodejs_22}/bin/npx";
-                  args = [
-                    "-y"
-                    "@sveltejs/mcp"
-                  ];
-                };
-              })
-              // (lib.optionalAttrs config.modules.mcp.buzz.enable {
-                buzz = {
-                  command = lib.getExe pkgs.buzz-dev-mcp;
-                  args = [ ];
-                };
-              });
+              mcpServers = lib.mapAttrs (
+                _: server: lib.filterAttrs (name: value: !(name == "env" && value == { })) server
+              ) config.modules.mcp.servers;
             };
 
             mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
