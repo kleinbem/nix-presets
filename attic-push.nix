@@ -58,7 +58,10 @@ in
         # so per-output pushes still cover the full built set — as a SPARSE
         # OVERLAY (see nix-presets/containers/attic.nix), not a closure mirror.
         export HOME=/root
-        exec ${pkgs.attic-client}/bin/attic push --no-closure system $OUT_PATHS
+        # Best effort: Nix fails the build when this hook fails, and a cache
+        # problem (a rotated token, the cache being down) must not stop builds.
+        ${pkgs.attic-client}/bin/attic push --no-closure system $OUT_PATHS \
+          || echo "Attic push failed; the build continues without caching these paths" >&2
       '';
     };
 
