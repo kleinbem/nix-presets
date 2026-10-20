@@ -32,6 +32,11 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "4G";
     };
+    lanUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "10.0.0.21:8123";
+      description = "host:port where LAN clients reach Home Assistant (the host's DNAT to the container). Used for internal_url and the embedded host-service dashboards.";
+    };
   };
 
   config = lib.mkIf cfg.enable (
@@ -41,7 +46,13 @@ in
         name = "home-assistant";
         inherit cfg;
         inherit (cfg) enableUSB;
-        additionalCapabilities = lib.optional cfg.enableBluetooth "CAP_NET_ADMIN"; # Bluetooth needs this
+        # habluetooth needs both to manage/recover the adapter over bluez;
+        # with NET_ADMIN alone it logs "Missing required permissions for
+        # Bluetooth management" and can't reset a wedged adapter.
+        additionalCapabilities = lib.optionals cfg.enableBluetooth [
+          "CAP_NET_ADMIN"
+          "CAP_NET_RAW"
+        ];
 
         innerConfig =
           { pkgs, ... }:
@@ -149,7 +160,11 @@ in
                   unit_system = "metric";
                   time_zone = "Europe/Dublin";
                   external_url = "https://hass.kleinbem.dev";
-                  internal_url = "http://${cfg.ip}:8123";
+                  # NOT the container address: internal_url is what the companion
+                  # app and other LAN clients are told to use, and cfg.ip lives on
+                  # the host's private bridge. The host DNATs its LAN port 8123 to
+                  # the container (hosts/hass-pi/default.nix).
+                  internal_url = "http://${cfg.lanUrl}";
                 };
 
                 # Enable the default UI and features
@@ -159,22 +174,31 @@ in
                   themes = "!include themes.yaml";
                 };
 
-                # ESPHome device builder (dashboard for authoring/compiling/
-                # flashing device configs) isn't a Supervisor add-on here — this
-                # host runs Home Assistant Core natively via NixOS, not HAOS, so
-                # the usual embedded-add-on sidebar panel isn't available.
-                # panel_iframe gets the same "feels integrated" result: a sidebar
-                # tab that just embeds the standalone dashboard's own URL. Only
-                # one host (hass-pi) has ever consumed this preset, so the LAN IP
-                # is hardcoded here rather than plumbed through as a cfg option —
-                # same pragmatic call already made for e.g. `trusted_proxies`
-                # above. Revisit if a second host ever needs a different URL.
-                panel_iframe = {
-                  esphome_builder = {
-                    title = "ESPHome Builder";
-                    icon = "mdi:chip";
-                    url = "http://10.0.0.21:6052";
-                    require_admin = true;
+                # Sidebar entries for the host-side services (ESPHome device builder,
+                # Node-RED): HA Core on NixOS has no Supervisor add-on panels, and
+                # panel_iframe is gone from Home Assistant (removed before 2026.10), so
+                # these are YAML-mode dashboards with one iframe card each. The YAML
+                # files are store paths linked in by the tmpfiles rules below.
+                # Dashboard keys must contain a hyphen.
+                lovelace = {
+                  mode = "storage";
+                  dashboards = {
+                    esphome-builder = {
+                      mode = "yaml";
+                      title = "ESPHome Builder";
+                      icon = "mdi:chip";
+                      show_in_sidebar = true;
+                      require_admin = true;
+                      filename = "dashboards/esphome-builder.yaml";
+                    };
+                    node-red = {
+                      mode = "yaml";
+                      title = "Node-RED";
+                      icon = "mdi:sitemap";
+                      show_in_sidebar = true;
+                      require_admin = true;
+                      filename = "dashboards/node-red.yaml";
+                    };
                   };
                 };
 
@@ -193,8 +217,6 @@ in
                     "10.85.48.107" # Caddy Container (Core-Pi)
                     "10.0.0.22" # Core-Pi LAN
                     "100.117.146.201" # Core-Pi NetBird Mesh IP
-                    "10.85.46.1" # Legacy Gateway/Bridge
-                    "10.85.46.107" # Legacy Caddy
                   ];
                 };
 
@@ -225,12 +247,41 @@ in
             };
 
             # Ensure the themes and logic files exist or are linked
-            systemd.tmpfiles.rules = [
-              "f /var/lib/hass/themes.yaml 0644 hass hass - {}"
-              "f /var/lib/hass/automations.yaml 0644 hass hass - {}"
-              "f /var/lib/hass/scripts.yaml 0644 hass hass - {}"
-              "f /var/lib/hass/scenes.yaml 0644 hass hass - {}"
-            ];
+            systemd.tmpfiles.rules =
+              let
+                iframeDashboard =
+                  name: title: url:
+                  (pkgs.formats.yaml { }).generate "${name}.yaml" {
+                    inherit title;
+                    views = [
+                      {
+                        inherit title;
+                        panel = true;
+                        cards = [
+                          {
+                            type = "iframe";
+                            inherit url;
+                            aspect_ratio = "100%";
+                          }
+                        ];
+                      }
+                    ];
+                  };
+                lanHost = builtins.head (lib.splitString ":" cfg.lanUrl);
+              in
+              [
+                "d /var/lib/hass/dashboards 0755 hass hass -"
+                "L+ /var/lib/hass/dashboards/esphome-builder.yaml - - - - ${
+                  iframeDashboard "esphome-builder" "ESPHome Builder" "http://${lanHost}:6052"
+                }"
+                "L+ /var/lib/hass/dashboards/node-red.yaml - - - - ${
+                  iframeDashboard "node-red" "Node-RED" "http://${lanHost}:1880"
+                }"
+                "f /var/lib/hass/themes.yaml 0644 hass hass - {}"
+                "f /var/lib/hass/automations.yaml 0644 hass hass - {}"
+                "f /var/lib/hass/scripts.yaml 0644 hass hass - {}"
+                "f /var/lib/hass/scenes.yaml 0644 hass hass - {}"
+              ];
 
             networking.firewall.allowedTCPPorts = [ 8123 ];
           };
