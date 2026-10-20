@@ -179,9 +179,9 @@ in
                 # panel_iframe is gone from Home Assistant (removed before 2026.10), so
                 # these are YAML-mode dashboards with one iframe card each. The YAML
                 # files are store paths linked in by the tmpfiles rules below.
-                # Dashboard keys must contain a hyphen.
+                # Dashboard keys must contain a hyphen. No top-level `mode`: HA 2026.8
+                # deprecated it (the nixpkgs module warns) and storage is the default.
                 lovelace = {
-                  mode = "storage";
                   dashboards = {
                     esphome-builder = {
                       mode = "yaml";
