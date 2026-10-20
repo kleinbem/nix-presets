@@ -65,6 +65,17 @@
         description = "Enable Buzz developer MCP server (buzz-dev-mcp) for workspace AI coding agents";
       };
     };
+    agentTaskQueue = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Enable Block's agent-task-queue MCP server (run_task / task_status):
+          agents queue their expensive commands (builds, tests) so several
+          sessions on one machine run them one at a time per queue.
+        '';
+      };
+    };
     homeAssistant = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -294,6 +305,12 @@
       // (lib.optionalAttrs config.modules.mcp.buzz.enable {
         buzz = {
           command = lib.getExe pkgs.buzz-dev-mcp;
+          args = [ ];
+        };
+      })
+      // (lib.optionalAttrs config.modules.mcp.agentTaskQueue.enable {
+        agent-task-queue = {
+          command = lib.getExe pkgs.agent-task-queue;
           args = [ ];
         };
       });
