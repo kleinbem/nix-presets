@@ -80,6 +80,10 @@ in
               OPENAI_API_BASE_URL = cfg.openaiUrl;
               ENABLE_OPENAI_API = if (cfg.openaiUrl != "") then "True" else "False";
               WEBUI_AUTH = "True";
+              # chat.kleinbem.dev is on the public tunnel. Open WebUI's
+              # default is ENABLE_SIGNUP=true (anyone can create a pending
+              # account); accounts come from Authentik via OAuth below.
+              ENABLE_SIGNUP = "False";
             }
             // lib.optionalAttrs cfg.oidc.enable {
               WEBUI_URL = "https://chat.kleinbem.dev";

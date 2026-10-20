@@ -13,6 +13,8 @@ let
   # resolved on the deploying host) — same convention as vaultwarden.nix's
   # adminTokenPath.
   grafanaOidcClientSecretPath = "/run/secrets/grafana-oidc-client-secret";
+  # Same convention for alertmanager-ntfy's credentials/topic snippet.
+  alertmanagerNtfyAuthPath = "/run/secrets/alertmanager-ntfy.yml";
 in
 {
   options.my.containers.monitoring = {
@@ -92,7 +94,30 @@ in
       topic = lib.mkOption {
         type = lib.types.str;
         default = "alerts";
-        description = "ntfy topic for monitoring alerts";
+        description = ''
+          ntfy topic for monitoring alerts. The default is a guessable
+          public name; on an open ntfy server anyone can subscribe to it.
+          Leave it and set the real topic (plus credentials) through
+          authConfigFile instead, which never enters the nix store.
+        '';
+      };
+      authConfigFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = ''
+          Host path to an alertmanager-ntfy YAML snippet merged on top of
+          `settings` (bind-mounted into the container, loaded through
+          systemd LoadCredential). Carries the secret topic name and the
+          ntfy credentials:
+
+            ntfy:
+              auth:
+                basic:
+                  username: monitoring
+                  password: <password of the ntfy user>
+              notification:
+                topic: <secret alert topic>
+        '';
       };
     };
   };
@@ -210,6 +235,7 @@ in
             prometheus = {
               alertmanager-ntfy = lib.mkIf cfg.ntfy.enable {
                 enable = true;
+                extraConfigFiles = lib.optional (cfg.ntfy.authConfigFile != null) alertmanagerNtfyAuthPath;
                 settings = {
                   http.addr = "127.0.0.1:8000";
                   ntfy = {
@@ -470,6 +496,12 @@ in
         // lib.optionalAttrs (cfg.githubMetrics.enable && cfg.githubMetrics.configFile != null) {
           "/etc/json-exporter.yml" = {
             hostPath = cfg.githubMetrics.configFile;
+            isReadOnly = true;
+          };
+        }
+        // lib.optionalAttrs (cfg.ntfy.enable && cfg.ntfy.authConfigFile != null) {
+          ${alertmanagerNtfyAuthPath} = {
+            hostPath = cfg.ntfy.authConfigFile;
             isReadOnly = true;
           };
         };
