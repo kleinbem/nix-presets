@@ -65,6 +65,29 @@
         description = "Enable Buzz developer MCP server (buzz-dev-mcp) for workspace AI coding agents";
       };
     };
+    homeAssistant = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Bridge the HA-MCP server running inside the Home Assistant
+          container (ha_mcp_tools custom component, nix-presets
+          containers/home-assistant.nix) into every stdio MCP client here
+          via mcp-proxy. The connect URL is the credential (HA-MCP "Secret
+          URL" mode), so it is read at launch from `urlFile`, never written
+          into the world-readable mcp_config.json copies.
+        '';
+      };
+      urlFile = lib.mkOption {
+        type = lib.types.str;
+        default = "/run/secrets/ha_mcp_url";
+        description = ''
+          File holding the HA-MCP connect URL (one line). A sops-nix secret
+          owned by the desktop user on the host; see nix-config
+          hosts/nixos-nvme/secrets.nix.
+        '';
+      };
+    };
     servers = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule {
@@ -247,6 +270,25 @@
             "-y"
             "@sveltejs/mcp"
           ];
+        };
+      })
+      // (lib.optionalAttrs config.modules.mcp.homeAssistant.enable {
+        home-assistant = {
+          command = lib.getExe (
+            pkgs.writeShellApplication {
+              name = "home-assistant-mcp";
+              runtimeInputs = [ pkgs.mcp-proxy ];
+              text = ''
+                url_file=${lib.escapeShellArg config.modules.mcp.homeAssistant.urlFile}
+                if [ ! -r "$url_file" ]; then
+                  echo "home-assistant-mcp: $url_file missing or unreadable — add ha_mcp_url to the host's sops file" >&2
+                  exit 1
+                fi
+                exec mcp-proxy --transport streamablehttp "$(tr -d '\n' < "$url_file")"
+              '';
+            }
+          );
+          args = [ ];
         };
       })
       // (lib.optionalAttrs config.modules.mcp.buzz.enable {
