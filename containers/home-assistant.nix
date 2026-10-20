@@ -129,7 +129,17 @@ in
               # Was HACS-installed on HAOS; nixpkgs packages both, so HACS
               # itself is dropped. Lovelace resource path for button-card:
               # /local/nixos-lovelace-modules/button-card.js
-              customComponents = with pkgs.home-assistant-custom-components; [ alarmo ];
+              customComponents = with pkgs.home-assistant-custom-components; [
+                alarmo
+                # "Sign in with Authentik" next to the local login (OIDC, public
+                # client + PKCE, no secret). The Authentik side is
+                # nix/infra/authentik.tf's oidc_apps.home-assistant; config below.
+                auth_oidc
+                # In-process HA-MCP server (87 tools) for Claude Code & co. UI-configured
+                # (admin token + access mode); the client side is modules.mcp.homeAssistant
+                # in ../mcp.nix.
+                ha_mcp_tools
+              ];
               customLovelaceModules = with pkgs.home-assistant-custom-lovelace-modules; [ button-card ];
 
               config = {
@@ -192,6 +202,20 @@ in
                 automation = "!include automations.yaml";
                 script = "!include scripts.yaml";
                 scene = "!include scenes.yaml";
+
+                # Authentik as OIDC login (custom component auth_oidc above).
+                # Public client, so nothing secret lives here. Users come in as
+                # "<authentik username>" and get HA's admin role via the staff
+                # group; the local owner account stays as break-glass login.
+                auth_oidc = {
+                  client_id = "home-assistant";
+                  discovery_url = "https://auth.kleinbem.dev/application/o/home-assistant/.well-known/openid-configuration";
+                  display_name = "Authentik";
+                  # Authentik's profile scope already carries `groups`; asking for a
+                  # separate `groups` scope it doesn't define would be rejected.
+                  features.include_groups_scope = false;
+                  roles.admin = "staff";
+                };
 
                 # Monitoring
                 prometheus = {
