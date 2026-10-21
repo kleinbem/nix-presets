@@ -26,6 +26,10 @@ pkgs.testers.runNixOSTest {
     {
       imports = [ module ];
 
+      # postgres + restic + rclone in one guest: 1 GiB (the default) runs out
+      # on GitHub's runners since the nixpkgs 02c087f bump.
+      virtualisation.memorySize = 2048;
+
       services.postgresql = {
         enable = true;
         initialScript = pkgs.writeText "init.sql" ''
