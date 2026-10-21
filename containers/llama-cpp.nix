@@ -14,6 +14,7 @@ let
   # We use pkgs.llama-cpp from the host's pkgs to ensure CUDA compatibility.
   # We set cpuArchDynamicDispatch = false because CUDA pins the host compiler to GCC 13,
   # while armv9.2+sme target in cpuArchDynamicDispatch requires GCC >= 14.
+  # Drop once nixpkgs' llama-cpp includes ggml-org/llama.cpp#26103 (probes each ARM variant).
   llamaPackage = pkgs.llama-cpp.override {
     cudaSupport = true;
     cpuArchDynamicDispatch = false;
