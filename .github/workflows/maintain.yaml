@@ -70,10 +70,27 @@ jobs:
                 fileChanges: {additions: [{path: "flake.lock", contents: $content}]}
             }}}' | gh api graphql --input -
 
-          gh pr create \
-            --title "chore: update flake.lock" \
-            --body "Automated lockfile update. Check Flake re-validates the new inputs on this PR; auto-merge is enabled and lands this once it's green." \
-            --head "$BRANCH_NAME" \
-            --base main || true
+          # Resetting the branch makes it identical to main for an instant, and
+          # GitHub sometimes closes the open PR for it right then (zero-diff
+          # detection) before the new commit lands. Reopen it instead of leaving
+          # the bump stranded on the branch with every error swallowed.
+          PR_JSON=$(gh pr list --head "$BRANCH_NAME" --state all --limit 1 --json number,state --jq '.[0] // empty')
+          PR_NUMBER=$(jq -r '.number // empty' <<<"$PR_JSON")
+          PR_STATE=$(jq -r '.state // empty' <<<"$PR_JSON")
+          if [ "$PR_STATE" = "CLOSED" ]; then
+            echo "PR #$PR_NUMBER was closed by the branch reset — reopening it."
+            gh pr reopen "$PR_NUMBER"
+          elif [ "$PR_STATE" != "OPEN" ]; then
+            gh pr create \
+              --title "chore: update flake.lock" \
+              --body "Automated lockfile update. Check Flake re-validates the new inputs on this PR; auto-merge is enabled and lands this once it's green." \
+              --head "$BRANCH_NAME" \
+              --base main
+          fi
 
           gh pr merge "$BRANCH_NAME" --auto --squash || true
+
+          # Fail the run if the bump is not on its way: an open PR with auto-merge
+          # armed, or already merged.
+          gh pr view "$BRANCH_NAME" --json state,autoMergeRequest \
+            --jq 'if .state == "MERGED" or (.state == "OPEN" and .autoMergeRequest != null) then "lock bump PR: \(.state), auto-merge armed" else error("no open PR with auto-merge for the lock bump (state: \(.state))") end'
