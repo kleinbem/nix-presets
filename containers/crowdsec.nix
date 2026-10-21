@@ -36,7 +36,15 @@ in
           systemd.tmpfiles.rules = [ "Z /var/lib/crowdsec - crowdsec crowdsec - -" ];
           services.crowdsec = {
             enable = true;
-            localConfig = {
+            # The hub collections the module installs on start (nixpkgs rewrote
+            # the module in 26.11: hub items, acquisitions and config.yaml keys
+            # are declared, not shelled in).
+            hub.collections = [
+              "crowdsecurity/caddy"
+              "crowdsecurity/sshd"
+              "crowdsecurity/linux"
+            ];
+            settings = {
               acquisitions = [
                 {
                   source = "journalctl";
@@ -61,15 +69,12 @@ in
                   };
                 }
               ];
-            };
-            settings = {
-              lapi.credentialsFile = "/var/lib/crowdsec/local_api_credentials.yaml";
-              general = {
-                api = {
-                  server = {
-                    enable = true;
-                    listen_uri = "0.0.0.0:8080";
-                  };
+              # Keys of crowdsec's config.yaml.
+              config.api = {
+                client.credentials_path = "/var/lib/crowdsec/local_api_credentials.yaml";
+                server = {
+                  enable = true;
+                  listen_uri = "0.0.0.0:8080";
                 };
               };
             };
@@ -78,7 +83,6 @@ in
           systemd.services.crowdsec = {
             serviceConfig = {
               ExecStartPre = [
-                "${pkgs.bash}/bin/bash -c '${pkgs.crowdsec}/bin/cscli collections install crowdsecurity/caddy crowdsecurity/sshd crowdsecurity/linux || true'"
                 "${pkgs.bash}/bin/bash -c '${pkgs.crowdsec}/bin/cscli bouncers add firewall -k $(cat /var/lib/crowdsec/bouncer-key) 2>/dev/null || true'"
               ];
             };
