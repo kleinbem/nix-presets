@@ -26,6 +26,9 @@ pkgs.testers.runNixOSTest {
     {
       imports = [ module ];
 
+      # postgres, restic and rclone share one guest; 1 GiB (the default) is tight.
+      virtualisation.memorySize = 2048;
+
       services.postgresql = {
         enable = true;
         initialScript = pkgs.writeText "init.sql" ''

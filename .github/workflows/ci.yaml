@@ -14,5 +14,11 @@ jobs:
       - uses: cachix/install-nix-action@v31.10.6
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+      # Build the NixOS VM test on its own first. Inside `nix flake check` it
+      # runs next to the other builds and the guest dies on the runner (#108:
+      # BrokenPipeError on the backdoor shell, or the job gets cancelled);
+      # alone it passes in ~30 s, and -L shows the guest console if it breaks.
+      - name: Build the backup-engine VM test
+        run: nix build -L --no-link .#checks.x86_64-linux.backup-engine --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages
       - run: nix flake check --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages
       - run: nix fmt --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages -- --fail-on-change
