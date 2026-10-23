@@ -30,6 +30,41 @@ in
     else
       "";
 
+  # TLS directive for a vhost. `tls internal` (the fleet's Caddy CA) unless
+  # the node asks for a publicly trusted certificate: `publicCert = true`
+  # gets one from Let's Encrypt through the Cloudflare DNS-01 challenge, so a
+  # mesh-only name never has to be reachable from the internet. Needed for
+  # clients that trust only the public CA list (Buzz 1.0's websocket uses
+  # webpki-roots). The token comes from the container's env file
+  # (my.containers.caddy.secretsFile). Public resolvers for the propagation
+  # check: NetBird answers the node's own name authoritatively on the mesh.
+  mkTls =
+    node:
+    if node.insecure or false then
+      ""
+    else if node.publicCert or false then
+      ''
+        tls {
+          dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+          resolvers 1.1.1.1 1.0.0.1
+        }
+      ''
+    else
+      "tls internal";
+
+  # Extra path routes to other ports on the node's own ip, e.g. Buzz's
+  # pairing relay: `extraRoutes."/pair*" = 3001;`. Each gets its own handle
+  # block ahead of the node's main reverse_proxy.
+  mkExtraRoutes =
+    node:
+    lib.concatStrings (
+      lib.mapAttrsToList (path: port: ''
+        handle ${path} {
+          reverse_proxy http://${node.ip}:${toString port}
+        }
+      '') (node.extraRoutes or { })
+    );
+
   # Generates the maintenance page HTML
   mkMaintPage = name: ''
     respond "<h1>System Maintenance</h1><p>${name} is offline.</p>" 503 {
@@ -61,14 +96,16 @@ in
               else
                 "";
           in
-          "${ipHostStr}${name}.local${customDomain}";
+          # A publicCert node serves only its domain: ACME can't issue for
+          # the `.local` or IP aliases, and they'd share the site's issuer.
+          if node.publicCert or false then node.domain else "${ipHostStr}${name}.local${customDomain}";
 
         isDown = isGlobalMaint || (node.maintenance or false);
       in
       nameValuePair vhostName {
         logFormat = "output stderr";
         extraConfig = ''
-          ${if (node.insecure or false) then "" else "tls internal"}
+          ${helpers.mkTls node}
           ${
             if isDown then
               helpers.mkMaintPage name
@@ -113,24 +150,27 @@ in
                 # backing this up yet).
                 authExcludePaths = node.authExcludePaths or [ ];
               in
-              if !(node.auth or false) then
-                reverseProxyBlock
-              else if authExcludePaths != [ ] then
-                ''
-                  @auth_excluded path ${lib.concatStringsSep " " authExcludePaths}
-                  handle @auth_excluded {
-                    ${reverseProxyBlock}
-                  }
-                  handle {
+              helpers.mkExtraRoutes node
+              + (
+                if !(node.auth or false) then
+                  reverseProxyBlock
+                else if authExcludePaths != [ ] then
+                  ''
+                    @auth_excluded path ${lib.concatStringsSep " " authExcludePaths}
+                    handle @auth_excluded {
+                      ${reverseProxyBlock}
+                    }
+                    handle {
+                      ${authConfig}
+                      ${reverseProxyBlock}
+                    }
+                  ''
+                else
+                  ''
                     ${authConfig}
                     ${reverseProxyBlock}
-                  }
-                ''
-              else
-                ''
-                  ${authConfig}
-                  ${reverseProxyBlock}
-                ''
+                  ''
+              )
           }
         '';
       }
