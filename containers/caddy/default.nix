@@ -8,6 +8,10 @@ let
   cfg = config.my.containers.caddy;
   # Import our clean helpers
   h = import ./helpers.nix { inherit lib; };
+  # Some vhost wants a publicly trusted certificate via Cloudflare DNS-01
+  # (helpers.nix mkTls). Derived from proxyTargets alone, so the closure
+  # container-factory builds matches the host's without a factory override.
+  acmeDns = lib.any (node: node.publicCert or false) (lib.attrValues cfg.proxyTargets);
   tlsOpts = import ../../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -47,6 +51,16 @@ in
       type = lib.types.bool;
       default = false;
       description = "When true, every proxied vhost serves a maintenance page instead of reverse-proxying.";
+    };
+    secretsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        Host path to an env file (bind-mounted to /run/secrets/caddy.env)
+        with `CLOUDFLARE_API_TOKEN=…`: a token with Zone Read + DNS Write on
+        the zone, for the DNS-01 challenge of nodes with `publicCert = true`.
+        Unused by `tls internal` vhosts.
+      '';
     };
     memoryLimit = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
@@ -89,58 +103,78 @@ in
         cfg = cfg // {
           privateUsers = "no";
         };
-        innerConfig = {
-          users.groups.caddy.gid = lib.mkForce 3000;
-          users.users.caddy = {
-            uid = lib.mkForce 3000;
-            isSystemUser = true;
-            group = "caddy";
-          };
+        # Bind-mounts to /run/secrets/caddy.env — see nix-gantry's
+        # mkContainer secretsFile.
+        inherit (cfg) secretsFile;
+        secretsFilePath = "/run/secrets/caddy.env";
+        innerConfig =
+          { pkgs, ... }:
+          {
+            users.groups.caddy.gid = lib.mkForce 3000;
+            users.users.caddy = {
+              uid = lib.mkForce 3000;
+              isSystemUser = true;
+              group = "caddy";
+            };
 
-          services.caddy = {
-            enable = true;
-            logFormat = "output stderr";
-            globalConfig = "debug";
-
-            # Restore the full generative logic with proven fixes
-            virtualHosts =
-              (h.genVHosts {
-                inherit (cfg) proxyTargets hostIP;
-                isGlobalMaint = cfg.globalMaintenance;
-                helpers = h;
-              })
-              // (
-                # Static-site vhosts (file_server). Each entry in
-                # cfg.staticSites becomes one vhost.
-                lib.mapAttrs' (
-                  domain: site:
-                  lib.nameValuePair domain {
-                    logFormat = "output stderr";
-                    extraConfig = ''
-                      tls internal
-                      root * /var/www/${domain}
-                      try_files {path} {path}/${site.index}
-                      file_server
-                    '';
-                  }
-                ) cfg.staticSites
+            services.caddy = {
+              enable = true;
+              logFormat = "output stderr";
+              globalConfig = "debug";
+              # caddy-dns/cloudflare for publicCert vhosts. The hash covers the
+              # vendored Go modules of this Caddy version plus the plugin: a
+              # nixpkgs bump that changes caddy fails the build here until the
+              # hash is updated (build with lib.fakeHash to get the new one).
+              package = lib.mkIf acmeDns (
+                pkgs.caddy.withPlugins {
+                  plugins = [ "github.com/caddy-dns/cloudflare@v0.2.4" ];
+                  hash = "sha256-5a5cpFl90pEWt0lUC4ZJQ7g+1//ZvsRhee64Dt9vh5o=";
+                }
               );
+
+              # Restore the full generative logic with proven fixes
+              virtualHosts =
+                (h.genVHosts {
+                  inherit (cfg) proxyTargets hostIP;
+                  isGlobalMaint = cfg.globalMaintenance;
+                  helpers = h;
+                })
+                // (
+                  # Static-site vhosts (file_server). Each entry in
+                  # cfg.staticSites becomes one vhost.
+                  lib.mapAttrs' (
+                    domain: site:
+                    lib.nameValuePair domain {
+                      logFormat = "output stderr";
+                      extraConfig = ''
+                        tls internal
+                        root * /var/www/${domain}
+                        try_files {path} {path}/${site.index}
+                        file_server
+                      '';
+                    }
+                  ) cfg.staticSites
+                );
+            };
+
+            systemd.services.caddy.serviceConfig = {
+              AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
+              # CLOUDFLARE_API_TOKEN for the DNS-01 challenge (secretsFile).
+              EnvironmentFile = lib.mkIf acmeDns "/run/secrets/caddy.env";
+            };
+
+            networking.firewall.allowedTCPPorts = [
+              80
+              443
+            ]
+            ++ (lib.mapAttrsToList (_: node: node.externalPort) cfg.proxyTargets);
+
+            # Ensure the bind-mount points exist inside the container
+            systemd.tmpfiles.rules = [
+              "d /etc/pki 0755 root root - -"
+              "d /etc/pki/internal 0755 root root - -"
+            ];
           };
-
-          systemd.services.caddy.serviceConfig.AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
-
-          networking.firewall.allowedTCPPorts = [
-            80
-            443
-          ]
-          ++ (lib.mapAttrsToList (_: node: node.externalPort) cfg.proxyTargets);
-
-          # Ensure the bind-mount points exist inside the container
-          systemd.tmpfiles.rules = [
-            "d /etc/pki 0755 root root - -"
-            "d /etc/pki/internal 0755 root root - -"
-          ];
-        };
 
         bindMounts =
           (lib.optionalAttrs (cfg.hostDataDir != null) {
