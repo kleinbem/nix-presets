@@ -71,6 +71,7 @@ in
           check-signatures = jjToolboxTool "check-signatures";
           push = jjToolboxTool "push";
           pull = jjToolboxTool "pull";
+          abandon-merged = jjToolboxTool "abandon-merged";
           sign-unsigned = jjToolboxTool "sign-unsigned";
           ws-new = jjToolboxTool "ws-new";
           ws-list = jjToolboxTool "ws-list";
