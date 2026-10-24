@@ -21,11 +21,10 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
-      - uses: cachix/install-nix-action@v31.10.6
+      - uses: kleinbem/actions/nix-setup@d640cb482c1083235491da5ce469468a0019fc64 # v1.0.0
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-          extra_nix_config: |
-            access-tokens = github.com=${{ steps.app-token.outputs.token }}
+          github-token: ${{ steps.app-token.outputs.token }}
+          nix-path: nixpkgs=channel:nixos-unstable
 
       - name: Update flake inputs
         run: nix flake update
