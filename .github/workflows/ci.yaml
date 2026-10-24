@@ -11,9 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.2
-      - uses: cachix/install-nix-action@v31.10.6
+      - uses: kleinbem/actions/nix-setup@d640cb482c1083235491da5ce469468a0019fc64 # v1.0.0
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          nix-path: nixpkgs=channel:nixos-unstable
+          # Read-only Attic over NetBird; skipped when the secrets are
+          # absent (fork PRs, Dependabot).
+          netbird-setup-key: ${{ secrets.NETBIRD_SETUP_KEY_EPHEMERAL }}
+          attic-token: ${{ secrets.ATTIC_PULL_TOKEN }}
       # Build the NixOS VM test on its own first. Inside `nix flake check` it
       # runs next to the other builds and the guest dies on the runner (#108:
       # BrokenPipeError on the backdoor shell, or the job gets cancelled);

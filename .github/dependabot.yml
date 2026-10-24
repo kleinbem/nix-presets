@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # Keeps pinned actions current, kleinbem/actions/nix-setup included. One
+  # grouped PR a week instead of one per action.
+  - package-ecosystem: github-actions
+    directories: ["/"]
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
