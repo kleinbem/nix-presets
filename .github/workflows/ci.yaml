@@ -18,11 +18,33 @@ jobs:
           # absent (fork PRs, Dependabot).
           netbird-setup-key: ${{ secrets.NETBIRD_SETUP_KEY_EPHEMERAL }}
           attic-token: ${{ secrets.ATTIC_PULL_TOKEN }}
-      # Build the NixOS VM test on its own first. Inside `nix flake check` it
-      # runs next to the other builds and the guest dies on the runner (#108:
-      # BrokenPipeError on the backdoor shell, or the job gets cancelled);
-      # alone it passes in ~30 s, and -L shows the guest console if it breaks.
+      # Build the NixOS VM test on its own first: alone it passes in ~30 s,
+      # and -L shows the guest console if it breaks.
       - name: Build the backup-engine VM test
         run: nix build -L --no-link .#checks.x86_64-linux.backup-engine --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages
-      - run: nix flake check --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages
+      # Not `nix flake check`: it evaluates all ~50 module-* checks (each a
+      # full NixOS system) in one process that never frees them, peaking at
+      # 17.7 GiB RSS on 2026-10-25, more than the 16 GiB runner. That is what
+      # killed the runner ("received a shutdown signal") or starved the VM
+      # test until its 1 h timeout (#108). nix-fast-build evaluates in
+      # workers with a memory cap and restarts them, so memory stays bounded.
+      - name: Build all checks
+        run: >-
+          nix run github:Mic92/nix-fast-build --
+          --flake .#checks.x86_64-linux
+          --systems x86_64-linux
+          --eval-workers 2
+          --eval-max-memory-size 4096
+          --no-nom --no-link --skip-cached
+          --override-input nix-devshells github:kleinbem/nix-devshells
+          --override-input nix-packages github:kleinbem/nix-packages
+      # The rest of what `nix flake check` covered: packages and dev shells
+      # must evaluate (they are not built here).
+      - name: Evaluate packages and dev shells
+        run: |
+          for out in packages devShells; do
+            nix eval --json ".#$out.x86_64-linux" --apply 'builtins.mapAttrs (_: d: d.drvPath)' \
+              --override-input nix-devshells github:kleinbem/nix-devshells \
+              --override-input nix-packages github:kleinbem/nix-packages >/dev/null
+          done
       - run: nix fmt --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages -- --fail-on-change
