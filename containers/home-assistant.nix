@@ -56,6 +56,51 @@ in
 
         innerConfig =
           { pkgs, ... }:
+          let
+            # Since 2026.10, Home Assistant keeps its HTTP settings in
+            # .storage/http and reads the `http:` YAML block only once, to
+            # migrate it (and the YAML goes away in 2027.2). The HAOS restore
+            # brought a store with the migration already done and no proxy
+            # settings, so the YAML trusted_proxies were ignored and every
+            # request through Caddy got 400 "not set-up for reverse proxies".
+            # A migrated YAML block also only lands as a "pending" trial that
+            # reverts after 5 minutes unless someone confirms it in the UI.
+            # So write the store itself on every start, from Nix: our config as
+            # `stable`, nothing pending, migration done. Format: version 2.2,
+            # homeassistant/components/http/config.py; keys left out of the
+            # schema defaults are spelled out because HA reads them directly.
+            httpStore = pkgs.writeText "home-assistant-http-store.json" (
+              builtins.toJSON {
+                version = 2;
+                minor_version = 2;
+                key = "http";
+                data = {
+                  stable = {
+                    server_port = 8123;
+                    cors_allowed_origins = [ "https://cast.home-assistant.io" ];
+                    use_x_forwarded_for = true;
+                    trusted_proxies = [
+                      "127.0.0.1/32"
+                      "::1/128"
+                      "10.85.49.1/32" # Hass-Pi Gateway/Bridge (host DNAT + masquerade)
+                      "10.85.48.107/32" # Caddy Container (Core-Pi)
+                      "10.0.0.22/32" # Core-Pi LAN
+                      "100.117.146.201/32" # Core-Pi NetBird Mesh IP
+                    ];
+                    login_attempts_threshold = -1;
+                    ip_ban_enabled = true;
+                    ssl_profile = "modern";
+                    use_x_frame_options = true;
+                    created_at = "2026-10-25T00:00:00+00:00";
+                    error = null;
+                    error_message = null;
+                  };
+                  pending = null;
+                  yaml_migration_done = true;
+                };
+              }
+            );
+          in
           {
             # Upstream workaround: paho-mqtt 2.1.0's test suite fails under Python 3.14
             # (callback-registration assertion, on_unsubscribe/on_disconnect), which
@@ -208,17 +253,8 @@ in
                   commit_interval = 30;
                 };
 
-                http = {
-                  use_x_forwarded_for = true;
-                  trusted_proxies = [
-                    "127.0.0.1"
-                    "::1"
-                    "10.85.49.1" # Hass-Pi Gateway/Bridge
-                    "10.85.48.107" # Caddy Container (Core-Pi)
-                    "10.0.0.22" # Core-Pi LAN
-                    "100.117.146.201" # Core-Pi NetBird Mesh IP
-                  ];
-                };
+                # No `http:` here: HA 2026.10 moved it to .storage/http, see
+                # httpStore below.
 
                 # Declarative logic (Nix-managed hooks)
                 automation = "!include automations.yaml";
@@ -282,6 +318,11 @@ in
                 "f /var/lib/hass/scripts.yaml 0644 hass hass - {}"
                 "f /var/lib/hass/scenes.yaml 0644 hass hass - {}"
               ];
+
+            systemd.services.home-assistant.preStart = lib.mkAfter ''
+              install -d -m 0700 /var/lib/hass/.storage
+              install -m 0600 ${httpStore} /var/lib/hass/.storage/http
+            '';
 
             networking.firewall.allowedTCPPorts = [ 8123 ];
           };
