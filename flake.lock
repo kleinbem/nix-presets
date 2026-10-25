@@ -882,11 +882,11 @@
         "treefmt-nix": "treefmt-nix_2"
       },
       "locked": {
-        "lastModified": 1792825234,
-        "narHash": "sha256-U94TpTXrOSpoYAiPXtmLtRA6nHHwoOWk6+2AaALAutE=",
+        "lastModified": 1792882732,
+        "narHash": "sha256-DKhCnCk8G7OQeRj0gMOf3lAHGg8fGJwLO0zq3apscH8=",
         "owner": "kleinbem",
         "repo": "nix-devshells",
-        "rev": "3ec4a73f63c02ce267d39350850889c983e2b2b2",
+        "rev": "7ce77cf926a9325ae11a1a15ce3cc82337565341",
         "type": "github"
       },
       "original": {
@@ -915,11 +915,11 @@
         "treefmt-nix": "treefmt-nix_4"
       },
       "locked": {
-        "lastModified": 1792825234,
-        "narHash": "sha256-U94TpTXrOSpoYAiPXtmLtRA6nHHwoOWk6+2AaALAutE=",
+        "lastModified": 1792882732,
+        "narHash": "sha256-DKhCnCk8G7OQeRj0gMOf3lAHGg8fGJwLO0zq3apscH8=",
         "owner": "kleinbem",
         "repo": "nix-devshells",
-        "rev": "3ec4a73f63c02ce267d39350850889c983e2b2b2",
+        "rev": "7ce77cf926a9325ae11a1a15ce3cc82337565341",
         "type": "github"
       },
       "original": {
@@ -936,11 +936,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792529900,
-        "narHash": "sha256-+oW4NLMy6utd2CjVUK1FcgMjNgxVIMiGWJ6Tj2bxeRY=",
+        "lastModified": 1792882887,
+        "narHash": "sha256-mW8HsJ1PoXto4eyE692EjecvQHww99uh5XFOJOkjtFw=",
         "owner": "kleinbem",
         "repo": "nix-gantry",
-        "rev": "0fa32b3e1522a715033918bd04d63394400a3d14",
+        "rev": "8fe791e0459d94148d359a30a9b09393ae85598f",
         "type": "github"
       },
       "original": {
@@ -1024,11 +1024,11 @@
         "treefmt-nix": "treefmt-nix_5"
       },
       "locked": {
-        "lastModified": 1792826629,
-        "narHash": "sha256-3oeAWHJfnxuxgW6sunHDMlQtxuvFbtyEvAD4w1SrZ/I=",
+        "lastModified": 1792913913,
+        "narHash": "sha256-9t0oGI/bhgj/+HuKZ/u96U9ENQOTWLDvkNM+DukpvBg=",
         "owner": "kleinbem",
         "repo": "nix-packages",
-        "rev": "9b640ed083faf3608ee9f0d6213fedd610abd60a",
+        "rev": "41af432778ab2228766d84d7dd0510083559ea55",
         "type": "github"
       },
       "original": {
@@ -1044,11 +1044,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792814758,
-        "narHash": "sha256-/H/C/u02zqXvCKFivR1p7KOEqyzYRyQNnd4lhiIG1Fw=",
+        "lastModified": 1792901374,
+        "narHash": "sha256-fLLGF/KvkVp71oNoFsmHEYiV31Yvn4NQmp+YCJO1O6c=",
         "owner": "nix-community",
         "repo": "nix-vscode-extensions",
-        "rev": "f46e69a408c2775827719ab2b61b4d4453f92b22",
+        "rev": "99e8983d74f99f68dc81010b817ac102cbf6b1b1",
         "type": "github"
       },
       "original": {
@@ -1433,11 +1433,11 @@
     "nixpkgs-mesh": {
       "flake": false,
       "locked": {
-        "lastModified": 1792797770,
-        "narHash": "sha256-B7ibp9rQcDuQOky+xn2FarhYJGSXJeHSofn5GlP14Cg=",
+        "lastModified": 1792830099,
+        "narHash": "sha256-ZDXSa4ocLOVDQMG800FBKXSFvaHfy/RpIRYZEMwY4tA=",
         "owner": "kleinbem",
         "repo": "nixpkgs",
-        "rev": "933a2cd0caa657a622b9cc45167ce464e9bd46f2",
+        "rev": "6c68a12adbb8c969a9693c5cdc8fb2ccd6343c90",
         "type": "github"
       },
       "original": {
@@ -1595,11 +1595,11 @@
     },
     "nixpkgs_7": {
       "locked": {
-        "lastModified": 1792502884,
-        "narHash": "sha256-IoNisKcGbUjdd45qCqywGMCYmZ5EnkxezvLII0FWwNA=",
+        "lastModified": 1792773339,
+        "narHash": "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "02c087f3fe673c9e317f206a627cb6b910336dbe",
+        "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
         "type": "github"
       },
       "original": {
@@ -1657,11 +1657,11 @@
         "qmd": "qmd"
       },
       "locked": {
-        "lastModified": 1792732363,
-        "narHash": "sha256-lL9YdNq8puTydzWtFQBnTx0g0YAyHRvj0GO18W1mDZs=",
+        "lastModified": 1792876667,
+        "narHash": "sha256-s20U23XqdUmJdsxEIFgOFu2AXCNOoxIkqVf/PWBnSmY=",
         "owner": "openclaw",
         "repo": "nix-openclaw",
-        "rev": "20e2acf27898903c549e5faf7edca1fc8e85f8bf",
+        "rev": "4e5f44465d367839780be6f6111a1ab7ff6e315b",
         "type": "github"
       },
       "original": {
