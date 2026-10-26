@@ -344,9 +344,19 @@ in
         };
       })
       {
+        # The recorder DB is written constantly; copy it with sqlite's
+        # `.backup` instead of the live files. HA's own backup archives,
+        # the TTS cache and logs are left out.
         my.backup.items.home-assistant = {
           tier = "bulk";
+          sqlite = [ "${cfg.hostDataDir}/home-assistant_v2.db" ];
           paths = [ cfg.hostDataDir ];
+          exclude = [
+            "${cfg.hostDataDir}/home-assistant_v2.db*"
+            "${cfg.hostDataDir}/backups"
+            "${cfg.hostDataDir}/tts"
+            "${cfg.hostDataDir}/home-assistant.log*"
+          ];
         };
       }
     ]
