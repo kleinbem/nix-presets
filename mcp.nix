@@ -37,6 +37,13 @@
         description = "Enable Blender MCP Server for organic 3D modeling";
       };
     };
+    freecad = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable FreeCAD MCP Server (freecad-mcp) globally for AI-driven CAD";
+      };
+    };
     gimp = {
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -54,7 +61,7 @@
     svelte = {
       enable = lib.mkOption {
         type = lib.types.bool;
-        default = true;
+        default = false;
         description = "Enable official Svelte 5 & SvelteKit documentation MCP server (@sveltejs/mcp)";
       };
     };
@@ -74,6 +81,34 @@
           agents queue their expensive commands (builds, tests) so several
           sessions on one machine run them one at a time per queue.
         '';
+      };
+    };
+    github = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable GitHub MCP server (prefer gh CLI and jj git push)";
+      };
+    };
+    filesystem = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable filesystem MCP server (prefer native agent file tools)";
+      };
+    };
+    memory = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable MCP knowledge graph memory server";
+      };
+    };
+    sequentialThinking = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable sequential thinking MCP server (superseded by native model thinking)";
       };
     };
     homeAssistant = {
@@ -206,6 +241,8 @@
             "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/tools/workspace-mcp.py"
           ];
         };
+      }
+      // (lib.optionalAttrs config.modules.mcp.github.enable {
         github = {
           command = "atlas";
           args = [
@@ -216,26 +253,31 @@
             "stdio"
           ];
         };
+      })
+      // (lib.optionalAttrs config.modules.mcp.filesystem.enable {
         filesystem = {
           command = lib.getExe pkgs.mcp-server-filesystem;
           args = [ "${config.home.homeDirectory}/Develop" ];
         };
-
+      })
+      // (lib.optionalAttrs config.modules.mcp.memory.enable {
         memory = {
           command = lib.getExe pkgs.mcp-server-memory;
           args = [ ];
         };
-
+      })
+      // (lib.optionalAttrs config.modules.mcp.sequentialThinking.enable {
         "sequential-thinking" = {
           command = lib.getExe pkgs.mcp-server-sequential-thinking;
           args = [ ];
         };
-
+      })
+      // (lib.optionalAttrs config.modules.mcp.freecad.enable {
         freecad = {
           command = lib.getExe freecadMcpPkg;
           args = [ ];
         };
-      }
+      })
       // (lib.optionalAttrs config.modules.mcp.bambu.enable {
         bambu-printer = {
           command = "${pkgs.nodejs_22}/bin/npx";
