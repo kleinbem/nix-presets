@@ -180,6 +180,11 @@ in
                 # libs each one logs an import error on every start.
                 "nest"
                 "qnap_qsw"
+                # alarmo imports homeassistant.components.mqtt at load time
+                # although its manifest lists mqtt only as optional, so without
+                # paho-mqtt it fails to set up at all (nielsfaber/alarmo#572).
+                # This adds the libraries only; no broker is configured.
+                "mqtt"
               ];
 
               # Was HACS-installed on HAOS; nixpkgs packages both, so HACS
