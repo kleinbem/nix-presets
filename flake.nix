@@ -238,7 +238,6 @@
               comfyui = import ./containers/comfyui.nix { inherit self; };
               langfuse = import ./containers/langfuse.nix { inherit self inputs; };
               langflow = import ./containers/langflow.nix { inherit self; };
-              vllm = import ./containers/vllm.nix { inherit self; };
               openclaw = import ./containers/openclaw.nix { inherit self inputs; };
               hermes = import ./containers/hermes.nix { inherit self inputs; };
               persona-runtime = import ./containers/persona-runtime.nix { inherit self inputs; };
