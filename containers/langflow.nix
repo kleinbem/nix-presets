@@ -1,4 +1,4 @@
-_:
+{ self }:
 {
   config,
   lib,
@@ -6,6 +6,7 @@ _:
 }:
 let
   cfg = config.my.containers.langflow;
+  inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 in
 {
@@ -19,47 +20,35 @@ in
     };
     autoStart = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Start the container automatically on boot.";
     };
   }
   // tlsOpts;
 
-  config = lib.mkIf cfg.enable {
-    virtualisation.oci-containers.containers.langflow = {
-      image = "docker.io/langflowai/langflow:latest";
-      inherit (cfg) autoStart;
-      ports = [ "7860:7860" ];
-      environment = {
-        LANGFLOW_DATABASE_URL = "sqlite:////var/lib/langflow/langflow.db";
-        LANGFLOW_HOST = "0.0.0.0";
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
+    name = "langflow";
+    inherit cfg;
+    usesPodman = true;
+    subDirs = [ "data" ];
+    innerConfig = {
+      virtualisation.oci-containers = {
+        backend = "podman";
+        containers.langflow = {
+          image = "docker.io/langflowai/langflow:latest";
+          ports = [ "7860:7860" ];
+          environment = {
+            LANGFLOW_DATABASE_URL = "sqlite:////var/lib/langflow/langflow.db";
+            LANGFLOW_HOST = "0.0.0.0";
+          };
+          volumes = [
+            "${cfg.hostDataDir}/data:/var/lib/langflow"
+          ];
+        };
       };
-      volumes = [
-        "${cfg.hostDataDir}:/var/lib/langflow"
-      ];
-      extraOptions = [
-        "--network=cbr0"
-        "--ip=${lib.head (lib.splitString "/" cfg.ip)}"
-        "--security-opt=no-new-privileges"
-        # Run as the fleet-standard martin:users uid/gid instead of
-        # trusting langflowai/langflow's image default — makes
-        # hostDataDir ownership deterministic so it doesn't need to be
-        # world-writable (0777) for the sqlite db bind mount to work.
-        "--user=1000:100"
-      ];
-    };
 
-    systemd.services.podman-langflow = {
-      after = [ "podman-network-cbr0.service" ];
-      requires = [ "podman-network-cbr0.service" ];
-      serviceConfig = {
-        MemoryMax = lib.mkIf (cfg.memoryLimit != null) cfg.memoryLimit;
-        Environment = [ "TMPDIR=/var/lib/images/podman/tmp" ];
-      };
+      networking.firewall.allowedTCPPorts = [ 7860 ];
     };
-
-    systemd.tmpfiles.rules = [
-      "d ${cfg.hostDataDir} 0755 1000 100 - -"
-    ];
-  };
+  });
 }
