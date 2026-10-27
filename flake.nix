@@ -271,6 +271,7 @@
               dev-db = import ./containers/dev-db.nix { inherit self; };
               qbittorrent = import ./containers/qbittorrent.nix { inherit self; };
               caido = import ./containers/caido.nix { inherit self; };
+              miniflux = import ./containers/miniflux.nix { inherit self; };
             };
 
             # dashboard-homer redeclares the same my.containers.dashboard
