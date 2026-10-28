@@ -71,6 +71,18 @@ in
         innerConfig = inner: {
           services.atticd = {
             enable = true;
+            # zhaofengli/attic#376: chunk holds were released by detached tasks
+            # that fail silently under load, so chunks stayed held forever and
+            # GC never freed them (3.9 GB on 2026-10-28). Drop once merged.
+            package = inner.pkgs.attic-server.overrideAttrs (old: {
+              patches = (old.patches or [ ]) ++ [
+                (inner.pkgs.fetchpatch {
+                  name = "attic-release-chunk-holds.patch";
+                  url = "https://github.com/zhaofengli/attic/commit/651f59712dfac1d4e29ddc9b169021237c2a3219.patch";
+                  hash = "sha256-/NMj9FKigyOaw94qm1QFvukRNjuG6JPhHpHXxo/KVuY=";
+                })
+              ];
+            });
             environmentFile = if cfg.secretsFile != null then "/etc/atticd-env" else null;
             settings = {
               listen = "[::]:8080";
@@ -298,7 +310,19 @@ in
             sqlite3 "file:$DB?immutable=1" \
               "SELECT json_extract(remote_file,'$.Local.name') FROM chunk WHERE state='D' AND holders_count=0;" > "$LIST"
             N=$(wc -l < "$LIST")
-            if [ "$N" -eq 0 ]; then echo "nothing to reap"; rm -f "$LIST"; exit 0; fi
+
+            # Leaked holds (zhaofengli/attic#376): a chunk keeps holders_count>0
+            # with no chunkref left, or a NAR upload stays pending forever, and
+            # atticd's GC never collects either. Older than a day can't be a
+            # live upload. Released here, atticd's next GC pass deletes them.
+            CUTOFF="strftime('%Y-%m-%dT%H:%M:%S','now','-1 day')"
+            STALE_NARS="SELECT id FROM nar WHERE state='P' AND holders_count=0 AND created_at < $CUTOFF"
+            STALE_HOLDS="FROM chunk WHERE state='V' AND holders_count>0 AND created_at < $CUTOFF
+              AND NOT EXISTS (SELECT 1 FROM chunkref r WHERE r.chunk_id=chunk.id)"
+            LEAKS=$(sqlite3 "file:$DB?immutable=1" \
+              "SELECT (SELECT count(*) FROM ($STALE_NARS)) + (SELECT count(*) $STALE_HOLDS);")
+
+            if [ "$N" -eq 0 ] && [ "$LEAKS" -eq 0 ]; then echo "nothing to reap"; rm -f "$LIST"; exit 0; fi
 
             BEFORE=$(du -sh "$ST" | cut -f1)
             # Slow part, kept online: delete the orphaned files. Sharded layout is
@@ -306,16 +330,23 @@ in
             sed -E "s#^((.)(.).*)#$ST/\2/\2\3/\1#" "$LIST" | xargs -r -P4 rm -f
 
             # Only the DB writes need atticd stopped (seconds on a compacted DB).
+            # chunkrefs are deleted by hand: the sqlite3 CLI doesn't enforce the
+            # ON DELETE CASCADE.
             systemctl -M attic stop atticd
             sleep 2
             cp -a "$DB" "$DB.pre-reap.bak" 2>/dev/null || true
-            sqlite3 "$DB" "DELETE FROM chunk WHERE state='D' AND holders_count=0;"
+            sqlite3 "$DB" "BEGIN;
+              DELETE FROM chunk WHERE state='D' AND holders_count=0;
+              DELETE FROM chunkref WHERE nar_id IN ($STALE_NARS);
+              DELETE FROM nar WHERE id IN ($STALE_NARS);
+              UPDATE chunk SET holders_count=0 WHERE id IN (SELECT id $STALE_HOLDS);
+              COMMIT;"
             sqlite3 "$DB" "VACUUM;"
             systemctl -M attic start atticd
 
             rm -f "$LIST"
             AFTER=$(du -sh "$ST" | cut -f1)
-            echo "attic-reap: storage $BEFORE -> $AFTER, removed $N orphaned chunks"
+            echo "attic-reap: storage $BEFORE -> $AFTER, removed $N orphaned chunks, released $LEAKS leaked holds"
           '';
         };
         systemd.timers.attic-reap = {
