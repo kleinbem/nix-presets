@@ -8,6 +8,29 @@
 
 let
   cfg = config.modules.herdr;
+
+  # Markdown picker for agent output (plans, reports, CLAUDE.md): newest files
+  # first, rendered preview beside the list, Enter reads one in glow's pager
+  # and returns to the list. --no-require-git keeps .gitignore honoured in jj
+  # workspaces, which have no .git.
+  mdview = pkgs.writeShellApplication {
+    name = "herdr-mdview";
+    runtimeInputs = [
+      pkgs.fd
+      pkgs.fzf
+      pkgs.glow
+    ];
+    text = ''
+      # fzf expands $FZF_PREVIEW_COLUMNS, not this shell.
+      # shellcheck disable=SC2016
+      fd --type f --extension md --no-require-git --exec-batch ls -t -- \
+        | fzf --prompt 'md> ' \
+          --preview 'glow --style dark --width "$FZF_PREVIEW_COLUMNS" {}' \
+          --preview-window 'right,65%' \
+          --bind 'enter:execute(glow --pager {})'
+    '';
+  };
+
   herdrConfigFile = (pkgs.formats.toml { }).generate "herdr-config" {
     session.resume_agents_on_restore = true;
 
@@ -71,6 +94,14 @@ let
           description = "file browser";
           width = "80%";
           height = "80%";
+        }
+        {
+          key = "prefix+m";
+          type = "popup";
+          command = lib.getExe mdview;
+          description = "markdown viewer";
+          width = "90%";
+          height = "90%";
         }
         {
           key = "prefix+f";
