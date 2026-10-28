@@ -24,6 +24,20 @@ in
       type = lib.types.bool;
       default = true;
     };
+    upstreamCacheKeyNames = lib.mkOption {
+      type = lib.types.nullOr (lib.types.listOf lib.types.str);
+      default = null;
+      example = [
+        "cache.nixos.org-1"
+        "nix-community.cachix.org-1"
+      ];
+      description = ''
+        Signing key names of the public caches Attic sits on top of. Pushes
+        skip paths signed by any of them, so the cache holds only what no
+        public cache has. Applied to the `system` cache on every activation
+        that changes the list; null leaves the cache's setting alone.
+      '';
+    };
     autoReap = {
       enable = lib.mkEnableOption ''
         a weekly systemd timer that reclaims orphaned chunks. atticd's retention
@@ -54,7 +68,7 @@ in
         # doc comment.
         inherit (cfg) secretsFile;
         secretsFilePath = "/etc/atticd-env";
-        innerConfig = _: {
+        innerConfig = inner: {
           services.atticd = {
             enable = true;
             environmentFile = if cfg.secretsFile != null then "/etc/atticd-env" else null;
@@ -136,23 +150,9 @@ in
                 # only sweeps orphans then). Per-cache override: `attic cache configure
                 # system --retention-period <dur>`.
                 #
-                # UPSTREAM FILTER (imperative — no declarative atticd knob exists):
-                # atticd's server-side push filter skips paths signed by an upstream
-                # cache's key. It defaults to cache.nixos.org-1 only; the four cachix
-                # keys this flake trusts were added on 2026-07-24 via
-                #   attic cache configure system \
-                #     --upstream-cache-key-name cache.nixos.org-1 \
-                #     --upstream-cache-key-name nix-community.cachix.org-1 \
-                #     --upstream-cache-key-name devenv.cachix.org-1 \
-                #     --upstream-cache-key-name cuda-maintainers.cachix.org-1 \
-                #     --upstream-cache-key-name anduril.cachix.org-1
-                # cuda-maintainers.cachix.org was retired Nov 2025 in favour of
-                # cache.nixos-cuda.org (2026-09-20) — swap the filter key too:
-                #   attic cache configure system \
-                #     --upstream-cache-key-name cache.nixos-cuda.org
-                # This is PER-CACHE DB state, NOT captured by this module — if the
-                # cache DB is ever recreated, re-run the above (keep it in sync with
-                # trusted-public-keys in nix-config/modules/nixos/core.nix).
+                # The upstream filter (paths signed by a public cache are skipped
+                # on push) is per-cache DB state with no atticd config knob; the
+                # attic-upstream-keys unit below applies upstreamCacheKeyNames.
                 default-retention-period = "14 days";
               };
             };
@@ -192,6 +192,52 @@ in
           };
 
           networking.firewall.allowedTCPPorts = [ 8080 ];
+
+          # Applies upstreamCacheKeyNames to the `system` cache. The token is
+          # minted here from the server's own secret and lives for 10 minutes,
+          # so no admin token has to be stored anywhere. The key list is part
+          # of the script, so a changed list re-runs the unit on activation.
+          systemd.services.attic-upstream-keys = lib.mkIf (cfg.upstreamCacheKeyNames != null) (
+            let
+              innerAtticd = inner.config.services.atticd;
+              serverToml = (pkgs.formats.toml { }).generate "server.toml" innerAtticd.settings;
+            in
+            {
+              description = "Set the upstream cache keys of the Attic system cache";
+              after = [ "atticd.service" ];
+              requires = [ "atticd.service" ];
+              wantedBy = [ "multi-user.target" ];
+              path = [
+                innerAtticd.package
+                pkgs.attic-client
+                pkgs.curl
+              ];
+              serviceConfig = {
+                Type = "oneshot";
+                RemainAfterExit = true;
+                EnvironmentFile = lib.mkIf (cfg.secretsFile != null) "/etc/atticd-env";
+              };
+              script = ''
+                set -euo pipefail
+                for _ in $(seq 60); do
+                  curl -s -o /dev/null http://127.0.0.1:8080/ && break
+                  sleep 1
+                done
+                token=$(atticadm -f ${serverToml} make-token --sub attic-upstream-keys \
+                  --validity 10m --pull system --configure-cache system \
+                  --configure-cache-retention system)
+                export XDG_CONFIG_HOME=$(mktemp -d)
+                trap 'rm -rf "$XDG_CONFIG_HOME"' EXIT
+                attic login --set-default local http://127.0.0.1:8080 "$token" >/dev/null
+                attic cache configure system ${
+                  lib.concatMapStringsSep " " (
+                    k: "--upstream-cache-key-name ${lib.escapeShellArg k}"
+                  ) cfg.upstreamCacheKeyNames
+                }
+                attic cache info system | grep 'Upstream Cache Keys'
+              '';
+            }
+          );
         };
         bindMounts = {
           "/var/lib/atticd" = {
