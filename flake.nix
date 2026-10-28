@@ -291,6 +291,7 @@
               dev-db = import ./containers/dev-db.nix { inherit self; };
               qbittorrent = import ./containers/qbittorrent.nix { inherit self; };
               caido = import ./containers/caido.nix { inherit self; };
+              garage-ui = import ./containers/garage-ui.nix { inherit self; };
               miniflux = import ./containers/miniflux.nix { inherit self; };
             };
 
