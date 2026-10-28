@@ -79,7 +79,8 @@
       enable = true;
       settings = {
         add_newline = true;
-        scan_timeout = 100;
+        # 100ms ran out on busy boots (load ~60) and printed scan warnings.
+        scan_timeout = 500;
         character = {
           success_symbol = "[➜](bold cyan)";
           error_symbol = "[✗](bold red)";
