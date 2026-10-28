@@ -43,8 +43,8 @@ in
         externalPort). Passed from host config, which computes it from
         its own inventory -- this preset has no inventory of its own. See
         helpers.nix's genVHosts for the fields read per entry (ip, port,
-        externalPort, domain, mtls, secure, auth, authExcludePaths,
-        maintenance).
+        externalPort, domain, extraDomains, mtls, secure, auth,
+        authExcludePaths, maintenance).
       '';
     };
     globalMaintenance = lib.mkOption {
