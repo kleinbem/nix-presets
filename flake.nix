@@ -142,6 +142,20 @@
                 "all" # Composite of the above; members are checked individually
               ];
 
+              # The nixpkgs NixOS tests of the held packages (kleinbem/nix-holds),
+              # with the holds and our fixes for them, as in the containers.
+              heldPkgs = import inputs.nixpkgs {
+                inherit system;
+                config.allowUnfree = true;
+                overlays = [
+                  inputs.nix-holds.overlays.default
+                  self.overlays.open-webui
+                ];
+              };
+              heldTests = inputs.nixpkgs.lib.mapAttrs' (
+                name: test: inputs.nixpkgs.lib.nameValuePair "held-${name}" test
+              ) (inputs.nix-holds.lib.nixosTests heldPkgs);
+
               moduleChecks = inputs.nixpkgs.lib.mapAttrs' (
                 name: module: inputs.nixpkgs.lib.nameValuePair "module-${name}" (mkModuleCheck module)
               ) (inputs.nixpkgs.lib.filterAttrs (n: _: !(builtins.elem n excludedModules)) self.nixosModules);
@@ -161,6 +175,7 @@
                 };
               };
             }
+            // heldTests
             // moduleChecks;
 
           devShells.default = pkgs.mkShell {
@@ -187,6 +202,10 @@
         };
 
       flake = {
+        # Fixes for packages the containers use, shared with the checks that
+        # test them.
+        overlays.open-webui = import ./overlays/open-webui.nix;
+
         lib = {
           # Re-exported from nix-gantry, the standalone extraction of this
           # mechanism (github:kleinbem/nix-gantry) -- lib/factory.nix no

@@ -1029,11 +1029,11 @@
         "nixpkgs-stable": "nixpkgs-stable_2"
       },
       "locked": {
-        "lastModified": 1793155073,
-        "narHash": "sha256-V6FMmbHK4FWBOZQjneLB3EHsMC4psSRxp6ACPHvTDCs=",
+        "lastModified": 1793215255,
+        "narHash": "sha256-Rlig6S1JI48/YUY/sae7btZfR6XAEkfFf9Fq6E39C8o=",
         "owner": "kleinbem",
         "repo": "nix-holds",
-        "rev": "4cdf748d2747b8541fab420498b58bfd85e35bf8",
+        "rev": "653de3b19f6901eb4f5e6774760e2099416d9d97",
         "type": "github"
       },
       "original": {

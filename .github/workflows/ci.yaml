@@ -18,6 +18,8 @@ jobs:
           # absent (fork PRs, Dependabot).
           netbird-setup-key: ${{ secrets.NETBIRD_SETUP_KEY_EPHEMERAL }}
           attic-token: ${{ secrets.ATTIC_PULL_TOKEN }}
+          # held-open-webui builds open-webui with all optional dependencies.
+          free-disk-space: 'true'
       # Build the NixOS VM test on its own first: alone it passes in ~30 s,
       # and -L shows the guest console if it breaks.
       - name: Build the backup-engine VM test
