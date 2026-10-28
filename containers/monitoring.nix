@@ -378,6 +378,25 @@ in
                       annotations:
                         summary: "High disk usage on {{ $labels.instance }}"
                         description: "Disk space on / has fallen below 15% for more than 5 minutes."
+                    # node_rtc_* and node_chrony_* come from node-time-metrics
+                    # (monitoring-node.nix). A wrong RTC makes every boot start
+                    # in the past, and the clock step then fires every timer at once.
+                    - alert: RTCDrift
+                      expr: 'abs(node_rtc_offset_seconds) > 120'
+                      for: 1h
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Hardware clock off on {{ $labels.instance }}"
+                        description: "RTC {{ $labels.device }} ({{ $labels.name }}) is {{ $value | humanizeDuration }} away from system time; the next boot will start at the wrong time."
+                    - alert: ClockNotSynced
+                      expr: 'node_chrony_synchronized == 0'
+                      for: 30m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Clock not synchronised on {{ $labels.instance }}"
+                        description: "chrony has not been synchronised to NTP for 30 minutes."
                 - name: network-edge
                   # Router-relevant health. Metric names follow node_exporter;
                   # the OpenWrt node-exporter-lua aims for compatibility —
