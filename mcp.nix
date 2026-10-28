@@ -190,19 +190,9 @@
       # Two halves: the MCP server (stdio, started by the AI client) and a
       # GIMP plugin that listens on localhost:9877 once started via
       # Tools > MCP > Start MCP Server.
-      gimp3McpPkg = pkgs.python3.pkgs.buildPythonPackage rec {
-        pname = "gimp3-mcp";
-        version = "0.2.0";
-        pyproject = true;
-        src = pkgs.fetchPypi {
-          pname = "gimp3_mcp";
-          inherit version;
-          sha256 = "39514a83dabb29941c4e8891a5a829850dee71707fca6b91b0fcec1304818879";
-        };
-        nativeBuildInputs = [ pkgs.python3.pkgs.hatchling ];
-        propagatedBuildInputs = [ pkgs.python3.pkgs.mcp ];
-        meta.mainProgram = "gimp3-mcp";
-      };
+      # The server is our nix-packages package (held in nix-holds while it
+      # needs mcp 1.x).
+      gimp3McpPkg = pkgs.gimp3-mcp;
 
       # GIMP 3 only loads plugins that are executable and live in a folder of
       # the same name; pull the plugin out of the sdist and mark it executable.
