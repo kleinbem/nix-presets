@@ -94,6 +94,15 @@ in
                 max-size = 16777216; # 16 MiB
               };
 
+              # atticd's default is zstd 8. Measured on core-pi (Pi 5, one core,
+              # 214 MB of typical libraries): level 3 compresses ~3x faster than
+              # 8 for 10% more bytes; level 1 is faster again but 26% bigger,
+              # which costs on every pull over the mesh. Only new chunks use it.
+              compression = {
+                type = "zstd";
+                level = 3;
+              };
+
               # Retention policy. This cache is a SPARSE OVERLAY on cache.nixos.org:
               # CI pushes only the paths it actually built — the non-upstream ones
               # (custom linux-rpi kernel, custom packages, host-specific config) —
