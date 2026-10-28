@@ -90,15 +90,18 @@ in
                 if (node ? domain) then "" else "${hostIP}, "
               else
                 "${hostIP}:${toString node.externalPort}, :${toString node.externalPort}, ";
-            customDomain =
-              if (node ? domain) then
-                ", ${if (node.insecure or false) then "http://" else ""}${node.domain}"
-              else
-                "";
+            # `extraDomains`: more names for the same site, e.g. the old name
+            # while a node is renamed.
+            domains = lib.optional (node ? domain) node.domain ++ node.extraDomains or [ ];
+            scheme = if (node.insecure or false) then "http://" else "";
+            customDomain = lib.concatMapStrings (d: ", ${scheme}${d}") domains;
           in
-          # A publicCert node serves only its domain: ACME can't issue for
+          # A publicCert node serves only its domains: ACME can't issue for
           # the `.local` or IP aliases, and they'd share the site's issuer.
-          if node.publicCert or false then node.domain else "${ipHostStr}${name}.local${customDomain}";
+          if node.publicCert or false then
+            lib.concatStringsSep ", " domains
+          else
+            "${ipHostStr}${name}.local${customDomain}";
 
         isDown = isGlobalMaint || (node.maintenance or false);
       in
