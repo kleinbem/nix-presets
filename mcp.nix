@@ -200,7 +200,8 @@
           sha256 = "39514a83dabb29941c4e8891a5a829850dee71707fca6b91b0fcec1304818879";
         };
         nativeBuildInputs = [ pkgs.python3.pkgs.hatchling ];
-        propagatedBuildInputs = [ pkgs.python3.pkgs.mcp ];
+        # 0.2.0 pins mcp<2 and imports mcp.server.fastmcp, which mcp 2 removed.
+        propagatedBuildInputs = [ pkgs.python3.pkgs.mcp_1 ];
         meta.mainProgram = "gimp3-mcp";
       };
 
