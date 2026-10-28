@@ -384,6 +384,18 @@
             };
 
             mcpJson = pkgs.writeText "mcp_config.json" (builtins.toJSON mcpConfig);
+
+            # Registered but off: agents use the CLIs first and a server is
+            # switched on per client when needed. Cline/Roo and Antigravity
+            # read `disabled`; Claude Code gets it through its project
+            # approvals below; Claude Desktop has no such key.
+            mcpJsonOff = pkgs.writeText "mcp_config.json" (
+              builtins.toJSON {
+                mcpServers = lib.mapAttrs (_: server: server // { disabled = true; }) mcpConfig.mcpServers;
+              }
+            );
+            mcpNames = builtins.toJSON (lib.attrNames config.modules.mcp.servers);
+            claudeLocal = "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.claude/settings.local.json";
           in
           lib.hm.dag.entryAfter [ "writeBoundary" ] ''
             mkdir -p "${config.home.homeDirectory}/.gemini/antigravity"
@@ -395,13 +407,13 @@
             mkdir -p "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
             mkdir -p "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings"
 
-            cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
+            cp -f "${mcpJsonOff}" "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
             chmod 644 "${config.home.homeDirectory}/.gemini/antigravity/mcp_config.json"
 
-            cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/antigravity-ide/mcp_config.json"
+            cp -f "${mcpJsonOff}" "${config.home.homeDirectory}/.gemini/antigravity-ide/mcp_config.json"
             chmod 644 "${config.home.homeDirectory}/.gemini/antigravity-ide/mcp_config.json"
 
-            cp -f "${mcpJson}" "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
+            cp -f "${mcpJsonOff}" "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
             chmod 644 "${config.home.homeDirectory}/.gemini/config/mcp_config.json"
 
             # Remove dangling symlink if sops previously owned it
@@ -409,20 +421,36 @@
             cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
             chmod 644 "${config.home.homeDirectory}/.config/Claude/claude_desktop_config.json"
 
-            cp -f "${mcpJson}" "${config.home.homeDirectory}/.antigravity-ide/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            cp -f "${mcpJsonOff}" "${config.home.homeDirectory}/.antigravity-ide/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
             chmod 644 "${config.home.homeDirectory}/.antigravity-ide/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
 
-            cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            cp -f "${mcpJsonOff}" "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
             chmod 644 "${config.home.homeDirectory}/.config/antigravity/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
 
-            cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            cp -f "${mcpJsonOff}" "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
             chmod 644 "${config.home.homeDirectory}/.config/cursor/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
 
-            cp -f "${mcpJson}" "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+            cp -f "${mcpJsonOff}" "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
             chmod 644 "${config.home.homeDirectory}/.config/windsurf/data/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
 
             cp -f "${mcpJson}" "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.mcp.json"
             chmod 644 "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/.mcp.json"
+
+            # Claude Code: every .mcp.json server not yet approved or refused
+            # starts refused; /mcp turns one on and that choice is kept.
+            claudeLocal=${lib.escapeShellArg claudeLocal}
+            current='{}'
+            if [ -s "$claudeLocal" ] && ${pkgs.jq}/bin/jq -e 'type == "object"' "$claudeLocal" >/dev/null 2>&1; then
+              current=$(cat "$claudeLocal")
+            fi
+            tmp=$(mktemp)
+            echo "$current" | ${pkgs.jq}/bin/jq --argjson names ${lib.escapeShellArg mcpNames} '
+              (.enabledMcpjsonServers // []) as $on
+              | (.disabledMcpjsonServers // []) as $off
+              | .disabledMcpjsonServers = $off + ($names - $on - $off)
+            ' > "$tmp"
+            install -Dm644 "$tmp" "$claudeLocal"
+            rm -f "$tmp"
           '';
       };
     }
