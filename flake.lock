@@ -910,7 +910,7 @@
           "nixpkgs"
         ],
         "nixpkgs-master": "nixpkgs-master_2",
-        "nixpkgs-stable": "nixpkgs-stable_2",
+        "nixpkgs-stable": "nixpkgs-stable_3",
         "rust-overlay": "rust-overlay_4",
         "treefmt-nix": "treefmt-nix_4"
       },
@@ -991,6 +991,27 @@
       "original": {
         "owner": "nix-community",
         "repo": "nix-github-actions",
+        "type": "github"
+      }
+    },
+    "nix-holds": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "nixpkgs-stable": "nixpkgs-stable_2"
+      },
+      "locked": {
+        "lastModified": 1793144099,
+        "narHash": "sha256-v9ykW1QHBEwGoSqsNhiVHymCZvEkPSYxqDHYbFn0AFU=",
+        "owner": "kleinbem",
+        "repo": "nix-holds",
+        "rev": "ef78aad02881afceebb2b20240f381cc8e3987e1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kleinbem",
+        "repo": "nix-holds",
         "type": "github"
       }
     },
@@ -1499,6 +1520,22 @@
     },
     "nixpkgs-stable_2": {
       "locked": {
+        "lastModified": 1793015021,
+        "narHash": "sha256-Ee5BWo8sh3pGt70QUdRajnaginqFmWvrtdBc4gJzhks=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "718f670e845328e9c2cecdd832835712b2cbd065",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-26.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs-stable_3": {
+      "locked": {
         "lastModified": 1792615934,
         "narHash": "sha256-MlvRfa1O5Cqc2/a+gG+l9TSuowEoCKCmrJ1d9oAVm0I=",
         "owner": "NixOS",
@@ -1753,6 +1790,7 @@
         "hermes": "hermes",
         "nix-devshells": "nix-devshells",
         "nix-gantry": "nix-gantry",
+        "nix-holds": "nix-holds",
         "nix-packages": "nix-packages",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixpak": "nixpak",

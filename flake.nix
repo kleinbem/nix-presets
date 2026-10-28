@@ -35,6 +35,12 @@
     nixpak.url = "github:nixpak/nixpak";
     nixpak.inputs.nixpkgs.follows = "nixpkgs";
     nix-gantry.url = "github:kleinbem/nix-gantry";
+    # Packages the fleet holds back from nixos-unstable; mkContainer gives
+    # them to every container.
+    nix-holds = {
+      url = "github:kleinbem/nix-holds";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nix-gantry.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -192,14 +198,28 @@
           # lives, so every existing containers/*.nix preset's
           # `self.lib.mkContainer` call keeps working unchanged without
           # nix-gantry itself needing to know about my.* at all.
+          #
+          # A container evaluates its own package set, without the host's
+          # overlays, so the wrapper also gives every container the fleet's
+          # held packages (kleinbem/nix-holds), before the container's own
+          # overlays, as on the hosts.
           mkContainer =
             args:
+            let
+              innerConfig = args.innerConfig or { };
+            in
             inputs.nix-gantry.lib.mkContainer (
               args
               // {
                 cfg = args.cfg // {
                   hostBridge = args.cfg.hostBridge or args.config.my.network.bridge;
                   gpuRenderNode = args.cfg.gpuRenderNode or args.config.my.hardware.gpuRenderNode;
+                };
+                innerConfig = innerArgs: {
+                  imports = [
+                    (if builtins.isFunction innerConfig then innerConfig innerArgs else innerConfig)
+                  ];
+                  nixpkgs.overlays = inputs.nixpkgs.lib.mkBefore [ inputs.nix-holds.overlays.default ];
                 };
               }
             );
