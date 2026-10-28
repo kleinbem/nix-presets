@@ -31,6 +31,109 @@ let
     '';
   };
 
+  ntfyEnabled = cfg.ntfy.url != null && cfg.ntfy.topicFile != null;
+
+  # New jj workspace for an agent: pick a fleet repo, name it (empty = auto),
+  # then open it as its own herdr workspace. jj-ws-new is the same primitive
+  # `just jj::ws-new` ends in.
+  wsNew = pkgs.writeShellApplication {
+    name = "herdr-jj-ws-new";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.fzf
+      pkgs.herdr
+      pkgs.jujutsu
+    ];
+    text = ''
+      root=${lib.escapeShellArg cfg.fleetRoot}
+      repo=$(
+        cd "$root"
+        for d in */.jj; do printf '%s\n' "''${d%/.jj}"; done \
+          | fzf --prompt 'repo> ' --header 'new jj workspace for an agent'
+      ) || exit 0
+      read -rp "workspace name (empty = auto): " name
+      name=''${name:-ws-$(date +%H%M%S)-$RANDOM}
+      if ! (cd "$root/$repo" && "$root/jj-toolbox/bin/jj-ws-new" "$name"); then
+        read -rp "jj-ws-new failed, press Enter to close" _
+        exit 1
+      fi
+      herdr workspace create --cwd "$root/$repo.ws/$name" --label "$repo/$name" --focus >/dev/null
+    '';
+  };
+
+  # Phone push when an agent needs you or finishes. herdr's own toasts only
+  # reach the desktop the server runs on, not the remote clients.
+  agentNotify = pkgs.writeShellApplication {
+    name = "herdr-agent-notify";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.curl
+      pkgs.herdr
+      pkgs.jq
+    ];
+    text = ''
+      topic=$(cat ${lib.escapeShellArg (toString cfg.ntfy.topicFile)} 2>/dev/null) || exit 0
+      [ -n "$topic" ] || exit 0
+
+      ev=''${HERDR_PLUGIN_EVENT_JSON:-}
+      status=$(jq -r '.data.agent_status // empty' <<<"$ev")
+      pane=$(jq -r '.data.pane_id // empty' <<<"$ev")
+      agent=$(jq -r '.data.agent // "agent"' <<<"$ev")
+      [ -n "$pane" ] || exit 0
+
+      # Remember the last status per pane: "idle" only means finished when
+      # the agent was working before (not on startup or repeat reports).
+      state_dir=''${HERDR_PLUGIN_STATE_DIR:-''${XDG_STATE_HOME:-$HOME/.local/state}/herdr-agent-notify}
+      mkdir -p "$state_dir"
+      state_file="$state_dir/''${pane//[^A-Za-z0-9_-]/_}"
+      prev=$(cat "$state_file" 2>/dev/null || true)
+      printf '%s\n' "$status" >"$state_file"
+
+      pane_json=$(herdr pane get "$pane" 2>/dev/null || echo '{}')
+      case "$status" in
+        blocked)
+          [ "$prev" != blocked ] || exit 0
+          prio=high tags=warning what="needs you"
+          ;;
+        idle)
+          [ "$prev" = working ] || exit 0
+          # The pane you're looking at doesn't need a ping for every turn.
+          [ "$(jq -r '.result.pane.focused // false' <<<"$pane_json")" != true ] || exit 0
+          prio=default tags=white_check_mark what="finished"
+          ;;
+        *) exit 0 ;;
+      esac
+
+      ws=$(jq -r '.result.pane.workspace_id // empty' <<<"$pane_json")
+      label=$(herdr workspace get "$ws" 2>/dev/null | jq -r '.result.workspace.label // empty' || true)
+      body=$(jq -r '.result.pane.terminal_title_stripped // empty' <<<"$pane_json")
+
+      curl -fsS --max-time 15 \
+        -H "Title: $agent $what''${label:+ · $label}" \
+        -H "Priority: $prio" -H "Tags: $tags" \
+        -d "''${body:-$pane}" \
+        ${lib.escapeShellArg cfg.ntfy.url}/"$topic" >/dev/null || true
+    '';
+  };
+
+  pluginDir = pkgs.writeTextDir "herdr-plugin.toml" (
+    builtins.readFile (
+      (pkgs.formats.toml { }).generate "herdr-plugin.toml" {
+        id = "kleinbem.fleet";
+        name = "kleinbem fleet";
+        version = "0.1.0";
+        min_herdr_version = "0.9.0";
+        platforms = [ "linux" ];
+        events = [
+          {
+            on = "pane.agent_status_changed";
+            command = [ (lib.getExe agentNotify) ];
+          }
+        ];
+      }
+    )
+  );
+
   herdrConfigFile = (pkgs.formats.toml { }).generate "herdr-config" {
     session.resume_agents_on_restore = true;
 
@@ -104,11 +207,19 @@ let
           height = "90%";
         }
         {
+          key = "prefix+a";
+          type = "popup";
+          command = lib.getExe wsNew;
+          description = "new jj workspace for an agent";
+          width = "60%";
+          height = "60%";
+        }
+        {
           key = "prefix+f";
           type = "popup";
           # Absolute -f/-d so this works from a popup opened inside any
           # sibling repo, not just from the workspace root.
-          command = "just -f ${config.home.homeDirectory}/Develop/github.com/kleinbem/justfile -d ${config.home.homeDirectory}/Develop/github.com/kleinbem";
+          command = "just -f ${cfg.fleetRoot}/justfile -d ${cfg.fleetRoot}";
           description = "kleinbem fleet hub";
           width = "80%";
           height = "80%";
@@ -120,6 +231,26 @@ in
 {
   options.modules.herdr = {
     enable = lib.mkEnableOption "Herdr terminal workspace manager for AI coding agents";
+
+    fleetRoot = lib.mkOption {
+      type = lib.types.str;
+      default = "${config.home.homeDirectory}/Develop/github.com/kleinbem";
+      description = "Workspace root holding the fleet repos (fleet hub and jj workspace popups).";
+    };
+
+    ntfy = {
+      url = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "https://ntfy.example.org";
+        description = "ntfy server for agent blocked/finished pushes. Set on the host that runs the herdr server.";
+      };
+      topicFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "File holding the ntfy topic (a secret), readable by the herdr user.";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -182,6 +313,20 @@ in
             rm -f "$tmpConfig"
           fi
         '';
+
+        # Re-linking the same plugin id replaces the registered path, so each
+        # generation points herdr at its own store copy. Without ntfy the
+        # plugin has nothing to do; unlink it.
+        herdrPlugin = lib.hm.dag.entryAfter [ "herdrConfig" ] (
+          if ntfyEnabled then
+            ''
+              run ${pkgs.coreutils}/bin/timeout 15 ${pkgs.herdr}/bin/herdr plugin link ${pluginDir} >/dev/null || true
+            ''
+          else
+            ''
+              run ${pkgs.coreutils}/bin/timeout 15 ${pkgs.herdr}/bin/herdr plugin unlink kleinbem.fleet >/dev/null 2>&1 || true
+            ''
+        );
 
         # Herdr's per-agent state hooks (e.g. ~/.claude/hooks/herdr-agent-state.sh)
         # are extracted from the herdr binary by `integration install` and carry a
