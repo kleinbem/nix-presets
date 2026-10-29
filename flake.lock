@@ -940,13 +940,13 @@
       "locked": {
         "lastModified": 1793152241,
         "narHash": "sha256-JXp4fAk03W1GiQDAPTfOWqkFg/18X+zVotNdeuOrQE4=",
-        "owner": "kleinbem",
+        "owner": "kleinbem-dev",
         "repo": "nix-gantry",
         "rev": "d7490bbced25bcd0fe0d8a5a3e6318e4617a8488",
         "type": "github"
       },
       "original": {
-        "owner": "kleinbem",
+        "owner": "kleinbem-dev",
         "repo": "nix-gantry",
         "type": "github"
       }

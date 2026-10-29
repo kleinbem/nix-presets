@@ -34,7 +34,7 @@
     # bubblewrap sandboxes for desktop apps (pkgs/nixpak/, desktop.nix)
     nixpak.url = "github:nixpak/nixpak";
     nixpak.inputs.nixpkgs.follows = "nixpkgs";
-    nix-gantry.url = "github:kleinbem/nix-gantry";
+    nix-gantry.url = "github:kleinbem-dev/nix-gantry";
     # Packages the fleet holds back from nixos-unstable; mkContainer gives
     # them to every container.
     nix-holds = {
@@ -208,7 +208,7 @@
 
         lib = {
           # Re-exported from nix-gantry, the standalone extraction of this
-          # mechanism (github:kleinbem/nix-gantry) -- lib/factory.nix no
+          # mechanism (github:kleinbem-dev/nix-gantry) -- lib/factory.nix no
           # longer exists locally. nix-gantry's own mkContainer takes
           # cfg.hostBridge/cfg.gpuRenderNode as plain required fields (it
           # doesn't read any option path it doesn't own); this wrapper is
