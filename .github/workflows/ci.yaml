@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: kleinbem/actions/nix-setup@d640cb482c1083235491da5ce469468a0019fc64 # v1.0.0
+      - uses: kleinbem/actions/nix-setup@7ec628296d5194e6e10031706387b992a10a1638 # v1.0.1
         with:
           nix-path: nixpkgs=channel:nixos-unstable
           # Read-only Attic over NetBird; skipped when the secrets are
