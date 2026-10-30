@@ -166,6 +166,11 @@
                 module = ./nixosModules/backup-engine;
               };
 
+              forgejo = import ./checks/forgejo.nix {
+                inherit pkgs;
+                module = self.nixosModules.forgejo;
+              };
+
               pre-commit-check = inputs.git-hooks.lib.${system}.run {
                 src = ./.;
                 hooks = {
@@ -312,6 +317,7 @@
               caido = import ./containers/caido.nix { inherit self; };
               garage-ui = import ./containers/garage-ui.nix { inherit self; };
               miniflux = import ./containers/miniflux.nix { inherit self; };
+              forgejo = import ./containers/forgejo.nix { inherit self; };
             };
 
             # dashboard-homer redeclares the same my.containers.dashboard
