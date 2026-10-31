@@ -38,8 +38,9 @@
     # Packages the fleet holds back from nixos-unstable; mkContainer gives
     # them to every container.
     nix-holds = {
-      url = "github:kleinbem/nix-holds";
+      url = "github:kleinbem/nix-holds-fleet";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nix-packages.follows = "nix-packages";
     };
     nix-gantry.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -142,7 +143,7 @@
                 "all" # Composite of the above; members are checked individually
               ];
 
-              # The nixpkgs NixOS tests of the held packages (kleinbem/nix-holds),
+              # The nixpkgs NixOS tests of the held packages (kleinbem/nix-holds-fleet),
               # with the holds and our fixes for them, as in the containers.
               heldPkgs = import inputs.nixpkgs {
                 inherit system;
@@ -225,7 +226,7 @@
           #
           # A container evaluates its own package set, without the host's
           # overlays, so the wrapper also gives every container the fleet's
-          # held packages (kleinbem/nix-holds), before the container's own
+          # held packages (kleinbem/nix-holds-fleet), before the container's own
           # overlays, as on the hosts.
           mkContainer =
             args:
