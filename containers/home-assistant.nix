@@ -185,6 +185,9 @@ in
                 # paho-mqtt it fails to set up at all (nielsfaber/alarmo#572).
                 # This adds the libraries only; no broker is configured.
                 "mqtt"
+                # Local voice: the host's Whisper (10300) and Piper (10200)
+                # servers, used by the voice pipeline of the ESPHome panels.
+                "wyoming"
               ];
 
               # Was HACS-installed on HAOS; nixpkgs packages both, so HACS
