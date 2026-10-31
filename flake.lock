@@ -904,7 +904,7 @@
         "ghostty": "ghostty_2",
         "git-hooks": "git-hooks_6",
         "mk-shell-bin": "mk-shell-bin_2",
-        "nix-holds": "nix-holds_4",
+        "nix-holds": "nix-holds_3",
         "nix2container": "nix2container_2",
         "nixos-generators": "nixos-generators_2",
         "nixpkgs": [
@@ -1021,9 +1021,9 @@
         "type": "github"
       }
     },
-    "nix-holds_2": {
+    "nix-holds-fleet": {
       "inputs": {
-        "nix-holds": "nix-holds_3",
+        "nix-holds": "nix-holds_2",
         "nix-packages": [
           "nix-packages"
         ],
@@ -1033,11 +1033,11 @@
         "nixpkgs-stable": "nixpkgs-stable_2"
       },
       "locked": {
-        "lastModified": 1793415806,
-        "narHash": "sha256-jbjAcFHhXHsxSepRH+0X4YFqr+npqCVB5M6QzomE6OU=",
+        "lastModified": 1793423422,
+        "narHash": "sha256-jZ316+fNb4yjc019u1X31qAi6uNRaLBqFlh6Ik79y1k=",
         "owner": "kleinbem",
         "repo": "nix-holds-fleet",
-        "rev": "eaf185778deb095f9bf243df28681c3e92486435",
+        "rev": "7d87062f37b398c35a9eae87049d4b2f35863256",
         "type": "github"
       },
       "original": {
@@ -1046,32 +1046,32 @@
         "type": "github"
       }
     },
-    "nix-holds_3": {
+    "nix-holds_2": {
       "inputs": {
         "nixpkgs": [
-          "nix-holds",
+          "nix-holds-fleet",
           "nixpkgs"
         ],
         "nixpkgs-stable": [
-          "nix-holds",
+          "nix-holds-fleet",
           "nixpkgs-stable"
         ]
       },
       "locked": {
-        "lastModified": 1793415576,
-        "narHash": "sha256-kYmNyopvIpSvCNMRZQpDU2GpEkA+w+1TSm8OGytTrHs=",
-        "owner": "kleinbem",
+        "lastModified": 1793422466,
+        "narHash": "sha256-mWzbKmZY/goOIM3GcbL5ZhyHYDED+ivofhhdwQnoVNM=",
+        "owner": "kleinbem-dev",
         "repo": "nix-holds",
-        "rev": "7c7fb8f4a28381eb7973af8bdda886b977ec1ad8",
+        "rev": "d5807a0081bcec1e6e43ebf1c5b7f67647402314",
         "type": "github"
       },
       "original": {
-        "owner": "kleinbem",
+        "owner": "kleinbem-dev",
         "repo": "nix-holds",
         "type": "github"
       }
     },
-    "nix-holds_4": {
+    "nix-holds_3": {
       "inputs": {
         "nixpkgs": [
           "nix-packages",
@@ -1855,7 +1855,7 @@
         "hermes": "hermes",
         "nix-devshells": "nix-devshells",
         "nix-gantry": "nix-gantry",
-        "nix-holds": "nix-holds_2",
+        "nix-holds-fleet": "nix-holds-fleet",
         "nix-packages": "nix-packages",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixpak": "nixpak",

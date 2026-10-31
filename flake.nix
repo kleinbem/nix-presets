@@ -37,7 +37,7 @@
     nix-gantry.url = "github:kleinbem-dev/nix-gantry";
     # Packages the fleet holds back from nixos-unstable; mkContainer gives
     # them to every container.
-    nix-holds = {
+    nix-holds-fleet = {
       url = "github:kleinbem/nix-holds-fleet";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.nix-packages.follows = "nix-packages";
@@ -149,13 +149,13 @@
                 inherit system;
                 config.allowUnfree = true;
                 overlays = [
-                  inputs.nix-holds.overlays.default
+                  inputs.nix-holds-fleet.overlays.default
                   self.overlays.open-webui
                 ];
               };
               heldTests = inputs.nixpkgs.lib.mapAttrs' (
                 name: test: inputs.nixpkgs.lib.nameValuePair "held-${name}" test
-              ) (inputs.nix-holds.lib.nixosTests heldPkgs);
+              ) (inputs.nix-holds-fleet.lib.nixosTests heldPkgs);
 
               moduleChecks = inputs.nixpkgs.lib.mapAttrs' (
                 name: module: inputs.nixpkgs.lib.nameValuePair "module-${name}" (mkModuleCheck module)
@@ -244,7 +244,7 @@
                   imports = [
                     (if builtins.isFunction innerConfig then innerConfig innerArgs else innerConfig)
                   ];
-                  nixpkgs.overlays = inputs.nixpkgs.lib.mkBefore [ inputs.nix-holds.overlays.default ];
+                  nixpkgs.overlays = inputs.nixpkgs.lib.mkBefore [ inputs.nix-holds-fleet.overlays.default ];
                 };
               }
             );
