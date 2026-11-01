@@ -2,13 +2,16 @@
 # cluster. It reaches Garage's S3 and admin APIs on the host bridge address.
 #
 # View-only in two layers: users in oidc.viewerGroup may only look and download
-# (token login stays off, since garage-ui makes it full admin), and a scoped
-# admin token (`just containers::garage-ui-token` in nix-config) makes Garage
-# refuse bucket, key and layout changes. The scope needs GetKeyInfo, so objects
-# are protected by the UI layer only.
+# (token login stays off, since garage-ui makes it full admin:
+# https://github.com/Noooste/garage-ui/issues/148), and a scoped admin token
+# (`just containers::garage-ui-token` in nix-config) makes Garage refuse bucket,
+# key and layout changes. The scope needs GetKeyInfo, which also reads every S3
+# key's secret, write keys included, so object data is protected only by the UI
+# layer and by keeping the token secret
+# (https://github.com/Noooste/garage-ui/issues/149).
 #
-# With no auth method the server falls back to "none" (full admin for anyone),
-# hence the assertion below.
+# garage-ui must never run without a login method, hence the assertion below.
+# no-link: private security report to upstream
 { self }:
 {
   config,
