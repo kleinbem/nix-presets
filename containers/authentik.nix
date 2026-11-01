@@ -1,29 +1,7 @@
-# Authentik IdP Container (persona OIDC, Matrix federation, sigstore — Phase
-# 3+; also the shared kleinbem.dev visitor-login replacement for
-# kleinbem-auth, one instance serving both — see 2026-09-21 design note).
-#
-# nixpkgs has NO `services.authentik` NixOS module (confirmed live
-# 2026-09-21 against the pinned nixpkgs rev: only `pkgs.authentik` exists,
-# under pkgs/by-name/au/authentik) — the module this file used to assume
-# never existed, so this preset had never actually worked. Rather than
-# reverse-engineer authentik's internals against a bare package (attempted
-# first, real uncertainty around startup sequencing/bootstrap behavior that
-# the maintained image just doesn't have), this runs the official image via
-# podman — same OCI-in-nspawn pattern already proven by anythingllm.nix,
-# reused for the same reason: no native module, upstream-maintained image
-# is the trustworthy source of truth for how the app actually boots.
-#
-# Postgres itself DOES have a mature native NixOS module, so it stays
-# native (services.postgresql, same local-trust-auth precedent as
-# langfuse.nix/paperless.nix) rather than also being podman-ized — only
-# authentik itself needs the image.
-#
-# Confirmed against authentik's real requirements (docker-compose.yml at
-# goauthentik.io/docker-compose.yml, 2026-09-21): Redis was fully removed
-# as a dependency as of the 2025.10 release — Postgres alone is required.
-# `command: server` / `command: worker` are the only two processes;
-# migrations run automatically as part of server startup, no separate
-# migrate step.
+# Authentik IdP: persona OIDC and the kleinbem.dev visitor login, one instance.
+# nixpkgs has a package but no NixOS module, so authentik runs from the official
+# image via podman; Postgres stays native. Since 2025.10 it needs no Redis, and
+# the server runs migrations on startup.
 { self }:
 {
   config,
@@ -37,10 +15,8 @@ let
 
   image = "ghcr.io/goauthentik/server:2026.8.3";
 
-  # Fixed in-container path the env-setup script writes to and the podman
-  # containers read via environmentFiles — the *File options below are
-  # host-side sops paths and only reach the container via the bindMounts
-  # further down (same pattern as kleinbem-auth.nix).
+  # In-container paths the *File options are bind-mounted to; the env-setup
+  # script reads them into /run/authentik.env.
   secretKeyPath = "/run/secrets/authentik-secret-key";
   postgresPasswordPath = "/run/secrets/authentik-postgres-password";
   bootstrapAdminPasswordPath = "/run/secrets/authentik-bootstrap-admin-password";
@@ -131,18 +107,10 @@ in
                     inherit image;
                     cmd = [ "worker" ];
                     environmentFiles = [ "/run/authentik.env" ];
-                    # Same host network namespace as authentik-server (it
-                    # needs 127.0.0.1 Postgres too), and since 2026.8 the
-                    # worker's Rust arbiter also binds the default listeners
-                    # (:9000/:9443/:9300). Whichever container starts first
-                    # wins; when the worker did (core-pi 2026-09-26, after a
-                    # flake.lock bump restarted every container) the server
-                    # crash-looped on "Address already in use (os error 98)"
-                    # and :9000 answered with the worker's health-only
-                    # listener — 404 on the whole UI/API. Park the worker's
-                    # listeners on distinct loopback ports so the race can't
-                    # exist. Comma-separated lists per ak-common's
-                    # KEYS_TO_PARSE_AS_LIST.
+                    # Since 2026.8 the worker also binds :9000/:9443/:9300 and,
+                    # sharing the host netns, can grab them before the server
+                    # (server crash-loops, :9000 returns 404). Park the
+                    # worker's listeners on other loopback ports.
                     environment = {
                       AUTHENTIK_LISTEN__HTTP = "127.0.0.1:9001";
                       AUTHENTIK_LISTEN__HTTPS = "127.0.0.1:9444";
@@ -154,17 +122,11 @@ in
               };
             };
 
-            # Postgres has a real native NixOS module, unlike authentik
-            # itself — no reason to also podman-ize it. Local-only, trust
-            # auth (this container is the only tenant), same precedent as
-            # langfuse.nix/paperless.nix. enableTCPIP + a loopback-only
-            # trust rule so the podman containers (host-networked, so they
-            # see this container's own 127.0.0.1) can reach it.
+            # Trust auth is fine: this container is the only tenant. TCP on
+            # loopback so the host-networked podman containers can reach it.
             services.postgresql = {
               enable = true;
-              # Major pinned: an unpinned default changes under a nixpkgs bump
-              # and Postgres then refuses to start on the existing datadir
-              # (live datadir is 17, checked 2026-10-02).
+              # Pinned major: a nixpkgs default bump would refuse the existing datadir.
               package = pkgs.postgresql_17;
               enableTCPIP = true;
               ensureDatabases = [ "authentik" ];
@@ -180,13 +142,8 @@ in
               '';
             };
 
-            # Compose the environment file the podman containers load via
-            # environmentFiles, from sops-templated secrets plus the fixed
-            # local-Postgres/base-URL settings that don't need to be secret;
-            # then extend oci-containers' auto-generated
-            # podman-authentik-{server,worker} units with the dependency
-            # ordering podman's own module doesn't expose as a
-            # container-level option.
+            # Build /run/authentik.env from the secret files plus fixed settings,
+            # and order the generated podman-authentik-* units after it and Postgres.
             systemd.services = {
               authentik-env-setup = {
                 description = "Materialise authentik environment from sops files";
@@ -252,15 +209,12 @@ in
           };
 
         bindMounts = {
-          # Postgres — static NixOS system uid, ownership stays consistent
-          # across independently-built container closures (same note as
-          # paperless.nix).
+          # postgres has a static NixOS uid, so ownership survives rebuilt closures.
           "/var/lib/postgresql" = {
             hostPath = "${cfg.hostDataDir}/postgresql";
             isReadOnly = false;
           };
-          # Podman's own image/layer storage is bind-mounted automatically
-          # by usesPodman (factory.nix) — see its doc comment for why.
+          # Podman image storage is bind-mounted by usesPodman.
         }
         // lib.optionalAttrs (cfg.secretKeyFile != null) {
           ${secretKeyPath} = {

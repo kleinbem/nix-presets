@@ -6,14 +6,11 @@ let
   sandboxedXdgUtils = pkgs.callPackage ../../nixpak/xdg-utils.nix { };
 
   # nixpkgs' commandLineArgs is deprecated, so flags go on via a wrapper.
-  # - --password-store=basic: same as Flathub's SIGNAL_PASSWORD_STORE=basic.
-  #   Encrypted storage needs org.freedesktop.secrets — the whole login
-  #   keyring (firejail's profile grants it) — so the database key stays in
-  #   ~/.config/Signal, protected at rest by LUKS. See element.nix.
-  # - WebRtcPipeWireCamera: camera via the Camera portal + PipeWire rather
-  #   than binding /dev/video* (Flathub uses --device=all). Device binds are
-  #   a snapshot taken at launch, so a webcam plugged in later would never
-  #   show up; PipeWire nodes do.
+  # - --password-store=basic: encrypted storage would need the whole login
+  #   keyring (org.freedesktop.secrets), so the key stays in ~/.config/Signal,
+  #   protected at rest by LUKS.
+  # - WebRtcPipeWireCamera: camera via the portal, not /dev/video* binds,
+  #   which are fixed at launch and miss a webcam plugged in later.
   signal = pkgs.symlinkJoin {
     inherit (pkgs.signal-desktop) pname version meta;
     name = "signal-desktop-${pkgs.signal-desktop.version}";

@@ -261,20 +261,11 @@ in
       packages = [
         pkgs.herdr
 
-        # Google Antigravity CLI (`agy`) — built by nix-packages, reachable here
-        # via its overlay (modules/nixos/base.nix, useGlobalPkgs = true). Without
-        # this, herdr's `antigravity-cli` integration has an installed hook
-        # (herdr integration install antigravity-cli, below) but nothing to
-        # actually launch a pane with.
+        # Antigravity CLI (`agy`) from nix-packages' overlay, so the
+        # antigravity-cli integration installed below has something to launch.
         pkgs.google-antigravity-cli
 
-        # Hermes Agent (Nous Research) — terminal-native coding agent, run
-        # interactively in a Herdr pane alongside claude/opencode. It's a
-        # first-class Herdr integration; the state hook is installed by the
-        # activation block below. This is the CLI, NOT the headless Discord
-        # gateway — that's the separate mac-mini container (my.containers.hermes),
-        # which uses the `messaging` build. `minimal` here would trim the closure
-        # if that ever matters.
+        # Hermes Agent CLI for interactive panes (the gateway is my.containers.hermes).
         inputs.hermes.packages.${pkgs.stdenv.hostPlatform.system}.default
 
         # Native Zsh completion for Herdr CLI
@@ -290,15 +281,9 @@ in
       };
 
       activation = {
-        # herdr has exactly one config file (`herdr --help` → "Config:
-        # ~/.config/herdr/config.toml") and persists runtime UI state into it too
-        # (agent_panel_sort changes, the onboarding-seen flag, ...) — there's no
-        # separate state file. A plain xdg.configFile symlink into the Nix store
-        # made every one of those writes fail with "Read-only file system (os
-        # error 30)" (see herdr-server.log: context="onboarding setting" /
-        # context="agent panel sort"). Seed it as a real, writable copy instead,
-        # and merge declarative keys (theme, keys, ui, session) without wiping
-        # runtime UI state.
+        # herdr writes runtime UI state (panel sort, onboarding flag) into its
+        # only config file, so a store symlink breaks it. Keep a writable copy
+        # and merge our declarative keys into it.
         herdrConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           configPath="${config.xdg.configHome}/herdr/config.toml"
           if [ ! -e "$configPath" ]; then
@@ -328,15 +313,9 @@ in
             ''
         );
 
-        # Herdr's per-agent state hooks (e.g. ~/.claude/hooks/herdr-agent-state.sh)
-        # are extracted from the herdr binary by `integration install` and carry a
-        # version stamp that must match the binary — a plain package bump silently
-        # leaves them stale ("outdated (v7 < v8)"). Re-running the install on every
-        # activation is idempotent (overwrites the hook, upserts the agent's
-        # settings entry) and, because the string embeds ${pkgs.herdr}, only
-        # actually re-runs when the herdr version changes.
-        #
-        # Also exports the bundled herdr agent skill for Claude Code and Antigravity.
+        # The agent state hooks carry a version stamp that must match the binary,
+        # so reinstall them on every activation (idempotent). Also exports
+        # herdr's agent skill for Claude Code and Antigravity.
         herdrIntegrations = lib.hm.dag.entryAfter [ "herdrConfig" ] ''
           run ${pkgs.herdr}/bin/herdr integration install claude
           run ${pkgs.herdr}/bin/herdr integration install opencode

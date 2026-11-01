@@ -213,16 +213,9 @@
         overlays.open-webui = import ./overlays/open-webui.nix;
 
         lib = {
-          # Re-exported from nix-gantry, the standalone extraction of this
-          # mechanism (github:kleinbem-dev/nix-gantry) -- lib/factory.nix no
-          # longer exists locally. nix-gantry's own mkContainer takes
-          # cfg.hostBridge/cfg.gpuRenderNode as plain required fields (it
-          # doesn't read any option path it doesn't own); this wrapper is
-          # where THIS fleet's own convention -- defaulting them from
-          # config.my.network.bridge/config.my.hardware.gpuRenderNode --
-          # lives, so every existing containers/*.nix preset's
-          # `self.lib.mkContainer` call keeps working unchanged without
-          # nix-gantry itself needing to know about my.* at all.
+          # nix-gantry's mkContainer, wrapped to default cfg.hostBridge and
+          # cfg.gpuRenderNode from this fleet's my.* options, which nix-gantry
+          # doesn't know about.
           #
           # A container evaluates its own package set, without the host's
           # overlays, so the wrapper also gives every container the fleet's
@@ -266,11 +259,6 @@
               attic = import ./containers/attic.nix { inherit self; };
               code-server = import ./containers/code-server.nix { inherit self; };
               open-webui = import ./containers/open-webui.nix { inherit self; };
-              # The hand-rolled custom skin (plain index.html/script.js) that
-              # used to live here is retired — dashboard-homepage (a real
-              # gethomepage/homepage deployment) is now the only default
-              # frontend; dashboard-homer stays available as an opt-in
-              # alternative skin.
               dashboard-homer = import ./containers/dashboard/homer { inherit self; };
               dashboard-homepage = import ./containers/dashboard/homepage { inherit self; };
               qdrant = import ./containers/qdrant.nix { inherit self; };
@@ -322,12 +310,9 @@
               forgejo = import ./containers/forgejo.nix { inherit self; };
             };
 
-            # dashboard-homer redeclares the same my.containers.dashboard
-            # options as dashboard-homepage — building both by default from
-            # `all` would be wasteful (and, if both ever enabled at once,
-            # redundant containers), so `all` only carries the homepage skin
-            # through by default; homer stays reachable only via an explicit
-            # nixosModules.dashboard-homer import on a host that wants it.
+            # `all` leaves out dashboard-homer: it declares the same
+            # my.containers.dashboard options as dashboard-homepage. A host that
+            # wants it imports the modules it needs plus dashboard-homer, not `all`.
             variants = [
               "dashboard-homer"
             ];

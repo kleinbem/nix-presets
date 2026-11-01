@@ -1,20 +1,6 @@
-# Buzz (Block/Jack Dorsey) — Nostr-based team chat + git + AI-agent
-# workspace, self-hosted natively (no Docker/Podman): the relay binary is
-# built from pkgs.buzz-relay and Postgres/Redis/Typesense/Garage
-# all run as ordinary NixOS services inside this one container. Deliberately
-# NOT using enableNesting + Podman's dockerCompat the way langfuse/anythingllm/
-# ente do — Buzz is ~10 days old at time of writing (2026-07-31) and pulling
-# in upstream's own Docker images on top of that immaturity was judged not
-# worth it; building from source keeps the whole stack auditable and
-# consistent with how openclaw/hermes/most of this fleet already runs.
-#
-# S3-compatible storage is Garage, not MinIO — nixpkgs marked minio insecure
-# and abandoned (2026-08-02: CVE-2026-40344 among others, upstream stopped
-# fixing issues), and MinIO was already rejected fleet-wide on 2026-06-27 in
-# favor of Garage (see hosts/nixos-nvme/garage.nix for the host-level
-# instance backing restic/tofu-state; this is a SEPARATE single-node Garage
-# instance private to the buzz container, not that one — self-containment is
-# the same rationale as Postgres/Redis/Typesense above).
+# Buzz (Block): Nostr chat, git and AI-agent workspace, run natively with no
+# podman. The relay, Postgres, Redis, Typesense and a private single-node
+# Garage (S3; nixpkgs marks MinIO insecure) all live in this one container.
 { self }:
 {
   config,
@@ -28,15 +14,10 @@ let
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
   buzzRelay = cfg.package;
 
-  # Evaluated by the CONSUMING host (nixos-nvme, etc.), not baked into the
-  # container-factory build — see the comment on RELAY_URL's removal from
-  # systemd.services.buzz-relay.environment above. bindMounts (below) is a
-  # host-level option, so this derivation and its content genuinely differ
-  # per real deploying host, unlike anything inside innerConfig.
-  # Same reason for the membership settings: they are per-host, so they ride
-  # this host-evaluated file too instead of the factory-built unit. The file
-  # keeps its old name (relay-url.env): containers are pulled independently of
-  # host switches, and a renamed EnvironmentFile would stop the relay in between.
+  # Per-host settings. innerConfig is built once by container-factory with
+  # placeholder values, so anything per-host must come in through a bindMount,
+  # which each host evaluates itself. The file stays mounted as relay-url.env:
+  # containers update apart from host switches, and a rename would break the relay.
   hexPubkey = lib.types.strMatching "[0-9a-f]{64}";
   relayHostEnvFile = pkgs.writeText "buzz-relay-host.env" (
     lib.concatStringsSep "\n" (
@@ -168,7 +149,7 @@ in
           }
         ];
       }
-      # ─── Host-side egress containment (mirrors openclaw.nix/hermes.nix) ─
+      # ─── Host-side egress containment (mirrors openclaw.nix) ─
       (lib.mkIf cfg.egress.restrictLan (
         let
           containerIp = lib.head (lib.splitString "/" cfg.ip);
@@ -195,9 +176,8 @@ in
         inherit config;
         name = "buzz";
         inherit cfg;
-        # Bind-mounts to /run/secrets/buzz.env — see factory.nix's
-        # secretsFile doc comment. relay-url.env and the typesense key
-        # below are separate secrets, left as manual bindMounts.
+        # Bind-mounted to /run/secrets/buzz.env. relay-url.env and the
+        # typesense key are separate bindMounts below.
         inherit (cfg) secretsFile;
         innerConfig = {
           networking.firewall = {
@@ -210,22 +190,10 @@ in
 
           users = {
             users = {
-              # Static user (not the module's DynamicUser) so the
-              # bind-mounted data dir has stable ownership across restarts —
-              # see the services.garage comment below.
-              #
-              # uid/gid PINNED, not left to isSystemUser's dynamic
-              # allocation: confirmed live 2026-08-09 that adding the
-              # typesense user below shifted garage's auto-allocated uid
-              # (996 -> 997), orphaning its already-on-disk data
-              # (/var/lib/garage/meta's files, e.g. node_key, stayed
-              # owned by 996) under the new uid — Garage panicked
-              # ("Unable to read or generate node ID: Permission
-              # denied") since only the top-level StateDirectory gets
-              # auto-rechowned on a uid change, not existing file
-              # contents. Pinning every static user here at its
-              # currently-resolved id freezes them against any future
-              # reshuffle from unrelated user-list edits.
+              # Static users, not DynamicUser, so the bind-mounted data dirs
+              # keep their owner. uids are pinned: an auto-allocated uid can
+              # shift when users are added, and systemd only re-chowns the top
+              # StateDirectory, leaving the data unreadable.
               garage = {
                 isSystemUser = true;
                 group = "garage";
@@ -236,13 +204,9 @@ in
                 group = "buzz-relay";
                 uid = 998;
               };
-              # Same reasoning as garage — services.typesense defaults to
-              # DynamicUser, which conflicts with bind-mounting a host dir
-              # straight onto /var/lib/typesense (systemd tries to migrate
-              # it to /var/lib/private/typesense and fails with "Device or
-              # resource busy" on an already-mounted, non-empty directory —
-              # confirmed live 2026-08-09). See the systemd.services.typesense
-              # override below.
+              # With DynamicUser, systemd tries to move the bind-mounted
+              # /var/lib/typesense to /var/lib/private and fails ("Device or
+              # resource busy").
               typesense = {
                 isSystemUser = true;
                 group = "typesense";
@@ -268,16 +232,8 @@ in
                   ensureDBOwnership = true;
                 }
               ];
-              # Peer auth compares the connecting OS username to the
-              # requested Postgres role directly unless mapped — buzz-relay
-              # (the systemd service's own OS user, isolated from postgres/
-              # garage/etc. for directory-ownership reasons) requests role
-              # "buzz", so the module's own default `local all all peer`
-              # rejected it outright ("Peer authentication failed for user
-              # buzz", confirmed live 2026-08-09). identMap translates
-              # buzz-relay → buzz for that one rule; the plain `peer`
-              # fallback below preserves default behavior (e.g. interactive
-              # `psql` as OS user postgres/root) for everything else.
+              # The relay runs as OS user buzz-relay but uses role buzz, which
+              # plain peer auth rejects; map just that pair.
               identMap = ''
                 buzz-relay-map buzz-relay buzz
               '';
@@ -305,12 +261,10 @@ in
             };
 
             # ── Garage (S3-compatible object storage) ────────────────────────
-            # Single-node, private to this container — same package/settings
-            # shape as hosts/nixos-nvme/garage.nix but scoped to buzz's own
-            # data dir.
+            # Single-node, private to this container.
             garage = {
               enable = true;
-              package = pkgs.garage_2; # matches hosts/nixos-nvme/garage.nix (v2.3.0)
+              package = pkgs.garage_2;
               environmentFile = "/run/secrets/buzz.env"; # GARAGE_RPC_SECRET/ADMIN_TOKEN
 
               settings = {
@@ -383,72 +337,22 @@ in
                   BUZZ_GIT_REPO_PATH = "/var/lib/buzz-relay/repos";
                   RUST_LOG = "buzz_relay=info,buzz_datastore=info,buzz_db=info,buzz_auth=info,buzz_pubsub=info";
 
-                  # NOT RELAY_URL = cfg.relayUrl here (tried first, wrong):
-                  # this whole `environment` block gets BAKED into the
-                  # container's systemd unit at BUILD time — fine for
-                  # constants, but this container is deployed standalone
-                  # (my.services.container-updater.containers), which means
-                  # the store path that actually ships is built ONCE by
-                  # hosts/container-factory (placeholder cfg, relayUrl =
-                  # "wss://buzz.example.invalid") and that exact closure is
-                  # what every consuming host's `update-container@buzz`
-                  # pulls verbatim — a real host's own `cfg.relayUrl` here
-                  # would just be evaluated and discarded, never built.
-                  # Confirmed live 2026-08-10: the desktop client got a 404
-                  # ("no community is configured for this host") because the
-                  # running relay had literally registered buzz.example.invalid
-                  # as its community, not the real address. secretsFile/
-                  # typesenseApiKeyFile don't have this problem because
-                  # bindMounts (below) is a HOST-level option, evaluated by
-                  # each consuming host's OWN config, not baked into the
-                  # shared factory build — so RELAY_URL needs the same
-                  # bind-mounted-file treatment, see relayHostEnvFile below.
+                  # RELAY_URL is not set here: this unit is built once by
+                  # container-factory with a placeholder URL. It comes from
+                  # relay-url.env (relayHostEnvFile) instead.
 
-                  # Schema was never created — the one-time init never ran
-                  # this. Without it every background job (push matching,
-                  # reminders, community scan) loops failing against tables
-                  # that don't exist ("relation events/communities/
-                  # push_match_queue does not exist"), confirmed live
-                  # 2026-08-10, even though the process itself stays up.
-                  # Upstream's own deploy docs (engineering.block.xyz/blog/
-                  # run-your-own-buzz-relay) set this permanently, not as a
-                  # one-shot — safe to leave on, applies pending migrations
-                  # idempotently on every start.
+                  # Applies pending migrations on every start, as upstream's deploy docs do.
                   BUZZ_AUTO_MIGRATE = "true";
 
-                  # Garage cannot pass this: its own docs state atomic
-                  # conditional writes (If-Match/If-None-Match CAS) are
-                  # "structurally impossible... due to the lack of a
-                  # consensus algorithm" — a permanent design choice, not a
-                  # version gap. buzz-relay's git-over-S3 storage leans on
-                  # that CAS as a formal correctness axiom (A3) for its
-                  # linearizability proof (docs/git-on-object-storage.md
-                  # upstream) — with the probe on, Garage fails it outright
-                  # (confirmed live 2026-08-09: "expected exactly 1 winner
-                  # among 32 classified observers, got 32").
-                  #
-                  # Deliberate tradeoff, not a fix: disabling this only
-                  # skips the startup check — Garage still can't provide
-                  # the guarantee, so a genuine same-repo concurrent push
-                  # could theoretically lose an update. Accepted here
-                  # because (a) this is a single-operator/low-concurrency
-                  # instance where that race is rare, (b) the git-hosting
-                  # feature isn't in active use — chat/relay/media (the
-                  # actual reason this container exists) don't touch this
-                  # code path at all, and (c) the alternative (a second
-                  # self-hosted object store, MinIO, just for this) was
-                  # already rejected fleet-wide 2026-06-27 for real CVEs.
-                  # Revisit if buzz's git hosting ever sees real concurrent
-                  # use — MinIO (or real AWS S3) is upstream's tested
-                  # reference backend for that guarantee, Garage is not.
+                  # Garage has no conditional writes (If-Match CAS), which
+                  # buzz's git-over-S3 relies on, so the startup probe fails.
+                  # Turning it off only skips the check: concurrent pushes to
+                  # one repo could lose an update. Accepted while git hosting
+                  # is unused; chat and media don't use this path.
                   BUZZ_GIT_CONFORMANCE_PROBE = "false";
                 };
-                # BUZZ_RELAY_PRIVATE_KEY, BUZZ_S3_ACCESS_KEY/SECRET_KEY (same
-                # values as MINIO_ROOT_USER/PASSWORD, duplicated under the name
-                # the relay reads) all come from secretsFile — see its option doc.
-                # relay-url.env carries RELAY_URL — see the comment on its
-                # removal from the `environment` block above for why it has
-                # to arrive this way instead.
+                # Secrets come from secretsFile (see its option doc), per-host
+                # settings from relay-url.env.
                 serviceConfig = {
                   EnvironmentFile = [
                     "/run/secrets/buzz.env"
@@ -602,22 +506,12 @@ in
     ]
   );
 }
-# --- ONE-TIME INIT after first apply (imperative; run against the buzz
-# container — e.g. `nixos-container run buzz -- garage ...` or a root shell
-# via `machinectl shell buzz`) ------------------------------------------------
-# Mirrors hosts/nixos-nvme/garage.nix's own one-time init. garage.service
-# comes up fine with no layout/bucket/key yet (buzz-relay will start too, but
-# its S3 calls will fail until this is done):
-#
-#   # 1. give this (only) node storage capacity and apply the layout:
+# One-time init after first deploy, inside the container (`machinectl shell buzz`).
+# Until then the relay runs but its S3 calls fail:
 #   garage layout assign -z buzz -c 10G "$(garage node id -q | cut -d@ -f1)"
 #   garage layout apply --version 1
-#
-#   # 2. create the bucket + a scoped key for the relay:
 #   garage bucket create buzz-media
 #   garage key create buzz-relay-key
 #   garage bucket allow --read --write buzz-media --key buzz-relay-key
-#   # → note the Key ID + Secret (shown once): put them into kleinbem-secrets
-#     as buzz_s3_access_key / buzz_s3_secret_key (see hosts/nixos-nvme/secrets.nix's
-#     "buzz.env" template), `sops updatekeys`, then `just apply` + restart
-#     buzz-relay so it picks up real S3 credentials.
+# Put the Key ID + Secret (shown once) into kleinbem-secrets as
+# buzz_s3_access_key / buzz_s3_secret_key, apply, then restart buzz-relay.

@@ -30,14 +30,10 @@ in
     else
       "";
 
-  # TLS directive for a vhost. `tls internal` (the fleet's Caddy CA) unless
-  # the node asks for a publicly trusted certificate: `publicCert = true`
-  # gets one from Let's Encrypt through the Cloudflare DNS-01 challenge, so a
-  # mesh-only name never has to be reachable from the internet. Needed for
-  # clients that trust only the public CA list (Buzz 1.0's websocket uses
-  # webpki-roots). The token comes from the container's env file
-  # (my.containers.caddy.secretsFile). Public resolvers for the propagation
-  # check: NetBird answers the node's own name authoritatively on the mesh.
+  # `tls internal` (the fleet CA) unless `publicCert = true`, for clients that
+  # trust only public CAs. That gets Let's Encrypt via Cloudflare DNS-01, so a
+  # mesh-only name needn't be reachable from the internet. Public resolvers for
+  # the propagation check, since NetBird answers the node's own name on the mesh.
   mkTls =
     node:
     if node.insecure or false then
@@ -125,14 +121,10 @@ in
                     ''
                   else
                     "reverse_proxy ${upstream}";
-                # Authentik embedded-outpost forward-auth (replaces
-                # Authelia). One shared Proxy Provider in "forward_domain"
-                # mode covers every *.kleinbem.dev node with `auth = true`
-                # via a single cookie_domain session — see
-                # nix/infra/authentik.tf's fleet_forward_auth resources.
-                # No ?rd= param needed (unlike Authelia's /api/verify) —
-                # the outpost derives the post-login redirect from Caddy's
-                # own forwarded request headers.
+                # Authentik embedded-outpost forward-auth. One "forward_domain"
+                # Proxy Provider (nix/infra/authentik.tf) covers every *.kleinbem.dev
+                # node with `auth = true` via one cookie_domain session, so .local
+                # aliases aren't covered. The outpost derives the post-login redirect.
                 authConfig = ''
                   forward_auth 10.85.48.142:9000 {
                     uri /outpost.goauthentik.io/auth/caddy
@@ -140,17 +132,9 @@ in
                     trusted_proxies private_ranges
                   }
                 '';
-                # Paths that must stay reachable WITHOUT an interactive
-                # Authentik session — e.g. n8n's /webhook/* and
-                # /webhook-test/*, hit by external services (GitHub, Stripe,
-                # …) that can't complete a login redirect. Everything else
-                # on the same domain still requires forward_auth. Path-level
-                # only — the excluded paths get NO network-layer auth here
-                # at all, so anything listed must authenticate itself
-                # another way (n8n's own per-webhook Header Auth/HMAC
-                # signature verification — see the per-node comment in
-                # inventory.nix for why there's no Cloudflare WAF rule
-                # backing this up yet).
+                # Paths that skip forward_auth, for callers that can't log in
+                # (e.g. n8n webhooks). They get no auth here at all, so the app
+                # must authenticate them itself.
                 authExcludePaths = node.authExcludePaths or [ ];
               in
               helpers.mkExtraRoutes node

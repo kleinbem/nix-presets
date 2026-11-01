@@ -45,12 +45,8 @@ in
         cfg = cfg // {
           privateUsers = "no"; # Consistant with other containers for bind-mount ease
         };
-        # Default 90s TimeoutStartSec kills the container mid-migration on
-        # weak hardware — confirmed live on nasbook 2026-09-18: a from-empty
-        # `manage.py migrate` was still pegged at ~98% CPU when systemd
-        # killed it at 90s, looping forever without ever converging. Same
-        # fix anythingllm.nix/monitoring.nix already needed for their own
-        # slow first-time startups.
+        # The default 90s start timeout kills a first-run `manage.py migrate`
+        # on weak hardware, and it then loops forever.
         timeout = "10m";
         # Must pre-exist on the host before nspawn starts — see factory.nix's
         # subDirs doc comment.
@@ -60,8 +56,7 @@ in
           { pkgs, ... }:
           {
             # Major pinned: an unpinned default changes under a nixpkgs bump
-            # and Postgres then refuses to start on the existing datadir
-            # (live datadir is 17, checked 2026-10-02).
+            # and Postgres then refuses to start on the existing datadir.
             services.postgresql.package = pkgs.postgresql_17;
 
             # Security Hardening for the container's NixOS system
@@ -77,68 +72,27 @@ in
               port = 28981;
               # Use Redis for better performance with task queue
               consumptionDirIsPublic = true;
-              # Postgres over SQLite: paperless-ngx itself recommends it for
-              # anything beyond a toy install (concurrent web+consumer+task
-              # writers, crash resilience without a UPS, clean pg_dump
-              # backups vs. copying a live db file). Migrated 2026-09-19 while
-              # the instance still had zero real documents and only the
-              # "admin" superuser (itself recreated idempotently from sops on
-              # every activation via passwordFile below) — confirmed via
-              # `paperless-manage shell` before switching, so no export/import
-              # dance was needed. database.createLocally wires up
-              # services.postgresql + PAPERLESS_DBHOST/NAME/USER
-              # automatically; persistence is the /var/lib/postgresql
-              # bindMount below.
+              # Postgres over SQLite, as paperless-ngx recommends: concurrent
+              # writers and clean pg_dump backups. Persisted by the
+              # /var/lib/postgresql bindMount below.
               database.createLocally = true;
               settings = {
                 PAPERLESS_OCR_LANGUAGE = "deu+eng"; # Common for European users, adjust if needed
-                # "clean" was set on the WRONG variable here — that's the
-                # value for PAPERLESS_OCR_CLEAN (which already defaults to
-                # "clean" on its own), not PAPERLESS_OCR_MODE (valid values:
-                # auto/force/off/redo). Confirmed live on nasbook 2026-09-18:
-                # this crashed the container at Django settings-import time,
-                # every single restart, in ~17s — before it ever reached the
-                # database. Every earlier fix this session (10m timeout,
-                # persisting a postgres dir it doesn't even use) was chasing
-                # a symptom; this was the actual bug the whole time. Just
-                # omit OCR_MODE — paperless-ngx's own default ("auto") is
-                # correct, and the intended "clean" behavior was already
-                # the default for OCR_CLEAN regardless.
+                # No PAPERLESS_OCR_MODE: "clean" is a PAPERLESS_OCR_CLEAN value
+                # (already the default), and an invalid OCR_MODE crashes startup.
                 PAPERLESS_TIME_ZONE = "Europe/London";
                 PAPERLESS_ADMIN_USER = "admin";
 
-                # --- SSO Integration (Authentik forward-auth, via Caddy's
-                # shared fleet_forward_auth Proxy Provider — see
-                # nix-presets/containers/caddy/helpers.nix and
-                # nix/infra/authentik.tf) ---
-                # Django maps a forwarded header to HTTP_<NAME-WITH-DASHES-AS-
-                # UNDERSCORES-UPPERCASED> in the WSGI environ — Caddy forwards
-                # the outpost's response header verbatim as
-                # `X-Authentik-Username`, hence HTTP_X_AUTHENTIK_USERNAME here
-                # (was HTTP_REMOTE_USER for Authelia's `Remote-User`).
+                # SSO via Caddy's Authentik forward-auth. Django exposes the
+                # forwarded X-Authentik-Username header as HTTP_X_AUTHENTIK_USERNAME.
                 PAPERLESS_ENABLE_HTTP_REMOTE_USER = "true";
                 PAPERLESS_HTTP_REMOTE_USER_HEADER = "HTTP_X_AUTHENTIK_USERNAME";
                 PAPERLESS_LOGOUT_REDIRECT_URL = "https://auth.kleinbem.dev/";
               };
-              # NOT gated on cfg.passwordFile here — innerConfig gets evaluated
-              # by container-factory (ADR-002: one shared closure, built
-              # once, consumed by whichever hosts enable this container), so
-              # `cfg` here is container-factory's OWN (nonexistent)
-              # my.containers.paperless config, never the consuming host's.
-              # Confirmed live 2026-09-18 via builtins.trace: cfg.passwordFile
-              # was unconditionally null in this scope even though nasbook's
-              # own eval of it was a real path — meaning this mkIf always
-              # evaluated false and LoadCredential was silently never set,
-              # so PAPERLESS_ADMIN_USER/PASSWORD never got exported and
-              # manage_superuser never ran, leaving the container's own
-              # first-run "create an account" web wizard as the only way in.
-              # The actual secret file is already placed correctly at
-              # runtime by the (per-host, correctly-evaluated) bindMounts
-              # entry below + the activationScript above, independent of
-              # this — so this just needs to unconditionally point at that
-              # fixed in-container path. A host that provides no passwordFile
-              # simply never populates it, and the activationScript's own
-              # `if [ -f ... ]` guard already handles that gracefully.
+              # Fixed path, not gated on cfg.passwordFile: container-factory
+              # builds innerConfig once for all hosts (ADR-002), so cfg here is
+              # never the host's and the gate would always be false. The host
+              # bindMount and the activation script below fill this path.
               passwordFile = "/run/secrets/paperless_password";
             };
 

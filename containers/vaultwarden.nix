@@ -56,9 +56,7 @@ in
       description = "INVITATIONS_ALLOWED — let admins/orgs invite users even with signups closed.";
     };
 
-    # Secret file paths (host-level bind mounts, resolved via sops on the
-    # deploying host — never part of the container closure, so the
-    # container-factory passes dummies).
+    # Host paths, bind-mounted; never in the container closure.
     adminTokenFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -133,14 +131,9 @@ in
               SIGNUPS_VERIFY = false; # needs SMTP; flip on once mail is wired
               INVITATIONS_ALLOWED = cfg.invitationsAllowed;
               WEB_VAULT_ENABLED = true;
-              # Favicon fetching is a server-side GET to a user-controlled URL —
-              # an SSRF primitive that, from this container's slice, can reach the
-              # rest of 10.85.48.0/24 (Caddy, Authentik, crowdsec LAPI, …).
-              # Kill it outright rather than delegate to an external ICON_SERVICE,
-              # which would leak the set of domains stored in the vault to a third
-              # party. Cost: new entries have no favicon; already-cached icons
-              # keep serving. (Fixed upstream in 1.37.0 / CVE batch, but removing
-              # the vector beats tracking the patch.)
+              # Favicon fetching is a server-side GET to a user-chosen URL, an
+              # SSRF path into the container subnet. An external ICON_SERVICE
+              # would leak the vault's domains, so new entries just get no icon.
               DISABLE_ICON_DOWNLOAD = true;
             }
             // lib.optionalAttrs hasSmtp {

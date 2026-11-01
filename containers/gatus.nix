@@ -12,14 +12,8 @@ let
 
   hasEndpointsFile = cfg.endpointsFile != null;
 
-  # gatus merges every *.yaml/*.yml file under GATUS_CONFIG_PATH when it's a
-  # directory (maps deep-merged, arrays like `endpoints` appended) — see
-  # https://github.com/TwiN/gatus#loading-configuration-from-a-directory.
-  # That's what lets the portable base file (built into this container's
-  # closure by container-factory) and the host's real endpoints file (bind-
-  # mounted at runtime) live side by side without either baking the other
-  # in. Numeric prefixes are just for readability; merge order doesn't
-  # matter for array-append.
+  # gatus merges every YAML file in a config directory (arrays appended), so
+  # the built-in base config and the host's bind-mounted endpoints sit side by side.
   configDir = "/run/gatus/conf.d";
   endpointsPath = "${configDir}/10-endpoints.yaml";
 
@@ -41,13 +35,8 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "128M";
     };
-    # Host-level bind mount, same convention as vaultwarden's
-    # adminTokenFile: a fixed in-container path that the deploying host
-    # points at real content, because container-factory builds this
-    # container's closure once, centrally (ADR-002) — the fleet-specific
-    # endpoint list can't be baked in here without losing that portability.
-    # Not a secret, but the same "host-specific value, centrally-built
-    # container" problem, so it gets the same fix.
+    # A bind mount, not baked in: container-factory builds the container once
+    # for all hosts (ADR-002), so the host-specific list must come from the host.
     endpointsFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
@@ -73,9 +62,8 @@ in
         configFile = configDir;
       };
 
-      # Materialise the portable base config into the same directory the
-      # host's endpoints file is bind-mounted into (a plain /run path, not
-      # /etc, so this doesn't have to race NixOS's own etc-activation).
+      # Link the base config next to the bind-mounted endpoints file (in /run,
+      # not /etc, to avoid racing etc activation).
       systemd.services = {
         gatus-config-setup = {
           description = "Materialise gatus base config for GATUS_CONFIG_PATH merge";
@@ -93,11 +81,7 @@ in
         };
       };
 
-      # In-memory storage only — no bind-mounted data dir. Same call
-      # ntfy.nix makes for its message cache: a container rebuild resets
-      # uptime history, which is fine for a personal status page and avoids
-      # the DynamicUser/bind-mount ownership dance vaultwarden needs for
-      # its actually-important sqlite db.
+      # In-memory storage only: a restart resets uptime history, which is fine here.
       networking.firewall.allowedTCPPorts = [ cfg.port ];
     };
 

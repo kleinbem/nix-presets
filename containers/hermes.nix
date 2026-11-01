@@ -103,13 +103,8 @@ in
         innerConfig = {
           imports = [ inputs.hermes.nixosModules.default ];
 
-          # Observed with a stray nixos-nvme-subnet address (10.85.46.1) in
-          # this container's resolv.conf on hass-pi despite the host's own
-          # config.my.network.hostAddress correctly being 10.85.49.1 and
-          # hass-pi's own /etc/resolv.conf not containing it either —
-          # mechanism unclear, but it broke Discord's DNS lookup
-          # (aiohttp.ClientConnectorDNSError). Forcing known-good public
-          # resolvers directly sidesteps whatever's injecting that entry.
+          # Public resolvers: the container's resolv.conf has picked up a wrong
+          # host's bridge address before, which broke Discord's DNS lookups.
           networking.nameservers = lib.mkForce [
             "1.1.1.1"
             "8.8.8.8"
@@ -130,14 +125,8 @@ in
             environmentFiles = lib.optional (cfg.secretsFile != null) "/run/secrets/hermes.env";
 
             settings = {
-              # The embedded kanban/task-board dispatcher is on by default
-              # upstream but currently broken in the packaged build — it
-              # throws "ModuleNotFoundError: No module named
-              # 'hermes_state_common'" on every tick (the file exists in
-              # hermes-agent's source but isn't included in this package
-              # build). We don't use the kanban/multi-agent-board feature,
-              # so disable the dispatcher outright rather than patch the
-              # nix packaging around a module that's not otherwise needed.
+              # The kanban dispatcher fails every tick in the packaged build
+              # (ModuleNotFoundError: hermes_state_common). We don't use kanban.
               kanban.dispatch_in_gateway = false;
             }
             // lib.optionalAttrs (cfg.ollamaUrl != "" || cfg.vllmUrl != "") {

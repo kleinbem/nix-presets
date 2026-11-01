@@ -57,10 +57,8 @@ in
           "$right"
         ];
         signing = {
-          # jj 0.42+ renamed `sign-all = true` to `behavior = "own"`. With this
-          # set, `jj describe` signs every commit at creation time — the
-          # `sign-unsigned` recipe becomes a backstop only, not a routine step.
-          # Works touchlessly with the V2 SSH-FIDO key (no-touch-required).
+          # Signs every own commit as it's written, so `sign-unsigned` is only
+          # a backstop. Needs the no-touch FIDO key to stay touchless.
           behavior = "own";
           backend = "ssh";
         };
@@ -100,14 +98,9 @@ in
         gpg = {
           format = "ssh";
           ssh = {
-            # Wrap any IDE-provided SSH_ASKPASS (VS Code / Antigravity IDE) to
-            # strip trailing newlines — those break FIDO2 PIN inputs.
-            #
-            # NOTE: do NOT unset SSH_AUTH_SOCK here. user.signingKey is set as
-            # `key::<inline blob>` in users/martin/home.nix, which causes git
-            # to invoke ssh-keygen with `-U` ("key resides in ssh-agent"). If
-            # the agent socket is stripped, ssh-keygen errors with "Couldn't
-            # get agent socket" and the commit fails. Let the agent through.
+            # Strip trailing newlines from IDE-provided SSH_ASKPASS; they break
+            # FIDO2 PIN input. Don't unset SSH_AUTH_SOCK: user.signingKey is a
+            # .pub file (users/martin/home.nix), so ssh-keygen signs via the agent.
             program = "${pkgs.writeShellScript "git-ssh-sign" ''
               if [ -n "$SSH_ASKPASS" ] && [ "$SSH_ASKPASS" != "ide-askpass-wrapper" ]; then
                 export REAL_ASKPASS="$SSH_ASKPASS"

@@ -63,9 +63,8 @@ in
         inherit config;
         name = "attic";
         inherit cfg;
-        # atticd expects its env file at /etc/atticd-env, not the factory's
-        # default /run/secrets/attic.env — see factory.nix's secretsFile
-        # doc comment.
+        # atticd reads its env file from /etc/atticd-env, not the factory's
+        # default /run/secrets/attic.env.
         inherit (cfg) secretsFile;
         secretsFilePath = "/etc/atticd-env";
         innerConfig = inner: {
@@ -73,7 +72,7 @@ in
             enable = true;
             # zhaofengli/attic#376: chunk holds were released by detached tasks
             # that fail silently under load, so chunks stayed held forever and
-            # GC never freed them (3.9 GB on 2026-10-28). Drop once merged.
+            # GC never freed them. Drop once merged.
             package = inner.pkgs.attic-server.overrideAttrs (old: {
               patches = (old.patches or [ ]) ++ [
                 (inner.pkgs.fetchpatch {
@@ -92,14 +91,10 @@ in
                 path = "/var/lib/atticd/storage";
               };
               chunking = {
-                # Much larger chunks than atticd's defaults (was avg 64 KiB / max
-                # 256 KiB). core-pi is an RPi5: chunking a 300–750 MiB *unfree* app
-                # (chrome, vscode, electron — not on cache.nixos.org, so they must be
-                # pushed here) into ~12k tiny FastCDC/BLAKE3 chunks saturates its CPU,
-                # the upload request stalls, and the client times out (os error 110).
-                # ~64× bigger chunks = hundreds per NAR, not thousands → ingestible.
-                # Costs some cross-path dedup, negligible here (each app is unique;
-                # this is a sparse overlay, not a general cache).
+                # Much larger chunks than atticd's defaults. On a Pi 5, chunking a large
+                # unfree app (chrome, vscode) into thousands of small chunks saturates
+                # the CPU and the client upload times out (os error 110). The lost
+                # dedup is negligible since each app here is unique.
                 nar-size-threshold = 1048576; # 1 MiB: store smaller NARs whole
                 min-size = 1048576; # 1 MiB
                 avg-size = 4194304; # 4 MiB
@@ -115,65 +110,19 @@ in
                 level = 3;
               };
 
-              # Retention policy. This cache is a SPARSE OVERLAY on cache.nixos.org:
-              # CI pushes only the paths it actually built — the non-upstream ones
-              # (custom linux-rpi kernel, custom packages, host-specific config) —
-              # because nix-fleet-setup runs attic-action with `skip-push` and lets
-              # `nix-fast-build --attic-cache system --skip-cached` do the targeted
-              # push. So everything here is, by construction, stuff no public cache
-              # has.
+              # This cache only holds paths no public cache has, so retention can be short.
               garbage-collection = {
-                # How often atticd runs GC. Every pass ALWAYS sweeps orphaned chunks
-                # (NAR data no longer referenced by any cache entry) regardless of
-                # retention, AND applies the retention window below. 12h keeps storage
-                # tidy without thrashing.
+                # Every pass also sweeps orphaned chunks, regardless of retention.
                 interval = "12 hours";
 
-                # Finite retention: 14 days (tightened from 90d on 2026-07-24). A DB
-                # audit that day proved storage (37G / 41.7 GiB uncompressed) is ~100%
-                # genuine overlay — 0 paths signed by cache.nixos.org, 2 by cachix; the
-                # rest is unfree AI-tool apps + custom kernel + Android SDK, SEVERAL
-                # VERSIONS each (openclaw/lmstudio/vscode/cursor keep old versions).
-                # Attic has no "keep N versions" knob, so the retention window IS the
-                # version-count lever: 14d evicts each superseded version ~2x faster
-                # than 30d once it goes idle. Safe to tighten because the PUSH side
-                # only uploads non-upstream paths (CI `--skip-cached` + the local
-                # `push-cache` signature filter), so nothing a public cache has is at
-                # risk — clients fetch those from cache.nixos.org anyway. This is SAFE
-                # for the "devices must never
-                # build" requirement because of a self-healing loop, not in spite of
-                # it. The pieces:
-                #
-                #   1. GC deletes an object only when BOTH its created_at AND
-                #      last_accessed_at are older than the window (server/src/gc.rs),
-                #      so anything actively pulled renews itself and never ages out.
-                #   2. If GC DOES evict a still-needed non-upstream path (e.g. the
-                #      stable linux-rpi kernel, untouched for 14d), the next build-all
-                #      rebuilds it (its `--skip-cached` finds it cached NOWHERE) and
-                #      re-pushes it — refilling the current closure on CI, never on a
-                #      device.
-                #   3. The promote-production `verify-cache` gate then proves the full
-                #      union (Attic + cache.nixos.org + mirrors) covers every deployed
-                #      closure BEFORE advancing the `production` tag. So an eviction
-                #      that hasn't been refilled blocks promotion (visible CI failure)
-                #      instead of reaching a device as an on-device build.
-                #
-                # Net trade for bounded, automated disk: devices still never build;
-                # the costs are (a) a somewhat more frequent aarch64 kernel recompile
-                # in CI when a cold path ages out, and (b) a rollback gap — rolling
-                # `production` back to a closure whose unique paths are >14d old and
-                # already evicted would make that host build. If you ever roll back
-                # further than 14d, widen this first.
-                #
-                # Knobs: widen to "90 days"/"1 year" to cut recompiles + close the
-                # rollback gap at the cost of disk; set "0" to disable age-based GC
-                # entirely (keep-forever — unbounded disk, manual `just nixos::attic-gc`
-                # only sweeps orphans then). Per-cache override: `attic cache configure
-                # system --retention-period <dur>`.
-                #
-                # The upstream filter (paths signed by a public cache are skipped
-                # on push) is per-cache DB state with no atticd config knob; the
-                # attic-upstream-keys unit below applies upstreamCacheKeyNames.
+                # Attic has no "keep N versions" knob, so the window is what evicts old
+                # versions. GC drops a path only when it was neither created nor pulled
+                # within the window. An evicted path that is still needed gets rebuilt
+                # and re-pushed by the next CI build-all, and promote-production's
+                # verify-cache gate blocks a release until it is back. Gotcha: rolling
+                # `production` back more than 14 days can make a host build; widen first.
+                # The upstream-key filter is per-cache DB state with no config knob, so
+                # the attic-upstream-keys unit below applies it.
                 default-retention-period = "14 days";
               };
             };
