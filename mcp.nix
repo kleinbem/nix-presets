@@ -190,7 +190,7 @@
       # Two halves: the MCP server (stdio, started by the AI client) and a
       # GIMP plugin that listens on localhost:9877 once started via
       # Tools > MCP > Start MCP Server.
-      # The server is our nix-packages package (held in nix-holds while it
+      # The server is our nix-packages package (held in nix-holds-fleet while it
       # needs mcp 1.x).
       gimp3McpPkg = pkgs.gimp3-mcp;
 
