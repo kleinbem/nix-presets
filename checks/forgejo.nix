@@ -54,8 +54,11 @@ pkgs.testers.runNixOSTest {
         };
 
         # Stand-in for Authentik: add-oauth fetches the discovery document.
+        # Binding fails until br0 has its address.
         systemd.services.fake-oidc = {
           wantedBy = [ "multi-user.target" ];
+          requires = [ "network-addresses-br0.service" ];
+          after = [ "network-addresses-br0.service" ];
           serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 -m http.server 8000 --bind 10.85.99.1 --directory ${oidcRoot}";
         };
 
