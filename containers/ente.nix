@@ -9,10 +9,8 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
-  # Fixed in-container paths the env-setup script writes to and reads
-  # from — the *File options below are host-side sops paths and only
-  # reach the container via the bindMounts further down (same pattern as
-  # authentik.nix).
+  # In-container paths the *File options are bind-mounted to; the env-setup
+  # script reads them into /run/ente.env.
   minioRootPasswordPath = "/run/secrets/ente-minio-root-password";
   jwtSecretPath = "/run/secrets/ente-jwt-secret";
   keyEncryptionPath = "/run/secrets/ente-key-encryption";
@@ -25,9 +23,7 @@ in
     enable = lib.mkEnableOption "Ente Auth Container";
     ip = lib.mkOption { type = lib.types.str; };
     hostDataDir = lib.mkOption { type = lib.types.str; };
-    # No default: the old "auth.kleinbem.dev" one went stale when Authentik
-    # took that hostname (ente moved to 2fa.kleinbem.dev, 2026-09-21) and
-    # silently baked the wrong origin into museum's WebAuthn config.
+    # No default: a stale default hostname silently breaks museum's WebAuthn origin.
     domain = lib.mkOption {
       type = lib.types.str;
       description = "Public hostname of the museum API (e.g. 2fa.example.com); also its WebAuthn RP ID.";
@@ -76,10 +72,7 @@ in
         inherit config;
         name = "ente";
         inherit cfg;
-        # Bundles the 15m pull timeout, nesting caps/devices, podman's own
-        # registries.conf, and persistent podman image storage — see
-        # factory.nix's usesPodman doc comment. Only MinIO still runs this
-        # way; museum and Postgres are native (see below).
+        # For MinIO and the web app; museum and Postgres are native.
         usesPodman = true;
         # Must pre-exist on the host before nspawn starts — see factory.nix's
         # subDirs doc comment.
@@ -87,24 +80,11 @@ in
         innerConfig =
           { pkgs, ... }:
           {
-            # Native museum process from nixpkgs (services.ente.api / pkgs.museum).
-            # Reaches MinIO via localhost, which needs that podman container on
-            # host networking (same reason authentik.nix's podman containers
-            # use --network=host).
-            #
-            # Postgres: upstream's enableLocalDB — native services.postgresql,
-            # role+db `ente`, museum connects over /run/postgresql with peer
-            # auth, so there's no DB password at all. Until 2026-10 this was a
-            # podman postgres:15-alpine image (pguser/ente_db, password auth),
-            # the only fleet Postgres not on the native module. The major
-            # version is pinned: an unpinned default changes under a nixpkgs
-            # bump and Postgres then refuses to start on the old datadir.
-            #
-            # Migrated 2026-10-02 as a fresh db (the old one had no users).
-            # Trap for any future museum package swap: museum refuses to start
-            # ("setupDatabase file does not exist") when the db's
-            # schema_migrations version is newer than the highest file in the
-            # package's share/museum/migrations — check before downgrading.
+            # museum reaches MinIO on localhost, so MinIO runs with host networking.
+            # enableLocalDB gives native Postgres with peer auth (no DB password).
+            # Pinned major: a nixpkgs default bump would refuse the existing datadir.
+            # Before downgrading museum: it refuses to start ("setupDatabase file
+            # does not exist") if the db has migrations newer than the package's.
             services.postgresql.package = pkgs.postgresql_17;
 
             services.ente.api = {
@@ -112,12 +92,9 @@ in
               enableLocalDB = true;
               inherit (cfg) domain;
               settings = {
-                # Upstream only sets webauthn from services.ente.web's
-                # accounts domain; without the web app it stays empty and
-                # museum panics on start ("the field 'RPID' must be
-                # configured"). Its generated local.yaml replaces museum's
-                # bundled one wholesale, so the bundled localhost defaults
-                # don't apply either.
+                # The module only sets webauthn from services.ente.web, which
+                # isn't used here; without it museum panics ("the field 'RPID'
+                # must be configured").
                 webauthn = {
                   rpid = "kleinbem.dev";
                   rporigins = [
@@ -142,19 +119,8 @@ in
               backend = "podman";
               containers = {
                 minio = {
-                  # docker.io/minio/minio (the unqualified default registry for
-                  # this container per usesPodman's unqualified-search-registries)
-                  # started refusing anonymous pulls entirely — MinIO Inc.
-                  # restricted Docker Hub distribution of the community/AGPL
-                  # image in their 2025 licensing changes. Confirmed live
-                  # 2026-09-24: `docker.io/minio/minio:latest` → "requested
-                  # access to the resource is denied"; quay.io/minio/minio still
-                  # serves it, verified aarch64 manifest present (core-pi is a
-                  # Pi 5). Pinned to a real release tag instead of floating
-                  # `latest` again — quay.io's own `latest` could just as easily
-                  # get orphaned the same way if MinIO changes distribution
-                  # again; a pin at least fails loudly (image not found) instead
-                  # of silently drifting.
+                  # Docker Hub no longer serves MinIO anonymously; quay.io does
+                  # (aarch64 too). Pinned so a distribution change fails loudly.
                   image = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
                   cmd = [
                     "server"
@@ -191,26 +157,11 @@ in
               3003
             ];
 
-            # Consolidated: statix flags repeated top-level `systemd.*`
-            # assignments (this file used to set systemd.services.<name>
-            # separately at 4 different points, plus systemd.tmpfiles.rules
-            # at a 5th). Functionally identical either way (Nix's dotted
-            # attrpath sugar already merges same-prefix, different-leaf
-            # assignments fine), just written as one block now.
             systemd = {
               services = {
-                # Materialises the MinIO/museum secrets env file
-                # from sops secrets at activation instead of baking real
-                # credentials into environment.etc (world-readable, lands in
-                # the Nix store) — this file used to inline literal "pgpass"
-                # / "password123" and the upstream jwt_secret placeholder
-                # string directly into the repo. Missing *File options
-                # render as an empty secret rather than falling back to
-                # those old values, so the services fail closed instead of
-                # silently running on a known-weak default. One shared env
-                # file: podman's environmentFiles and systemd's
-                # EnvironmentFile both just ignore keys they don't
-                # recognise, so there's no reason to split it three ways.
+                # Builds the secrets env file at runtime so nothing lands in the
+                # Nix store. A missing *File renders as an empty value, so
+                # services fail closed. One file serves MinIO and museum.
                 ente-env-setup = {
                   description = "Materialise Ente secrets from sops files";
                   before = [
@@ -223,12 +174,8 @@ in
                     miniopass=$(${
                       lib.optionalString (cfg.minioRootPasswordFile != null) "cat ${minioRootPasswordPath}"
                     })
-                    # base64 values: strip ALL whitespace, not just the trailing
-                    # newline $(cat) drops. `openssl rand -base64 64` wraps at 64
-                    # chars, and the stored ente_key_hash kept that wrap — museum's
-                    # strict decoder then crash-looped ("Could not decode
-                    # email-hash-key: illegal base64 data at input byte 64", core-pi
-                    # 2026-09-26, ~940 restarts). Base64 never contains whitespace.
+                    # Strip all whitespace: `openssl rand -base64 64` wraps lines,
+                    # and museum's strict decoder crash-loops on the newline.
                     b64() { tr -d '[:space:]' < "$1"; }
                     jwt=$(${lib.optionalString (cfg.jwtSecretFile != null) "b64 ${jwtSecretPath}"})
                     keyenc=$(${lib.optionalString (cfg.keyEncryptionFile != null) "b64 ${keyEncryptionPath}"})
@@ -273,9 +220,7 @@ in
             hostPath = cfg.hostDataDir;
             isReadOnly = false;
           };
-          # Postgres — static NixOS system uid, ownership stays consistent
-          # across independently-built container closures (same as
-          # authentik.nix/paperless.nix).
+          # postgres has a static NixOS uid, so ownership survives rebuilt closures.
           "/var/lib/postgresql" = {
             hostPath = "${cfg.hostDataDir}/postgresql";
             isReadOnly = false;

@@ -57,18 +57,11 @@ in
         innerConfig =
           { pkgs, ... }:
           let
-            # Since 2026.10, Home Assistant keeps its HTTP settings in
-            # .storage/http and reads the `http:` YAML block only once, to
-            # migrate it (and the YAML goes away in 2027.2). The HAOS restore
-            # brought a store with the migration already done and no proxy
-            # settings, so the YAML trusted_proxies were ignored and every
-            # request through Caddy got 400 "not set-up for reverse proxies".
-            # A migrated YAML block also only lands as a "pending" trial that
-            # reverts after 5 minutes unless someone confirms it in the UI.
-            # So write the store itself on every start, from Nix: our config as
-            # `stable`, nothing pending, migration done. Format: version 2.2,
-            # homeassistant/components/http/config.py; keys left out of the
-            # schema defaults are spelled out because HA reads them directly.
+            # Since 2026.10 HA keeps HTTP settings in .storage/http and reads
+            # YAML `http:` only once, as a migration that reverts unless
+            # confirmed in the UI. So write the store on every start, as
+            # `stable` with the migration marked done. Format: version 2.2 in
+            # homeassistant/components/http/config.py; all keys spelled out.
             httpStore = pkgs.writeText "home-assistant-http-store.json" (
               builtins.toJSON {
                 version = 2;
@@ -102,12 +95,8 @@ in
             );
           in
           {
-            # Upstream workaround: paho-mqtt 2.1.0's test suite fails under Python 3.14
-            # (callback-registration assertion, on_unsubscribe/on_disconnect), which
-            # breaks the whole home-assistant closure — and thus the container-factory
-            # aarch64 build — from source. paho-mqtt is a pure transitive dep here, so
-            # skip its check phase until nixpkgs ships the fix. Scoped to this
-            # container's nixpkgs only. REMOVE once paho-mqtt builds green upstream.
+            # paho-mqtt 2.1.0's tests fail under Python 3.14, which breaks the
+            # whole HA closure. Remove once it builds in nixpkgs.
             nixpkgs.overlays = [
               (_final: prev: {
                 pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
@@ -115,14 +104,9 @@ in
                     paho-mqtt = pyprev.paho-mqtt.overridePythonAttrs (_: {
                       doCheck = false;
                     });
-                    # Home Assistant (2026.10, and still dev) pins
-                    # pywizlight==0.6.3; nixpkgs moved the package to 0.6.6,
-                    # whose multi-zone API turns `bulb.state` into a list and
-                    # breaks every WiZ entity ("'list' object has no attribute
-                    # 'get_brightness'", seen in the restore dry run). HA closed
-                    # its own bump PRs (home-assistant/core#186933) until
-                    # dual-zone support lands, so pin the library back to what HA
-                    # expects. REMOVE once HA's wiz manifest requires >= 0.6.6.
+                    # HA pins pywizlight 0.6.3; 0.6.6's multi-zone API makes
+                    # `bulb.state` a list and breaks every WiZ entity.
+                    # Remove once HA's wiz manifest requires >= 0.6.6.
                     pywizlight = pyprev.pywizlight.overridePythonAttrs (_: {
                       version = "0.6.3";
                       src = prev.fetchFromGitHub {
@@ -139,11 +123,8 @@ in
 
             services.home-assistant = {
               enable = true;
-              # Every integration the HAOS backup (MigrateToNixOS, 2026-06-04)
-              # had configured, so the restored .storage config entries find
-              # their python deps baked into the closure — HA Core on NixOS
-              # can't pip-install at runtime. Keep in sync with
-              # .storage/core.config_entries on hass-pi.
+              # HA on NixOS can't pip-install, so every configured integration
+              # needs its deps here. Keep in sync with .storage/core.config_entries.
               extraComponents = [
                 "met"
                 "radio_browser"
@@ -175,9 +156,8 @@ in
                 "thread"
                 "otbr"
                 "homeassistant_sky_connect"
-                # Discovery flows HA tried to load during the restore dry run
-                # (ssdp found a QNAP switch, dhcp a Google device); without the
-                # libs each one logs an import error on every start.
+                # Discovery finds a QNAP switch and a Google device; without
+                # the libs each logs an import error on every start.
                 "nest"
                 "qnap_qsw"
                 # alarmo imports homeassistant.components.mqtt at load time
@@ -193,8 +173,7 @@ in
                 "music_assistant"
               ];
 
-              # Was HACS-installed on HAOS; nixpkgs packages both, so HACS
-              # itself is dropped. Lovelace resource path for button-card:
+              # From nixpkgs, not HACS. Lovelace resource path for button-card:
               # /local/nixos-lovelace-modules/button-card.js
               customComponents = with pkgs.home-assistant-custom-components; [
                 alarmo
@@ -230,13 +209,10 @@ in
                   themes = "!include themes.yaml";
                 };
 
-                # Sidebar entries for the host-side services (ESPHome device builder,
-                # Node-RED): HA Core on NixOS has no Supervisor add-on panels, and
-                # panel_iframe is gone from Home Assistant (removed before 2026.10), so
-                # these are YAML-mode dashboards with one iframe card each. The YAML
-                # files are store paths linked in by the tmpfiles rules below.
-                # Dashboard keys must contain a hyphen. No top-level `mode`: HA 2026.8
-                # deprecated it (the nixpkgs module warns) and storage is the default.
+                # Sidebar entries for the host's ESPHome builder and Node-RED: no
+                # add-on panels and no panel_iframe, so one iframe dashboard each
+                # (files linked by tmpfiles below). Keys must contain a hyphen; no
+                # top-level `mode`, which HA deprecated.
                 lovelace = {
                   dashboards = {
                     esphome-builder = {
@@ -264,8 +240,7 @@ in
                   commit_interval = 30;
                 };
 
-                # No `http:` here: HA 2026.10 moved it to .storage/http, see
-                # httpStore below.
+                # No `http:` here, see httpStore.
 
                 # Declarative logic (Nix-managed hooks)
                 automation = "!include automations.yaml";

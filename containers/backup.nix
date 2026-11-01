@@ -60,57 +60,22 @@ in
           initialize = true;
           user = "root"; # Run as root inside the container
           repository = "rclone:gdrive:backups/nixos";
-          # NOT gated on cfg here — innerConfig is evaluated by
-          # container-factory (ADR-002: one shared closure, built once),
-          # so cfg is container-factory's OWN (nonexistent) config, never
-          # the consuming host's. Confirmed live on nasbook 2026-09-18,
-          # same bug class as paperless's passwordFile: both restic
-          # backup jobs failed every single run with "Fatal: Resolving
-          # password failed: /run/secrets/dummy does not exist" — the
-          # real secret WAS correctly bind-mounted to
-          # /run/secrets/restic_password by the (per-host, correctly
-          # evaluated) bindMounts below, this option just never pointed
-          # at it. Point at the fixed in-container paths unconditionally;
-          # a host with nothing configured just gets a missing-file error
-          # instead, which is the correct behavior for backup without
-          # credentials anyway.
+          # Fixed in-container paths, not cfg: container-factory builds innerConfig
+          # once for all hosts (ADR-002), so cfg here is never the host's. The per-host
+          # bindMounts below put the real secrets at these paths.
           passwordFile = "/run/secrets/restic_password";
           rcloneConfigFile = "/run/secrets/rclone_config";
 
           extraOptions = [
-            # restic's rclone backend default is "serve restic --stdio";
-            # rclone.args REPLACES that default rather than appending to
-            # it, so the old value (tuning flags only) made restic invoke
-            # rclone as `rclone <tuning-flags> gdrive:backups/nixos-system`,
-            # with no "serve restic --stdio" verb at all — rclone then
-            # tried to parse the remote path itself as a subcommand and
-            # failed with "unknown command ... for rclone".
-            #
-            # The embedded double quotes here are NOT redundant — NixOS's
-            # restic module writes ExecStart as a plain systemd unit-file
-            # command line, which systemd itself word-splits on
-            # whitespace. Without quotes around the value, "serve restic
-            # --stdio ..." gets split into separate bare argv tokens for
-            # restic itself, and restic's cobra CLI treats the first one
-            # ("restic") as an attempted subcommand: 'unknown command
-            # "restic" for "restic"'. Confirmed both failure modes live on
-            # nasbook 2026-09-18, in that order, while fixing this.
+            # rclone.args replaces restic's default "serve restic --stdio", so the verb
+            # must be repeated here. The inner quotes are needed: systemd word-splits
+            # ExecStart, and restic would read "restic" as a subcommand.
             "rclone.args=\"serve restic --stdio --tpslimit 5 --fast-list --drive-chunk-size 64M\""
           ];
 
-          # NOT derived from cfg.targets here — same innerConfig/
-          # container-factory scoping issue as passwordFile above, but
-          # unfixable with a single fixed secret path since the actual
-          # set of host paths genuinely varies per host. Confirmed live
-          # on nasbook 2026-09-18: with this reading container-factory's
-          # own empty cfg.targets, `paths` evaluated to [] in the built
-          # closure, so the NixOS restic module emitted no backup
-          # ExecStart at all (only unlock + forget/prune) — the jobs
-          # "succeeded" every run without ever backing up anything.
-          # Fixed instead by mounting every host target under one fixed,
-          # host-independent parent directory (bindMounts below) and
-          # just backing up that whole parent — same trick as
-          # passwordFile, generalized to a directory instead of a file.
+          # Not cfg.targets: same container-factory scoping, so it would be [] and
+          # restic would back up nothing. bindMounts below put every host target under
+          # this one fixed parent instead.
           paths = [ "/mnt/backup-targets" ];
 
           exclude = [
@@ -152,18 +117,16 @@ in
           initialize = false;
           user = "root";
           repository = "rclone:gdrive:backups/nixos-system";
-          # Same fixed-path fix as services.restic.backups.daily above.
+          # Same fixed paths as the daily job.
           passwordFile = "/run/secrets/restic_system_password";
           rcloneConfigFile = "/run/secrets/rclone_config";
 
           extraOptions = [
-            # Same rclone.args fix as services.restic.backups.daily above
-            # (quotes required — see the comment there).
+            # Same rclone.args as the daily job (quotes required).
             "rclone.args=\"serve restic --stdio --tpslimit 3 --fast-list --drive-chunk-size 128M\""
           ];
 
-          # Same fixed-parent-directory fix as services.restic.backups.daily
-          # above.
+          # Same fixed-parent-directory trick as the daily job.
           paths = [ "/mnt/backup-system-targets" ];
 
           exclude = [
@@ -190,16 +153,9 @@ in
         ];
       };
 
-    # Read-Only Bind Mounts
-    #
-    # Mounted under fixed, host-independent parent directories
-    # (/mnt/backup-targets, /mnt/backup-system-targets) rather than at the
-    # arbitrary container-path keys of cfg.targets/cfg.systemTargets — the
-    # `paths` options above back up those two fixed parents wholesale, so
-    # each host's real target directories just need to appear as SOME
-    # subdirectory underneath, keyed by a sanitized version of whatever
-    # container path the host chose (only used here as a unique label now,
-    # not as the actual in-container path).
+    # Read-only bind mounts. Targets go under the fixed parents
+    # /mnt/backup-targets and /mnt/backup-system-targets, which the `paths` above
+    # back up whole; the sanitized container path is only a unique subdir name.
     bindMounts =
       let
         sanitize = path: lib.replaceStrings [ "/" ] [ "-" ] (lib.removePrefix "/" path);

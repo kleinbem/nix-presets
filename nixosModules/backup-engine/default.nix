@@ -1,27 +1,15 @@
-# backup-engine — generic, host-level backup for the fleet.
+# backup-engine: generic, host-level backup for the fleet.
 #
-# WHAT is backed up is declared by the data owners themselves: presets and
-# modules add `my.backup.items.<name>` whenever their service is enabled
-# (they import this file by path — the module system dedups it, so the
-# options exist wherever any such preset is imported). WHERE it goes and
-# with which keys is fleet wiring (nix-config/modules/nixos/backup.nix).
-# A host only sets `my.backup.enable = true` plus any host-only paths.
+# Presets and modules declare WHAT to back up via `my.backup.items.<name>`
+# (importing this file by path; the module system dedups it). WHERE and with
+# which keys is fleet wiring in nix-config/modules/nixos/backup.nix.
 #
-# Two tiers:
-#   secure — small + critical (DB dumps, keys, CAs). One dated tarball,
-#            age-encrypted to `secure.recipients`, copied to every
-#            destination under <remote>/secure/<host>/. Restore needs only
-#            an age identity + tar; no repo password, no running service.
-#   bulk   — large data. restic, one independent repo per destination at
-#            <remote>/restic/<host> (one provider being down never blocks
-#            the other).
+# Tiers: `secure` is a small age-encrypted tarball per run under
+# <remote>/secure/<host>/, restorable with just an age identity and tar.
+# `bulk` is one independent restic repo per destination at <remote>/restic/<host>.
 #
-# Databases are always DUMPED (sqlite `.backup`, pg_dumpall) into a staging
-# dir, never file-copied live: tar/restic read a datadir file-by-file over
-# time, which is not the atomic snapshot crash recovery assumes.
-#
-# Units: backup-secure.service, restic-backups-bulk-<dest>.service,
-# backup-freshness-check.service, backup-notify-failure@.service.
+# Databases are always dumped (sqlite `.backup`, pg_dumpall), never copied live:
+# a file-by-file read of a datadir is not a consistent snapshot.
 # Test: checks/backup-engine.nix (NixOS VM, full backup + restore).
 {
   config,
@@ -486,7 +474,7 @@ in
               after = [ "network-online.target" ];
               path = [
                 # tar starts its -z compressor through `sh -c`, so the unit
-                # needs a shell on PATH, not just gzip (broke 2026-10-18).
+                # needs a shell on PATH, not just gzip.
                 pkgs.bash
                 pkgs.coreutils
                 pkgs.gnutar

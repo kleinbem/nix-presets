@@ -8,12 +8,8 @@
 let
   cfg = config.my.containers.monitoring;
   inherit (self.lib) mkContainer;
-  # Fixed path the secret file is bind-mounted to *inside* the container
-  # (cfg.grafanaOidc.clientSecretFile holds the host-level sops-nix path,
-  # resolved on the deploying host) — same convention as vaultwarden.nix's
-  # adminTokenPath.
+  # In-container paths the host-side secret files are bind-mounted to.
   grafanaOidcClientSecretPath = "/run/secrets/grafana-oidc-client-secret";
-  # Same convention for alertmanager-ntfy's credentials/topic snippet.
   alertmanagerNtfyAuthPath = "/run/secrets/alertmanager-ntfy.yml";
 in
 {
@@ -125,10 +121,8 @@ in
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
       {
-        # nspawn refuses to start the container if a bind-mount SOURCE is
-        # missing, and the factory only creates hostDataDir itself — not the
-        # per-service subdirs the bindMounts below point at (seen on core-pi:
-        # "Failed to clone /var/lib/monitoring/grafana" → start-limit-hit).
+        # nspawn won't start if a bind-mount source is missing, and the
+        # factory creates only hostDataDir, not these subdirs.
         systemd.tmpfiles.rules = [
           "d ${cfg.hostDataDir}/db 0755 1000 100 - -"
           "d ${cfg.hostDataDir}/grafana 0755 1000 100 - -"
@@ -153,24 +147,13 @@ in
             grafana = {
               enable = true;
               settings = {
-                # NixOS's grafana module defaults http_addr to 127.0.0.1
-                # (loopback-only, secure-by-default) — without this, Grafana
-                # is unreachable from outside the container entirely,
-                # including via Caddy's reverse proxy on the host. Confirmed
-                # live 2026-08-04 moving this container to a new host: every
-                # other service here (victoriametrics, alertmanager) has no
-                # such default and was already reachable on the bridge IP,
-                # only grafana silently wasn't.
+                # The NixOS module defaults http_addr to 127.0.0.1, which
+                # Caddy can't reach from outside the container.
                 server = {
                   http_addr = "0.0.0.0";
                   http_port = 3000;
-                  # Reverse-proxied at grafana.kleinbem.dev (Caddy +
-                  # Cloudflare Tunnel, see nix-config's inventory.nix
-                  # monitoring node + cloudflare-tunnel.nix). Without these,
-                  # Grafana's default root_url (http://localhost:3000/)
-                  # leaks into generated links and its Origin/CSRF check on
-                  # state-changing requests is validated against the wrong
-                  # host.
+                  # Without these, links and the Origin/CSRF check use
+                  # localhost:3000 instead of the proxied hostname.
                   domain = "grafana.kleinbem.dev";
                   root_url = "https://grafana.kleinbem.dev/";
                 };
@@ -185,21 +168,15 @@ in
                   enabled = true;
                   name = "Authentik";
                   client_id = cfg.grafanaOidc.clientId;
-                  # Grafana's own $__file{} config syntax — resolved by
-                  # Grafana itself at startup, not a Nix/sops-nix mechanism
-                  # — reads the bind-mounted secret without it ever
-                  # touching the Nix store. Same reasoning as every other
-                  # secret in this fleet.
+                  # Grafana reads the bind-mounted file at startup, so the
+                  # secret stays out of the Nix store.
                   client_secret = "$__file{${grafanaOidcClientSecretPath}}";
                   scopes = "openid email profile";
                   auth_url = "https://auth.kleinbem.dev/application/o/authorize/";
                   token_url = "https://auth.kleinbem.dev/application/o/token/";
                   api_url = "https://auth.kleinbem.dev/application/o/userinfo/";
-                  # Everyone who can reach this login screen at all is
-                  # already staff-only (the authentik_application's own
-                  # policy_binding, nix/infra/authentik.tf) — auto-assign
-                  # Admin rather than provisioning a second role layer on
-                  # top of that gate.
+                  # Authentik already lets only staff in (nix/infra/authentik.tf),
+                  # so everyone who logs in is Admin.
                   role_attribute_path = "'Admin'";
                 };
               };
@@ -220,9 +197,8 @@ in
                     url = cfg.lokiUrl;
                   }
                 ];
-                # Always provision the dashboards dir (was gated on githubMetrics;
-                # ungated so the network/router dashboard shows regardless — the
-                # github-actions panels just read empty when that's disabled).
+                # Not gated on githubMetrics: the router dashboard is needed anyway,
+                # and the github-actions panels just read empty.
                 dashboards.settings.providers = [
                   {
                     name = "dashboards";

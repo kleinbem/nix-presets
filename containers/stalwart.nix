@@ -15,22 +15,10 @@ let
   hasRelay = cfg.relaySecretFile != null;
   hasAdmin = cfg.adminPasswordFile != null;
 
-  # NOTE: this preset does NOT declare mailboxes. Earlier revisions did
-  # `import ../../nix-config/personas.nix` here and built a static
-  # `directory.internal` principal list from `p.email` / `p.full-name` —
-  # both broken: (1) nix-presets must not import back into nix-config
-  # (see this repo's CLAUDE.md "Don't"), and the path doesn't exist when
-  # nix-presets is a store-fetched flake input; (2) those fields live in
-  # kleinbem-secrets/personas/contact.nix, not the public manifest.
-  # Accounts are instead created imperatively by
-  # nix-config/scripts/persona-scaffold.sh (step 6: POST /api/principal
-  # inside the container via curl — NOT stalwart-cli, which is
-  # schema-driven and incompatible with this pinned 0.15.5). The internal
-  # directory is persistent by default — the NixOS `services.stalwart`
-  # module already sets `storage.data = "db"` (RocksDB under the data
-  # dir), `directory.internal.type = "internal"`, `.store = "db"` and
-  # `storage.directory = "internal"` as `mkDefault`s, so this preset only
-  # needs listeners + admin + (optional) outbound relay.
+  # No mailboxes here: persona emails live in kleinbem-secrets, and presets
+  # must not import nix-config. nix-config/scripts/persona-scaffold.sh creates
+  # accounts via POST /api/principal (stalwart-cli doesn't work with this 0.15.5).
+  # The NixOS module already defaults to a persistent internal directory.
 in
 {
   imports = [ ../nixosModules/backup-engine ];
@@ -128,12 +116,9 @@ in
             # start (it's a data-compat marker, like system.stateVersion).
             stateVersion = "26.05";
 
-            # Fallback administrator — loaded via systemd LoadCredential (see
-            # `credentials` below), referenced by macro. Lets `stalwart-cli`
-            # authenticate to create persona accounts. TODO(phase1): confirm
-            # `authentication.fallback-admin` is still the 0.15 key on first
-            # deploy (it has been since ~0.9); the rest of this block is
-            # straight off nixos/tests/stalwart/stalwart-config.nix.
+            # Human fallback administrator, loaded via LoadCredential and
+            # referenced by macro. TODO(phase1): confirm
+            # `authentication.fallback-admin` is still the 0.15 key.
             credentials = lib.mkIf hasAdmin {
               admin_secret = "/run/secrets/stalwart-admin-secret";
             };

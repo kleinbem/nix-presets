@@ -49,14 +49,9 @@ in
         # Output is sent to the nix-daemon log (journalctl -u nix-daemon)
         echo "Pushing paths to Attic: $OUT_PATHS"
 
-        # Push ONLY the freshly-built outputs, never their closure (--no-closure).
-        # $OUT_PATHS is what this build just produced locally — by definition it
-        # was built, not substituted, so it belongs in Attic. Without
-        # --no-closure, attic re-closes over each output and drags in its deps;
-        # its built-in filter only skips cache.nixos.org, so cachix deps leak in.
-        # Every locally-built dep was itself an $OUT_PATHS at its own build step,
-        # so per-output pushes still cover the full built set — as a SPARSE
-        # OVERLAY (see nix-presets/containers/attic.nix), not a closure mirror.
+        # --no-closure: push only what this build produced. Otherwise attic pushes
+        # the deps too, and its filter only skips cache.nixos.org, so cachix paths
+        # leak in. Locally built deps were pushed at their own build step.
         export HOME=/root
         # Best effort: Nix fails the build when this hook fails, and a cache
         # problem (a rotated token, the cache being down) must not stop builds.

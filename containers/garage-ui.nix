@@ -1,20 +1,14 @@
-# Garage UI (Noooste/garage-ui): web dashboard for the Garage S3 cluster —
-# buckets, objects, keys, layout. Garage itself runs host-native (not in a
-# container); this UI reaches its S3 and admin APIs on the host's bridge
-# address, which the host firewall opens to this container only.
+# Garage UI (Noooste/garage-ui): web dashboard for the host-native Garage S3
+# cluster. It reaches Garage's S3 and admin APIs on the host bridge address.
 #
-# View-only by default, in two layers:
-# - The UI: Authentik users in oidc.viewerGroup may look and download, nothing
-#   else (access_control). Token login is off, since garage-ui always makes it
-#   full admin; the `garage` CLI on the host is the break-glass.
-# - Garage: give it a scoped admin token (`just garage::ui-token` in
-#   nix-config) and Garage itself refuses bucket, key and layout changes. The
-#   scope must include GetKeyInfo, because garage-ui browses objects with the
-#   S3 keys already granted on each bucket. So objects stay protected by the
-#   UI layer only.
+# View-only in two layers: users in oidc.viewerGroup may only look and download
+# (token login stays off, since garage-ui makes it full admin), and a scoped
+# admin token (`just containers::garage-ui-token` in nix-config) makes Garage
+# refuse bucket, key and layout changes. The scope needs GetKeyInfo, so objects
+# are protected by the UI layer only.
 #
-# Never runs without auth: with no method configured the server falls back to
-# "none" (anyone reaching the port gets full admin), hence the assertion below.
+# With no auth method the server falls back to "none" (full admin for anyone),
+# hence the assertion below.
 { self }:
 {
   config,

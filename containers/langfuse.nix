@@ -55,27 +55,14 @@ in
           inherit (cfg) autoStart;
           ip = "10.85.46.124/24"; # Static IP for the DB container
           hostDataDir = "${cfg.hostDataDir}/db";
-          # postgres refuses to start against a data directory group/world
-          # can touch, so this can't use the factory's 1000:100 default —
-          # give it the real uid/gid the postgresql module assigns
-          # (config.ids.uids/gids.postgres, verified via `nix eval` against
-          # this flake's pinned nixpkgs: both 71).
+          # postgres refuses a data directory others can touch, so use its real
+          # uid/gid (config.ids.uids/gids.postgres = 71), not the factory's 1000:100.
           dataDirOwner = 71;
           dataDirGroup = 71;
         };
-        # Used to be `trust` for all of 10.85.46.0/24 plus an
-        # initialScript creating a `postgres`/'postgres' superuser — i.e.
-        # every container on that bridge got passwordless superuser, and
-        # the app connected as superuser too. Now: a dedicated `langfuse`
-        # role owning only its own database, scram password, reachable
-        # only from the app container's IP; superuser is local-socket
-        # peer only.
-        #
-        # RE-ENABLING with the old (Apr 2026 trial) datadir still at
-        # ${cfg.hostDataDir}/db: its tables are owned by `postgres`, which
-        # the new `langfuse` role can't use. Either wipe that dir (it was
-        # only ever a trial), or pg_dump it first and restore with
-        # `pg_restore --no-owner --role=langfuse -d langfuse`.
+        # A datadir from before the dedicated `langfuse` role has tables owned
+        # by `postgres`, which the role can't use. Wipe ${cfg.hostDataDir}/db, or
+        # pg_dump it and restore with `pg_restore --no-owner --role=langfuse -d langfuse`.
         innerConfig = {
           services.postgresql = {
             enable = true;
@@ -133,7 +120,7 @@ in
         };
       })
 
-      # 2. Native Application Container (migrated from OCI)
+      # 2. Native Application Container
       (mkContainer {
         inherit config;
         name = "langfuse";

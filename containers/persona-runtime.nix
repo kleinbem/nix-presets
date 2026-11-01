@@ -10,12 +10,8 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
-  # Bridge for NixOS/nixpkgs#569679 (merged 2026-10-03): litellm >= 1.101
-  # exports VectorStoreSearchError, and aider's LiteLLMExceptions raises on
-  # any litellm *Error it doesn't list — on every send, not just in its
-  # tests (which is where the build fails). Same patch as upstream; it drops
-  # itself once the pinned nixpkgs carries it, so no cleanup needed.
-  # nix-devshells' shells/default carries the same bridge.
+  # Bridge for NixOS/nixpkgs#569679: aider raises on litellm's new
+  # VectorStoreSearchError on every send. Skipped once nixpkgs has the patch.
   aider-chat =
     if
       lib.any (p: lib.hasSuffix "add-vector-store-search-error.patch" (toString p)) (
@@ -28,11 +24,8 @@ let
         patches = (old.patches or [ ]) ++ [ ./patches/aider-vector-store-search-error.patch ];
       });
 
-  # tool → {binary inside the container, env var its API key needs to land
-  # in}. This is internal knowledge of what this container's own package
-  # set provides — the consumer host just says which `tool` a persona
-  # uses (same field name as nix-config/personas.nix's own `tool`), it
-  # doesn't need to know container-internal paths.
+  # tool → binary in the container + the env var for its API key. Hosts only
+  # name the `tool`, as in nix-config/personas.nix.
   toolSpecs = {
     gemini-cli = {
       binary = "/run/current-system/sw/bin/hermes";
@@ -42,10 +35,7 @@ let
       binary = "/run/current-system/sw/bin/claude";
       apiKeyEnvVar = "ANTHROPIC_API_KEY";
     };
-    # aider reads ANTHROPIC_API_KEY via its litellm backend the same way
-    # claude-code does (its own --anthropic-api-key flag maps to the more
-    # specific AIDER_ANTHROPIC_API_KEY, but the plain var works too and
-    # keeps this entry consistent with claude-code's).
+    # aider's litellm backend reads the plain ANTHROPIC_API_KEY too.
     aider = {
       binary = "/run/current-system/sw/bin/aider";
       apiKeyEnvVar = "ANTHROPIC_API_KEY";
@@ -71,13 +61,8 @@ let
     )
   );
 
-  # Packaged here (not left as a standalone repo script) so it ships with
-  # the container closure on any host that enables this module — no manual
-  # file copy, no live git checkout of nix-config/kleinbem-secrets needed
-  # on the target host. Identity material is read straight from paths
-  # sops-nix already decrypted at activation time (the host's own
-  # sops.secrets.*, wired up by the consumer host's config) — this script
-  # never shells out to sops or nix eval itself.
+  # Ships with the module, so hosts need no repo checkout. It reads identity
+  # files the host's sops-nix already decrypted; no sops or nix eval here.
   personaInvokeScript = pkgs.writeShellApplication {
     name = "persona-invoke";
     runtimeInputs = [
@@ -138,21 +123,13 @@ let
       fi
       chmod 600 ${lib.escapeShellArg cfg.secretsEnvFile}
 
-      # Clean slate — a host-side bind mount survives the container's own
-      # ephemeral rootfs reset, so without this, one persona's session
-      # state could bleed into the next persona's context.
+      # The host data dir survives the ephemeral rootfs reset; wipe it so one
+      # persona's state can't reach the next.
       find "$DATA_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
       echo "Starting persona-runtime as $NAME..."
-      # autoStart = false means this is a declarative NixOS container that
-      # has never been booted yet — nothing is registered with
-      # systemd-machined for `machinectl start` to boot (that verb wants a
-      # pre-existing image under /var/lib/machines, which doesn't exist for
-      # an ephemeral container until its own systemd unit runs it). The
-      # unit NixOS actually generates is container@persona-runtime.service
-      # — go through systemctl, same as any other declarative container
-      # that isn't autoStart'd. `machinectl shell`/`machinectl poweroff`
-      # below still work fine once it's running, machined discovers it then.
+      # systemctl, not `machinectl start`: a declarative container has no
+      # image under /var/lib/machines. machinectl works once it's running.
       systemctl start container@persona-runtime.service
 
       for _ in $(seq 1 20); do
@@ -162,13 +139,8 @@ let
         sleep 0.5
       done
 
-      # Source agent.env inside the container before exec'ing the tool,
-      # rather than passing the API key via `machinectl shell --setenv`
-      # (would put the secret in the host's own argv/process list). Works
-      # uniformly for every tool — hermes-agent also reads GEMINI_API_KEY
-      # from its own $HERMES_HOME/.env (copied from this same file at
-      # container activation), so sourcing it again here is redundant but
-      # harmless for that tool specifically.
+      # Source agent.env inside the container rather than `--setenv`, which
+      # would put the API key in the host's process list.
       set +e
       # shellcheck disable=SC2016  # single-quoted on purpose — this runs
       # INSIDE the container via `sh -c`, must not expand here.
@@ -189,32 +161,11 @@ let
   };
 in
 {
-  # Generic, persona-agnostic worker container — ONE declared instance,
-  # identity swapped at invocation time instead of one container per
-  # persona (hermes-juan.nix's shape). Built 2026-08-08 once "up to ~200
-  # personas, never running concurrently" made per-persona standing
-  # containers the wrong model: this way NixOS eval/deploy cost is O(1)
-  # regardless of how many personas exist, not O(n).
-  #
-  # How identity gets in: NOTHING persona-specific is a Nix option here
-  # EXCEPT `personas` (below), which is plain data — signing-key/API-key
-  # paths the consumer host already decrypted via its own sops.secrets,
-  # plus git name/email. secretsEnvFile / gitConfigFile / signingKeyFile
-  # are bind-mounted at FIXED container paths; their HOST-SIDE content
-  # gets rewritten by the packaged `persona-invoke <name>` command (built
-  # below as personaInvokeScript, shipped via environment.systemPackages —
-  # no separate script checkout needed on the host) immediately before
-  # each `machinectl start`, and the model is passed as a `hermes -m ...`
-  # runtime flag, not a NixOS config value (confirmed working live
-  # 2026-08-08 testing juan's standing container). autoStart = false — the
-  # invoke script starts/stops it per call. ephemeral = true (mkContainer's
-  # default) means the rootfs resets on every start, so no persona's
-  # session state leaks into the next invocation.
-  #
-  # Rights/egress tiers per persona (role-tags → different egress
-  # profiles) are NOT built yet — this first version ships one
-  # restrictLan-only profile shared by everyone, same as juan's original
-  # container. Revisit once more than one tier is actually needed.
+  # One shared worker container for all personas (they never run at once), so
+  # eval cost doesn't grow with their number. `persona-invoke <name>` rewrites
+  # the bind-mounted identity files (agent.env, gitconfig, signing key), starts
+  # the container, runs the tool and stops it again. The rootfs is ephemeral.
+  # All personas share one egress profile.
   options.my.containers.persona-runtime = {
     enable = lib.mkEnableOption "Generic persona-agnostic agent worker container";
     ip = lib.mkOption { type = lib.types.str; };
@@ -303,10 +254,7 @@ in
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
-      # Bind-mount source files must exist before the container's systemd
-      # mount units can attach to them, even before persona-invoke.sh has
-      # ever run — empty placeholders, real content comes from the first
-      # invocation.
+      # Bind-mount sources must exist before the first persona-invoke run.
       {
         systemd.tmpfiles.rules = [
           "f ${cfg.secretsEnvFile} 0600 root root - -"
@@ -314,13 +262,11 @@ in
           "f ${cfg.signingKeyFile} 0600 root root - -"
         ];
 
-        # Host-level (not innerConfig) — persona-invoke runs on the HOST to
-        # drive machinectl, it doesn't run inside the persona-runtime
-        # container itself.
+        # On the host: persona-invoke drives the container from outside.
         environment.systemPackages = [ personaInvokeScript ];
       }
 
-      # ─── Host-side egress containment (mirrors openclaw.nix/hermes-juan.nix) ───
+      # ─── Host-side egress containment (mirrors openclaw.nix) ───
       (lib.mkIf cfg.egress.restrictLan (
         let
           containerIp = lib.head (lib.splitString "/" cfg.ip);
@@ -360,39 +306,27 @@ in
             enable = true;
             package = inputs.hermes.packages.${pkgs.stdenv.hostPlatform.system}.messaging;
 
-            # Runnable via `machinectl shell persona-runtime
-            # /run/current-system/sw/bin/hermes -m <model> -z '...'` — model
-            # is always a runtime flag here, never a Nix value, since this
-            # container is shared across every persona.
+            # The model is always a runtime flag (`hermes -m <model>`), since
+            # every persona shares this container.
             addToSystemPackages = true;
 
             environmentFiles = [ "/run/secrets/agent.env" ];
 
             settings = {
-              # Same upstream packaging gap as hermes.nix/hermes-juan.nix —
-              # ModuleNotFoundError: hermes_state_common. Not used anyway.
+              # Upstream packaging gap (ModuleNotFoundError: hermes_state_common); unused.
               kanban.dispatch_in_gateway = false;
             };
           };
 
-          # Other personas' declared tools (antigravity, self-hosted-runner —
-          # see nix-config/personas.nix's `tool` field per persona) get
-          # added here as they're actually invoked through this container,
-          # not preemptively for all of them. ANTHROPIC_API_KEY (claude-code,
-          # aider) reads straight from the process environment, no
-          # dotenv-from-home convention like hermes-agent's — see
-          # persona-invoke's `machinectl shell ... bash -c 'source agent.env'`
-          # wrapper above, which is what actually gets it there.
+          # Other personas' tools (antigravity, self-hosted-runner) get added
+          # when first used through this container.
           environment.systemPackages = [
             pkgs.claude-code
             aider-chat
           ];
 
-          # NOT programs.git — that bakes a static /etc/gitconfig at build
-          # time, which defeats the point (one shared container, N
-          # personas). /etc/gitconfig is bind-mounted directly instead
-          # (see bindMounts below); persona-invoke.sh writes real
-          # user.name/email/signingkey content into it before each start.
+          # No programs.git: /etc/gitconfig is bind-mounted and rewritten per
+          # persona by persona-invoke.
 
           networking.firewall.enable = true;
         };
