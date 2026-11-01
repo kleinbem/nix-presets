@@ -62,8 +62,9 @@ in
         };
         # A datadir from before the dedicated `langfuse` role has tables owned
         # by `postgres`, which the role can't use. Wipe ${cfg.hostDataDir}/db only
-        # if the data is disposable. Otherwise `pg_dump -Fc` it, check the dump, and
-        # restore into an empty DB with `pg_restore --no-owner --role=langfuse -d langfuse`.
+        # if the data is disposable. Otherwise `pg_dump -Fc -f langfuse.dump langfuse`,
+        # check the dump, and restore it into an empty DB with
+        # `pg_restore --no-owner --role=langfuse -d langfuse langfuse.dump`.
         innerConfig = {
           services.postgresql = {
             enable = true;
