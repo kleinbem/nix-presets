@@ -214,7 +214,8 @@ in
         };
       })
 
-      # Weekly reaper for chunks atticd marks deleted but never unlinks. Files are
+      # Weekly reaper for chunks atticd marks deleted but never unlinks: its GC
+      # unlinks only 500 per run (zhaofengli/attic#266). Files are
       # removed with atticd up (they're unreferenced); atticd stops only for the
       # DELETE+VACUUM. Refuses if a marked chunk is still referenced, and defers
       # while a push is writing chunks.

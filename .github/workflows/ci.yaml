@@ -26,7 +26,8 @@ jobs:
         run: nix build -L --no-link .#checks.x86_64-linux.backup-engine --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages
       # Not `nix flake check`: it evaluates all module-* checks (each a full
       # NixOS system) in one process that never frees them and outgrows the
-      # 16 GiB runner (#108). nix-fast-build uses memory-capped eval workers.
+      # 16 GiB runner (NixOS/nix#13483). nix-fast-build uses memory-capped
+      # eval workers.
       - name: Build all checks
         run: >-
           nix run github:Mic92/nix-fast-build --
