@@ -94,10 +94,8 @@ in
         isReadOnly = false;
       }) cfg.vaults
       // {
-        # Persist configuration. hostDataDir itself (owner 1000:100,
-        # matching this container's hardcoded uid=1000 user) is created
-        # automatically by mkContainer's own tmpfiles rule — the old
-        # preStart mkdir+chown wrapper here was fully redundant.
+        # Persist configuration. mkContainer's tmpfiles rule creates
+        # hostDataDir as 1000:100, matching the container's uid=1000 user.
         "/home/${cfg.user}/.config/syncthing" = {
           hostPath = cfg.hostDataDir;
           isReadOnly = false;

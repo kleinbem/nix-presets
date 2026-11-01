@@ -164,21 +164,16 @@ rec {
                       (sloth.concat' sloth.homeDir "/.icons")
                     ];
 
-                    # Deliberately NOT the whole $XDG_RUNTIME_DIR: it holds the
-                    # raw session bus (bypassing nixpak's filtered xdg-dbus-proxy,
-                    # which is on by default — grant names via dbus.policies),
-                    # ssh-agent, gnupg and podman sockets. Presets bind the
-                    # individual sockets an app needs. /doc is the document
-                    # portal's FUSE mount: file-chooser results land there.
+                    # Not the whole $XDG_RUNTIME_DIR: it holds the raw session bus
+                    # (bypassing the filtered dbus proxy), ssh-agent, gnupg and podman
+                    # sockets. Presets bind the sockets an app needs. /doc is the
+                    # document portal's mount, where file-chooser results land.
                     bind.rw = [
                       (sloth.concat' sloth.runtimeDir "/doc")
                       (sloth.mkdir (sloth.concat' sloth.homeDir "/.config/${configDir}"))
-                      # Persistent per-app data/cache, the Flatpak layout
-                      # (~/.var/app/<appId>/), since $HOME is otherwise a tmpfs.
-                      # Load-bearing for secrets: inside the flatpak shim libsecret
-                      # goes through the Secret portal, which keeps a per-app
-                      # keyring file under $XDG_DATA_HOME — lose it and apps
-                      # using it (Element's session-key safeStorage) start over.
+                      # Persistent per-app data (~/.var/app/<appId>/); $HOME is a tmpfs.
+                      # Load-bearing: the Secret portal keeps a per-app keyring under
+                      # $XDG_DATA_HOME, so losing it resets apps like Element.
                       [
                         (sloth.mkdir sloth.appDataDir)
                         sloth.xdgDataHome

@@ -7,11 +7,9 @@
 let
   commonData = import ./code-common/settings.nix;
 
-  # The Unified "Code Family" — bundles are built and synced independently
-  # via `just extensions::sync`, not as part of nixos-rebuild.
-  # Antigravity is NOT in this family: the 2.0 IDE is self-vendored in
-  # nix-packages (google-antigravity-ide, launches memory-capped) and uses
-  # ~/.antigravity-ide, which this wrapper/config layout never reached.
+  # VS Code forks sharing one config. Extension bundles are synced by
+  # `just extensions::sync`, not nixos-rebuild. Antigravity is left out: its
+  # IDE comes from nix-packages (google-antigravity-ide) and uses ~/.antigravity-ide.
   codeFamily = [
     {
       name = "Cursor";
@@ -114,13 +112,9 @@ in
     "d %h/.config/windsurf/extensions 0755 - - -"
   ];
 
-  # Catppuccin Mocha (Blue accent) — same palette rofi's theme in
-  # nix-config/modules/home-manager/gnome.nix already hand-codes
-  # (bg #1e1e2e, fg #cdd6f4, accent #89b4fa), so this makes every GTK/Qt
-  # app match the launcher instead of clashing with it.
-  # Qt apps are forced onto this GTK theme below (fixes rclone-browser
-  # dark mode) — that bridge means Catppuccin covers Qt apps too, no
-  # separate Kvantum/qt5ct theme needed.
+  # Catppuccin Mocha Blue, the palette rofi hand-codes in
+  # nix-config/modules/home-manager/gnome.nix. Qt follows via the gtk3
+  # platform theme below, so no separate Kvantum/qt5ct theme is needed.
   gtk = {
     enable = true;
     theme = {

@@ -109,11 +109,8 @@ in
       };
       users.groups.litellm = { };
 
-      # 2. Config Generation — real credentials are NEVER inlined here
-      # (this file lands in /etc, i.e. the Nix store, world-readable).
-      # LiteLLM's `os.environ/VARNAME` syntax defers to the process
-      # environment at runtime instead, sourced from the EnvironmentFile
-      # above (cfg.secretsFile, sops-templated on the host).
+      # 2. Config. This lands in the world-readable Nix store, so credentials
+      # stay out: `os.environ/VARNAME` reads them from the EnvironmentFile above.
       environment.etc."litellm/config.yaml".text = builtins.toJSON {
         model_list = map (b: {
           model_name = b.name;

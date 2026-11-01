@@ -115,14 +115,11 @@ in
                 # Every pass also sweeps orphaned chunks, regardless of retention.
                 interval = "12 hours";
 
-                # Attic has no "keep N versions" knob, so the window is what evicts old
-                # versions. GC drops a path only when it was neither created nor pulled
-                # within the window. An evicted path that is still needed gets rebuilt
-                # and re-pushed by the next CI build-all, and promote-production's
-                # verify-cache gate blocks a release until it is back. Gotcha: rolling
-                # `production` back more than 14 days can make a host build; widen first.
-                # The upstream-key filter is per-cache DB state with no config knob, so
-                # the attic-upstream-keys unit below applies it.
+                # No "keep N versions" knob: GC drops a path neither created nor pulled
+                # within the window. CI build-all re-pushes evicted paths still in use,
+                # and promote-production's verify-cache gate waits for them. Gotcha:
+                # rolling `production` back more than 14 days can make a host build;
+                # widen the window first.
                 default-retention-period = "14 days";
               };
             };
@@ -217,11 +214,11 @@ in
         };
       })
 
-      # Host-level weekly reaper for orphaned chunks that atticd marks deleted but
-      # never unlinks. Downtime-minimized: file deletion runs with atticd UP (the
-      # chunks are unreferenced, never served); atticd is stopped only for the
-      # quick DELETE+VACUUM. Guards: refuses if any deleted-marked chunk is still
-      # referenced, and defers if a push is writing chunks right now.
+      # Weekly reaper for chunks atticd marks deleted but never unlinks: its GC
+      # unlinks only 500 per run (zhaofengli/attic#266). Files are
+      # removed with atticd up (they're unreferenced); atticd stops only for the
+      # DELETE+VACUUM. Refuses if a marked chunk is still referenced, and defers
+      # while a push is writing chunks.
       (lib.mkIf cfg.autoReap.enable {
         systemd.services.attic-reap = {
           description = "Reclaim orphaned Attic chunks (atticd's reaper leaves them on disk)";

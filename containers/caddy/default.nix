@@ -66,13 +66,9 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "512M";
     };
-    # Static file-server vhosts that DON'T fit the reverse-proxy pattern
-    # (inventory.nix:network.nodes). Each entry produces a Caddy vhost
-    # serving the bind-mounted directory directly. Example:
-    #   staticSites."team.kleinbem.dev" = {
-    #     hostPath = "/home/martin/Develop/.../nix-config/docs";
-    #     index    = "TEAM.html";          # default file served at /
-    #   };
+    # Static file-server vhosts outside the reverse-proxy pattern
+    # (inventory.nix network.nodes); each serves its bind-mounted directory.
+    # Example: staticSites."example.kleinbem.dev" = { hostPath = "/srv/site"; index = "index.html"; };
     staticSites = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule {

@@ -132,11 +132,8 @@ FLAGS=(
   -accel on
 )
 
-# ⌨️  Input Fix V6.6: Re-enable VirtioInput but force legacy USB devices
-# Disabling VirtioInput broke mouse. We re-enable it (by removing the disable flag)
-# but we explicitly add USB devices to ensure they take precedence if Virtio fails.
-# We also use 'virtio-mouse-pci' if possible, but 'usb-tablet' is safer for absolute pointing.
-# Strategy: DEFAULT (Enable VirtioInput) + USB Fallbacks
+# VirtioInput stays on (disabling it breaks the mouse); USB tablet + keyboard
+# are a fallback, and usb-tablet gives reliable absolute pointing.
 QEMU_FLAGS=("-usb" "-device" "usb-tablet" "-device" "usb-kbd")
 
 # 🔑 Hardware Security Key (Opt-in)

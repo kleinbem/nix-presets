@@ -187,11 +187,9 @@
       enable = true;
       enableDefaultConfig = false;
       settings = {
-        # NOTE: do not set `IdentityAgent = "none"` for github.com here. It
-        # bypasses the ssh-agent and forces ssh to use the key file directly,
-        # which breaks agent-backed keys — in particular FIDO2 `sk` keys, where
-        # it surfaces as the misleading "incorrect passphrase supplied to decrypt
-        # private key" on any non-interactive push. Let github use the agent.
+        # Don't set `IdentityAgent = "none"` for github.com: it bypasses the
+        # agent, which breaks FIDO2 `sk` keys with a misleading "incorrect
+        # passphrase supplied to decrypt private key" on non-interactive pushes.
         "*" = {
           AddKeysToAgent = "yes";
           ControlMaster = "auto";

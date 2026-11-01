@@ -24,12 +24,10 @@ jobs:
       # and -L shows the guest console if it breaks.
       - name: Build the backup-engine VM test
         run: nix build -L --no-link .#checks.x86_64-linux.backup-engine --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages
-      # Not `nix flake check`: it evaluates all ~50 module-* checks (each a
-      # full NixOS system) in one process that never frees them, peaking at
-      # 17.7 GiB RSS on 2026-10-25, more than the 16 GiB runner. That is what
-      # killed the runner ("received a shutdown signal") or starved the VM
-      # test until its 1 h timeout (#108). nix-fast-build evaluates in
-      # workers with a memory cap and restarts them, so memory stays bounded.
+      # Not `nix flake check`: it evaluates all module-* checks (each a full
+      # NixOS system) in one process that never frees them and outgrows the
+      # 16 GiB runner (NixOS/nix#13483). nix-fast-build uses memory-capped
+      # eval workers.
       - name: Build all checks
         run: >-
           nix run github:Mic92/nix-fast-build --

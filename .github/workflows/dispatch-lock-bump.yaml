@@ -1,13 +1,9 @@
 name: Dispatch nix-config lock bump
 
-# nix-config pins this repo in its flake.lock, and every host deploys from
-# that lock (github:kleinbem/nix-config?ref=production). A merge here reaches
-# no device until the lock moves, which the nightly Maintain Flake run does
-# at 03:00 UTC together with nixpkgs and every other input. Ask for a bump
-# of exactly this input as soon as main is green instead: nix-config opens
-# (or extends) its lock PR, CI builds the device closures, auto-merge lands
-# it, build-all promotes. The App token is scoped to nix-config and only
-# needs the contents permission the App already has for its lock PRs.
+# A merge here reaches no host until nix-config's flake.lock moves, which the
+# nightly Maintain Flake run would do at 03:00 UTC. So once main is green, ask
+# nix-config to bump just this input in its lock PR. The App token is scoped
+# to nix-config and needs only the contents permission.
 on:
   workflow_run:
     workflows: ["Check Flake"]

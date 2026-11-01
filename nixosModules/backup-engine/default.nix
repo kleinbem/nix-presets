@@ -1,16 +1,9 @@
-# backup-engine: generic, host-level backup for the fleet.
-#
-# Presets and modules declare WHAT to back up via `my.backup.items.<name>`
-# (importing this file by path; the module system dedups it). WHERE and with
-# which keys is fleet wiring in nix-config/modules/nixos/backup.nix.
-#
-# Tiers: `secure` is a small age-encrypted tarball per run under
-# <remote>/secure/<host>/, restorable with just an age identity and tar.
-# `bulk` is one independent restic repo per destination at <remote>/restic/<host>.
-#
-# Databases are always dumped (sqlite `.backup`, pg_dumpall), never copied live:
-# a file-by-file read of a datadir is not a consistent snapshot.
-# Test: checks/backup-engine.nix (NixOS VM, full backup + restore).
+# Host-level backup. Presets declare what via `my.backup.items.<name>` (import
+# this file by path so it dedups); where and with which keys is wired in
+# nix-config/modules/nixos/backup.nix. `secure` = age-encrypted tarball per run,
+# restorable with just age + tar; `bulk` = one restic repo per destination.
+# Layout: <remote>/secure/<host>/ and <remote>/restic/<host>.
+# Databases are dumped, never copied live: a datadir read is not a snapshot.
 {
   config,
   lib,
@@ -197,11 +190,9 @@ let
     lib.optional hasSecure "secure"
     ++ lib.optionals hasBulk (map (d: "bulk-${d}") (lib.attrNames bulkDests));
 
-  # External dead-man's switch (healthchecks.io-style ping URLs):
-  #   <baseUrl>/<ping key>/<host>-backup-<job>        on success
-  #   <baseUrl>/<ping key>/<host>-backup-<job>/fail   from the OnFailure unit
-  # Best-effort: a failed ping never fails the backup itself — the external
-  # service alerting on the *missing* ping is the whole point.
+  # Dead-man's switch: pings <baseUrl>/<key>/<host>-backup-<job> on success,
+  # .../fail from the OnFailure unit. A failed ping never fails the backup;
+  # the external service alerts on the missing ping.
   hb = cfg.heartbeat;
   heartbeat = pkgs.writeShellScript "backup-heartbeat" ''
     set -u

@@ -213,14 +213,10 @@
         overlays.open-webui = import ./overlays/open-webui.nix;
 
         lib = {
-          # nix-gantry's mkContainer, wrapped to default cfg.hostBridge and
-          # cfg.gpuRenderNode from this fleet's my.* options, which nix-gantry
-          # doesn't know about.
-          #
-          # A container evaluates its own package set, without the host's
-          # overlays, so the wrapper also gives every container the fleet's
-          # held packages (kleinbem/nix-detour-fleet), before the container's own
-          # overlays, as on the hosts.
+          # nix-gantry's mkContainer, defaulting cfg.hostBridge and
+          # cfg.gpuRenderNode from the fleet's my.* options. Containers don't get
+          # host overlays, so this also adds the held packages
+          # (nix-detour-fleet) ahead of the container's own overlays.
           mkContainer =
             args:
             let
@@ -319,11 +315,9 @@
           in
           presets
           // {
-            # Whole-catalogue bundle. Pure Switchboard: every preset defaults
-            # to enable = false, so importing everything only declares options.
-            # Meant for hosts where eval cost is irrelevant (workstation);
-            # edge devices that eval their own config (autoUpgrade) should
-            # keep importing presets selectively.
+            # Every preset (all default to enable = false). For hosts where eval
+            # cost doesn't matter; devices that eval their own config should
+            # import presets selectively.
             all.imports = builtins.attrValues (builtins.removeAttrs presets variants);
           };
         homeManagerModules = {
