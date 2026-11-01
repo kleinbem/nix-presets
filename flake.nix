@@ -311,8 +311,8 @@
             };
 
             # `all` leaves out dashboard-homer: it declares the same
-            # my.containers.dashboard options as dashboard-homepage, so a host
-            # that wants it imports nixosModules.dashboard-homer explicitly.
+            # my.containers.dashboard options as dashboard-homepage. A host that
+            # wants it imports the modules it needs plus dashboard-homer, not `all`.
             variants = [
               "dashboard-homer"
             ];

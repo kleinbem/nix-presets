@@ -122,8 +122,9 @@ in
                   else
                     "reverse_proxy ${upstream}";
                 # Authentik embedded-outpost forward-auth. One "forward_domain"
-                # Proxy Provider (nix/infra/authentik.tf) covers every node with
-                # `auth = true`; the outpost derives the post-login redirect itself.
+                # Proxy Provider (nix/infra/authentik.tf) covers every *.kleinbem.dev
+                # node with `auth = true` via one cookie_domain session, so .local
+                # aliases aren't covered. The outpost derives the post-login redirect.
                 authConfig = ''
                   forward_auth 10.85.48.142:9000 {
                     uri /outpost.goauthentik.io/auth/caddy
