@@ -1,8 +1,6 @@
-# nixpak (bubblewrap) sandboxed desktop apps, installed system-wide — the
-# replacement for nix-config's firejail wrappers, app by app. System level
-# rather than the home-manager desktop preset so every GNOME host gets them
-# (mac-mini doesn't use that preset). Definitions: pkgs/nixpak/, shared
-# sandbox base: nixpak/utils.nix.
+# nixpak (bubblewrap) sandboxed desktop apps, installed system-wide so every
+# GNOME host gets them, including mac-mini, which lacks the home-manager
+# desktop preset. Definitions: pkgs/nixpak/, shared base: nixpak/utils.nix.
 { inputs }:
 {
   config,

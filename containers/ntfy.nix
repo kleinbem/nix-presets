@@ -72,10 +72,9 @@ in
           auth-default-access = "deny-all";
         }
         // {
-          # Message cache is advisory only: the fleet-deploy signal has the
-          # nightly autoUpgrade timer as its catch-up path, so losing cached
-          # messages on container rebuild is harmless. Keep 12h for the web
-          # UI and late long-poll reconnects.
+          # Losing cached messages is harmless: hosts catch up on missed deploy
+          # signals by themselves (autoUpgrade timer or comin polling). 12h
+          # covers the web UI and late long-poll reconnects.
           cache-duration = "12h";
           # Long-poll subscribers sit behind caddy + cloudflared; keepalives
           # below their idle timeouts stop silent connection drops.

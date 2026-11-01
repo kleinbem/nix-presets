@@ -10,11 +10,9 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
-  # Optimized package for Orin Nano (CUDA + ARM NEON)
-  # We use pkgs.llama-cpp from the host's pkgs to ensure CUDA compatibility.
-  # We set cpuArchDynamicDispatch = false because CUDA pins the host compiler to GCC 13,
-  # while armv9.2+sme target in cpuArchDynamicDispatch requires GCC >= 14.
-  # Drop once nixpkgs' llama-cpp includes ggml-org/llama.cpp#26103 (probes each ARM variant).
+  # CUDA build for the Orin Nano. Dynamic dispatch is off because CUDA pins
+  # GCC 13 and its armv9.2+sme variant needs GCC 14. Drop once nixpkgs'
+  # llama-cpp includes ggml-org/llama.cpp#26103 (probes each ARM variant).
   llamaPackage = pkgs.llama-cpp.override {
     cudaSupport = true;
     cpuArchDynamicDispatch = false;

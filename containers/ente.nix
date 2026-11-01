@@ -80,11 +80,9 @@ in
         innerConfig =
           { pkgs, ... }:
           {
-            # museum reaches MinIO on localhost, so MinIO runs with host networking.
-            # enableLocalDB gives native Postgres with peer auth (no DB password).
             # Pinned major: a nixpkgs default bump would refuse the existing datadir.
-            # Before downgrading museum: it refuses to start ("setupDatabase file
-            # does not exist") if the db has migrations newer than the package's.
+            # Don't downgrade museum: it won't start ("setupDatabase file does not
+            # exist") if the db has migrations newer than the package's.
             services.postgresql.package = pkgs.postgresql_17;
 
             services.ente.api = {

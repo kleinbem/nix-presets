@@ -1,16 +1,8 @@
 #!/usr/bin/env bash
-# Update the pinned freecad-mcp (neka-nat/freecad-mcp) source in mcp.nix to
-# the latest tagged release.
-#
-# No upstream flake/PyPI package — vendored via fetchFromGitHub, pinned to a
-# specific rev + hash + version literal. This tracks the latest git tag
-# (not bare HEAD) for reproducibility. `nix-prefetch-url --unpack` against
-# GitHub's archive tarball produces exactly the hash fetchFromGitHub expects
-# (confirmed against the currently-pinned rev's known-correct hash), so no
-# fake-hash/build-and-parse-the-error dance is needed here.
-#
-# Usage:  ./scripts/update-freecad-mcp.sh
-# Deps:   bash, curl, jq, nix (nix-prefetch-url)
+# Bump the pinned freecad-mcp (neka-nat/freecad-mcp) in mcp.nix to the latest
+# tag. `nix-prefetch-url --unpack` on GitHub's tarball gives the same hash
+# fetchFromGitHub expects, so no fake-hash build is needed.
+# Usage: ./scripts/update-freecad-mcp.sh   (needs curl, jq, nix)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -53,10 +45,8 @@ sed -i "s/sha256 = \"${CURRENT_HASH}\"/sha256 = \"${NEW_HASH}\"/" "$PKG"
 sed -i "s/version = \"${CURRENT}\"/version = \"${LATEST}\"/" "$PKG"
 
 # ── 4. Verify ────────────────────────────────────────────────────────────────
-# Rebuild the actual buildPythonPackage output (not just the source fetch)
-# standalone, matching mcp.nix's own expression, to catch real packaging
-# breakage from the version bump (new/changed deps, hatchling metadata,
-# etc.) — not just a bad hash.
+# Build the package itself, not just the source, to catch packaging breakage
+# (new deps, metadata) as well as a bad hash.
 log "Verifying build..."
 nix build --impure --no-link --expr "
   let pkgs = import <nixpkgs> {};

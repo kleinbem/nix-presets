@@ -57,11 +57,9 @@ in
         innerConfig =
           { pkgs, ... }:
           let
-            # Since 2026.10 HA keeps HTTP settings in .storage/http and reads
-            # YAML `http:` only once, as a migration that reverts unless
-            # confirmed in the UI. So write the store on every start, as
-            # `stable` with the migration marked done. Format: version 2.2 in
-            # homeassistant/components/http/config.py; all keys spelled out.
+            # HA keeps HTTP settings in .storage/http and reads YAML `http:` only
+            # once, as a migration that reverts unless confirmed in the UI. So write
+            # the store on every start (format: homeassistant/components/http/config.py).
             httpStore = pkgs.writeText "home-assistant-http-store.json" (
               builtins.toJSON {
                 version = 2;

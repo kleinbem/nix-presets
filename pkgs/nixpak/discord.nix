@@ -24,11 +24,9 @@ utils.mkSandboxed {
   extraPerms =
     { sloth, ... }:
     {
-      # Flathub's com.discordapp.Discord minus the legacy Unity/AppMenu
-      # names. Not carried over from it: --device=all (camera; Discord's own
-      # voice engine opens /dev/video* directly, and a launch-time device
-      # bind misses later hotplugs anyway), pcsc, and the discord-ipc-0
-      # socket bridge (Rich Presence for games running on the host).
+      # Flathub's com.discordapp.Discord, minus the AppMenu names (Unity stays for the badge), pcsc,
+      # the discord-ipc-0 Rich Presence bridge and --device=all (camera: the voice
+      # engine opens /dev/video* directly, and a launch-time bind misses hotplugs).
       dbus.policies = {
         "org.freedesktop.Notifications" = "talk";
         # File chooser, OpenURI (links -> host browser), screencast

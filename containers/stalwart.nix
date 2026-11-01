@@ -131,13 +131,10 @@ in
               };
             }
             // lib.optionalAttrs hasRelay {
-              # Outbound relay (smart host). Only emitted when relaySecretFile
-              # is set — otherwise Stalwart delivers directly (its built-in
-              # default). v0.13+ uses "virtual queue" routing
-              # (`queue.strategy.route` + `queue.route.<id>`); the old
-              # `queue.*.next-hop` is now a build-time assertion failure.
-              # TODO(phase1): validate this route shape against pkgs.stalwart
-              # 0.15 once SES/relay creds actually exist.
+              # Outbound smart host; without relaySecretFile Stalwart delivers
+              # directly. v0.13+ routes via `queue.route.<id>`; the old
+              # `queue.*.next-hop` fails an assertion.
+              # TODO(phase1): validate against stalwart 0.15 once relay creds exist.
               queue.strategy.route = "'relay'";
               queue.route.relay = {
                 type = "relay";

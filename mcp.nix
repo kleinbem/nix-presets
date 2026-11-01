@@ -375,8 +375,8 @@
         # This automatically registers the MCP servers in your editors and standalone clients
         activation.setupMcpConfigs =
           let
-            # Same JSON as before the option existed: the submodule fills in
-            # env = { }, which no server here sets, so drop it again.
+            # The submodule fills in env = { }, which no server here sets;
+            # drop it so the JSON stays minimal.
             mcpConfig = {
               mcpServers = lib.mapAttrs (
                 _: server: lib.filterAttrs (name: value: !(name == "env" && value == { })) server

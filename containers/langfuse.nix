@@ -83,11 +83,9 @@ in
             '';
           };
 
-          # (Re-)applies the langfuse role's password from sops on every
-          # start — ensureUsers creates the role but never sets one. Same
-          # pattern as ente.nix's ente-db-setup: secret goes in via
-          # psql's environment (\getenv) + :'var' quoting, never argv;
-          # runs as root to read the root-only sops file.
+          # ensureUsers creates the role but never sets a password, so this
+          # applies it from sops on every start. The secret goes in through
+          # psql's environment (\getenv), never argv; root reads the sops file.
           systemd.services.langfuse-db-password = {
             description = "Set Langfuse Postgres role password from sops";
             after = [ "postgresql-setup.service" ];

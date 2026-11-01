@@ -68,13 +68,8 @@ class AtlasEngine:
             except Exception:
                 pass
 
-        # 3. Fall back to running SOPS CLI against kleinbem-secrets. The old
-        # nix-secrets/secrets.yaml was one flat file (and that path never
-        # existed under flake_root=nix/ anyway — kleinbem/nix-secrets was
-        # always a flat sibling, not nested under nix/); kleinbem-secrets
-        # scopes keys across several files instead, so try each candidate
-        # this engine's callers actually use (github_*, brave_api_key all
-        # live in nix/shared.yaml) until one has the key.
+        # 3. Fall back to the sops CLI against kleinbem-secrets. Keys are spread
+        # over several files, so try each candidate until one has the key.
         secrets_root = os.path.join(
             os.path.dirname(self.flake_root), "kleinbem-secrets"
         )
