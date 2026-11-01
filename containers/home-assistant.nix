@@ -106,7 +106,8 @@ in
                     });
                     # HA pins pywizlight 0.6.3; 0.6.6's multi-zone API makes
                     # `bulb.state` a list and breaks every WiZ entity.
-                    # Remove once HA's wiz manifest requires >= 0.6.6.
+                    # nixpkgs reverted to 0.6.3 (NixOS/nixpkgs#576178): remove once
+                    # our nixpkgs has that revert.
                     pywizlight = pyprev.pywizlight.overridePythonAttrs (_: {
                       version = "0.6.3";
                       src = prev.fetchFromGitHub {
