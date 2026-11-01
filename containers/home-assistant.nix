@@ -188,6 +188,9 @@ in
                 # Local voice: the host's Whisper (10300) and Piper (10200)
                 # servers, used by the voice pipeline of the ESPHome panels.
                 "wyoming"
+                # Players and library of the Music Assistant server
+                # (my.containers.music-assistant).
+                "music_assistant"
               ];
 
               # Was HACS-installed on HAOS; nixpkgs packages both, so HACS

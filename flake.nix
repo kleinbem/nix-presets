@@ -301,6 +301,7 @@
               sandboxed-apps = import ./nixosModules/sandboxed-apps.nix { inherit inputs; };
 
               home-assistant = import ./containers/home-assistant.nix { inherit self; };
+              music-assistant = import ./containers/music-assistant.nix { inherit self; };
               syncthing = import ./containers/syncthing.nix { inherit self; };
               backup = import ./containers/backup.nix { inherit self; };
               # Host-level backup engine + `my.backup` interface (supersedes the
