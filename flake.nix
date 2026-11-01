@@ -37,8 +37,8 @@
     nix-gantry.url = "github:kleinbem-dev/nix-gantry";
     # Packages the fleet holds back from nixos-unstable; mkContainer gives
     # them to every container.
-    nix-holds-fleet = {
-      url = "github:kleinbem/nix-holds-fleet";
+    nix-detour-fleet = {
+      url = "github:kleinbem/nix-detour-fleet";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.nix-packages.follows = "nix-packages";
     };
@@ -143,19 +143,19 @@
                 "all" # Composite of the above; members are checked individually
               ];
 
-              # The nixpkgs NixOS tests of the held packages (kleinbem/nix-holds-fleet),
+              # The nixpkgs NixOS tests of the held packages (kleinbem/nix-detour-fleet),
               # with the holds and our fixes for them, as in the containers.
               heldPkgs = import inputs.nixpkgs {
                 inherit system;
                 config.allowUnfree = true;
                 overlays = [
-                  inputs.nix-holds-fleet.overlays.default
+                  inputs.nix-detour-fleet.overlays.default
                   self.overlays.open-webui
                 ];
               };
               heldTests = inputs.nixpkgs.lib.mapAttrs' (
                 name: test: inputs.nixpkgs.lib.nameValuePair "held-${name}" test
-              ) (inputs.nix-holds-fleet.lib.nixosTests heldPkgs);
+              ) (inputs.nix-detour-fleet.lib.nixosTests heldPkgs);
 
               moduleChecks = inputs.nixpkgs.lib.mapAttrs' (
                 name: module: inputs.nixpkgs.lib.nameValuePair "module-${name}" (mkModuleCheck module)
@@ -219,7 +219,7 @@
           #
           # A container evaluates its own package set, without the host's
           # overlays, so the wrapper also gives every container the fleet's
-          # held packages (kleinbem/nix-holds-fleet), before the container's own
+          # held packages (kleinbem/nix-detour-fleet), before the container's own
           # overlays, as on the hosts.
           mkContainer =
             args:
@@ -237,7 +237,7 @@
                   imports = [
                     (if builtins.isFunction innerConfig then innerConfig innerArgs else innerConfig)
                   ];
-                  nixpkgs.overlays = inputs.nixpkgs.lib.mkBefore [ inputs.nix-holds-fleet.overlays.default ];
+                  nixpkgs.overlays = inputs.nixpkgs.lib.mkBefore [ inputs.nix-detour-fleet.overlays.default ];
                 };
               }
             );
