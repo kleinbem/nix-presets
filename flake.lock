@@ -1979,6 +1979,26 @@
         "type": "github"
       }
     },
+    "revue": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793622313,
+        "narHash": "sha256-NqFw+lUD/5TshrD9oNZAZrjAzasOQPOmpjOajk6Rp7M=",
+        "owner": "kleinbem-dev",
+        "repo": "revue",
+        "rev": "02a62547a9ce4d4539068a58d492f6dec062b091",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kleinbem-dev",
+        "repo": "revue",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
@@ -1992,6 +2012,7 @@
         "nixpak": "nixpak",
         "nixpkgs": "nixpkgs_7",
         "openclaw": "openclaw",
+        "revue": "revue",
         "treefmt-nix": "treefmt-nix_6"
       }
     },
