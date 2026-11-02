@@ -19,8 +19,8 @@ let
     else
       pkgs.revue or (pkgs.writeShellScriptBin "revue" "echo 'revue package not provided' && exit 1");
 
-  hasSecret = cfg.webhookSecretFile != null;
-  secretDestPath = "/run/secrets/revue-webhook-secret";
+  hasSecrets = cfg.secretsFile != null;
+  secretsPath = "/run/secrets/revue.env";
 in
 {
   imports = [ ../nixosModules/backup-engine ];
@@ -51,10 +51,10 @@ in
       default = "1G";
       description = "Systemd memory ceiling for the container.";
     };
-    webhookSecretFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+    secretsFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Host path to sops secret file containing the HMAC webhook secret.";
+      description = "Host path to sops-backed environment file (e.g. REVUE_WEBHOOK_SECRET=..., DATABASE_URL=...).";
     };
     meshLlmUrl = lib.mkOption {
       type = lib.types.str;
@@ -64,7 +64,7 @@ in
     databaseUrl = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Database URL (sqlite:///var/lib/revue/revue.db?mode=rwc or postgres://...). If null, defaults to embedded SQLite.";
+      description = "Database URL (sqlite:///var/lib/revue/revue.db?mode=rwc or postgres://...). If null, defaults to embedded SQLite unless supplied in secretsFile.";
     };
   }
   // tlsOpts;
@@ -75,17 +75,13 @@ in
         inherit config;
         name = "revue";
         inherit cfg;
+        inherit (cfg) secretsFile;
+        secretsFilePath = secretsPath;
         subDirs = [ "data" ];
         bindMounts = {
           "/var/lib/revue" = {
             hostPath = "${cfg.hostDataDir}/data";
             isReadOnly = false;
-          };
-        }
-        // lib.optionalAttrs hasSecret {
-          ${secretDestPath} = {
-            hostPath = cfg.webhookSecretFile;
-            isReadOnly = true;
           };
         };
         innerConfig = {
@@ -94,9 +90,14 @@ in
             wantedBy = [ "multi-user.target" ];
             after = [ "network.target" ];
             environment = {
+              MESH_LLM_URL = cfg.meshLlmUrl;
               REVUE_MESH_LLM_URL = cfg.meshLlmUrl;
-              DATABASE_URL =
-                if cfg.databaseUrl != null then cfg.databaseUrl else "sqlite:///var/lib/revue/revue.db?mode=rwc";
+            }
+            // lib.optionalAttrs (cfg.databaseUrl != null) {
+              DATABASE_URL = cfg.databaseUrl;
+            }
+            // lib.optionalAttrs (cfg.databaseUrl == null && !hasSecrets) {
+              DATABASE_URL = "sqlite:///var/lib/revue/revue.db?mode=rwc";
             };
             serviceConfig = {
               Type = "simple";
@@ -105,7 +106,7 @@ in
               RestartSec = "5s";
               StateDirectory = "revue";
               WorkingDirectory = "/var/lib/revue";
-              EnvironmentFile = lib.optional hasSecret secretDestPath;
+              EnvironmentFile = lib.optional hasSecrets secretsPath;
             };
           };
 
@@ -117,7 +118,9 @@ in
       {
         my.backup.items.revue = {
           tier = "secure";
+          sqlite = [ "${cfg.hostDataDir}/data/revue.db" ];
           paths = [ "${cfg.hostDataDir}/data" ];
+          exclude = [ "${cfg.hostDataDir}/data/revue.db*" ];
         };
       }
     ]
