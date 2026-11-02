@@ -54,16 +54,32 @@ in
         inherit config;
         name = "music-assistant";
         inherit cfg;
-        innerConfig = {
-          services.music-assistant = {
-            enable = true;
-            inherit (cfg) providers;
-            # Stream port 8097 and Sendspin 8927 for the players.
-            openFirewall = true;
+        innerConfig =
+          { pkgs, ... }:
+          {
+            nixpkgs.overlays = [ self.inputs.nix-packages.overlays.default ];
+            services.music-assistant = {
+              enable = true;
+              inherit (cfg) providers;
+              # Stream port 8097 and Sendspin 8927 for the players.
+              openFirewall = true;
+            };
+            # Web UI and the API Home Assistant's integration talks to.
+            networking.firewall.allowedTCPPorts = [ 8095 ];
+
+            # YouTube Music needs a PO token server; the provider's default URL
+            # is http://127.0.0.1:4416.
+            systemd.services.bgutil-pot-server = lib.mkIf (lib.elem "ytmusic" cfg.providers) {
+              description = "PO token server for YouTube Music";
+              wantedBy = [ "multi-user.target" ];
+              before = [ "music-assistant.service" ];
+              serviceConfig = {
+                ExecStart = "${lib.getExe pkgs.bgutil-ytdlp-pot-provider-server} --host 127.0.0.1 --port 4416";
+                DynamicUser = true;
+                Restart = "on-failure";
+              };
+            };
           };
-          # Web UI and the API Home Assistant's integration talks to.
-          networking.firewall.allowedTCPPorts = [ 8095 ];
-        };
         bindMounts = {
           # services.music-assistant runs as a DynamicUser, so its state is
           # the private path.

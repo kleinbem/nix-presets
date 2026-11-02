@@ -866,22 +866,20 @@
     "nix-detour": {
       "inputs": {
         "nixpkgs": [
-          "nix-devshells",
           "nix-detour-fleet",
           "nixpkgs"
         ],
         "nixpkgs-stable": [
-          "nix-devshells",
           "nix-detour-fleet",
           "nixpkgs-stable"
         ]
       },
       "locked": {
-        "lastModified": 1793520739,
-        "narHash": "sha256-bZtpkIgtQWJrISc+9lhH2UcWWDvmkeoDnDU3iM3WYQY=",
+        "lastModified": 1793546438,
+        "narHash": "sha256-6qSr9iYmRIKpAwWYpqBnt97XiiBuCq3vJCS+thGpJgY=",
         "owner": "kleinbem-dev",
         "repo": "nix-detour",
-        "rev": "5abc0ab5998f61f51bff1a48ad5db5ecbea803f0",
+        "rev": "ce2483126fb00d5b182ba801e1f7bc90699761ea",
         "type": "github"
       },
       "original": {
@@ -893,6 +891,31 @@
     "nix-detour-fleet": {
       "inputs": {
         "nix-detour": "nix-detour",
+        "nix-packages": [
+          "nix-packages"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "nixpkgs-stable": "nixpkgs-stable"
+      },
+      "locked": {
+        "lastModified": 1793554975,
+        "narHash": "sha256-pxPPXSvSHq8jsoB+D85Oo8kiWqJRoobUvbvt/MwSJEk=",
+        "owner": "kleinbem",
+        "repo": "nix-detour-fleet",
+        "rev": "a2abd5b399fb85cafe8183ef3aa6125b2285e5ca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kleinbem",
+        "repo": "nix-detour-fleet",
+        "type": "github"
+      }
+    },
+    "nix-detour-fleet_2": {
+      "inputs": {
+        "nix-detour": "nix-detour_2",
         "nix-packages": "nix-packages",
         "nixpkgs": [
           "nix-devshells",
@@ -917,7 +940,7 @@
         "type": "github"
       }
     },
-    "nix-detour-fleet_2": {
+    "nix-detour-fleet_3": {
       "inputs": {
         "nix-detour": "nix-detour_4",
         "nix-packages": "nix-packages_3",
@@ -949,11 +972,13 @@
     "nix-detour_2": {
       "inputs": {
         "nixpkgs": [
-          "nix-holds-fleet",
+          "nix-devshells",
+          "nix-detour-fleet",
           "nixpkgs"
         ],
         "nixpkgs-stable": [
-          "nix-holds-fleet",
+          "nix-devshells",
+          "nix-detour-fleet",
           "nixpkgs-stable"
         ]
       },
@@ -980,11 +1005,11 @@
         "nixpkgs-stable": "nixpkgs-stable_3"
       },
       "locked": {
-        "lastModified": 1793520739,
-        "narHash": "sha256-bZtpkIgtQWJrISc+9lhH2UcWWDvmkeoDnDU3iM3WYQY=",
+        "lastModified": 1793531529,
+        "narHash": "sha256-PAAF86LCUtJIKXXD/vLwd5e1BxbxddAwb6ByY4G25m8=",
         "owner": "kleinbem-dev",
         "repo": "nix-detour",
-        "rev": "5abc0ab5998f61f51bff1a48ad5db5ecbea803f0",
+        "rev": "dad9ec7126d40ab791ef9dc8c5f54d5380406e9d",
         "type": "github"
       },
       "original": {
@@ -1030,14 +1055,14 @@
         "ghostty": "ghostty",
         "git-hooks": "git-hooks_3",
         "mk-shell-bin": "mk-shell-bin",
-        "nix-detour-fleet": "nix-detour-fleet",
+        "nix-detour-fleet": "nix-detour-fleet_2",
         "nix2container": "nix2container",
         "nixos-generators": "nixos-generators",
         "nixpkgs": [
           "nixpkgs"
         ],
         "nixpkgs-master": "nixpkgs-master",
-        "nixpkgs-stable": "nixpkgs-stable",
+        "nixpkgs-stable": "nixpkgs-stable_2",
         "rust-overlay": "rust-overlay_2",
         "treefmt-nix": "treefmt-nix_2"
       },
@@ -1063,7 +1088,7 @@
         "ghostty": "ghostty_2",
         "git-hooks": "git-hooks_6",
         "mk-shell-bin": "mk-shell-bin_2",
-        "nix-detour-fleet": "nix-detour-fleet_2",
+        "nix-detour-fleet": "nix-detour-fleet_3",
         "nix2container": "nix2container_2",
         "nixos-generators": "nixos-generators_2",
         "nixpkgs": [
@@ -1155,31 +1180,6 @@
         "type": "github"
       }
     },
-    "nix-holds-fleet": {
-      "inputs": {
-        "nix-detour": "nix-detour_2",
-        "nix-packages": [
-          "nix-packages"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "nixpkgs-stable": "nixpkgs-stable_2"
-      },
-      "locked": {
-        "lastModified": 1793524556,
-        "narHash": "sha256-WnvC1JDiBAm3hDNwUF4PsBlm+cxl7Jr3+LvTxMeo9UY=",
-        "owner": "kleinbem",
-        "repo": "nix-holds-fleet",
-        "rev": "e4e43242ec3cabda642594eea2220f0c651674bc",
-        "type": "github"
-      },
-      "original": {
-        "owner": "kleinbem",
-        "repo": "nix-holds-fleet",
-        "type": "github"
-      }
-    },
     "nix-openclaw-tools": {
       "inputs": {
         "nixpkgs": "nixpkgs_8"
@@ -1226,11 +1226,11 @@
         "treefmt-nix": "treefmt-nix_5"
       },
       "locked": {
-        "lastModified": 1793524822,
-        "narHash": "sha256-ryd1oaO935xc7u9wh86KP/wkFl5cQui1qDqF1jbOLQ0=",
+        "lastModified": 1793587346,
+        "narHash": "sha256-ekm6F/jAFSbF9X18nNnfEV37WHcEIpIt5EoYAr6BF8o=",
         "owner": "kleinbem",
         "repo": "nix-packages",
-        "rev": "8f327123d0b91ab4264b96b060ae0a01b5b66814",
+        "rev": "5778b2f60f399f8d9589274ca20cb88a0b3bb6cf",
         "type": "github"
       },
       "original": {
@@ -1684,11 +1684,11 @@
     },
     "nixpkgs-stable": {
       "locked": {
-        "lastModified": 1793410479,
-        "narHash": "sha256-HzgjxrLY4AEc0044ZuM5CHbLSWLZgDlay1idmzvvpJs=",
+        "lastModified": 1793294725,
+        "narHash": "sha256-loLMnbbS4KhmG2ln9EY6f0YMNCA273Yx02oWYQ9IMeE=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "fa1373130d5a21c040a47c5dbe1913d59ed91808",
+        "rev": "6f06d204d8f2d8761d9da78778745974a3216381",
         "type": "github"
       },
       "original": {
@@ -1700,11 +1700,11 @@
     },
     "nixpkgs-stable_2": {
       "locked": {
-        "lastModified": 1793294725,
-        "narHash": "sha256-loLMnbbS4KhmG2ln9EY6f0YMNCA273Yx02oWYQ9IMeE=",
+        "lastModified": 1793410479,
+        "narHash": "sha256-HzgjxrLY4AEc0044ZuM5CHbLSWLZgDlay1idmzvvpJs=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "6f06d204d8f2d8761d9da78778745974a3216381",
+        "rev": "fa1373130d5a21c040a47c5dbe1913d59ed91808",
         "type": "github"
       },
       "original": {
@@ -1984,9 +1984,9 @@
         "flake-parts": "flake-parts",
         "git-hooks": "git-hooks",
         "hermes": "hermes",
+        "nix-detour-fleet": "nix-detour-fleet",
         "nix-devshells": "nix-devshells",
         "nix-gantry": "nix-gantry",
-        "nix-holds-fleet": "nix-holds-fleet",
         "nix-packages": "nix-packages_2",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixpak": "nixpak",
