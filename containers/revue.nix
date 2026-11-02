@@ -116,13 +116,6 @@ in
 
       # Register backup engine
       {
-        assertions = [
-          {
-            assertion = !(cfg.databaseUrl != null && hasSecrets);
-            message = "my.containers.revue: specify database connection in either databaseUrl or secretsFile, not both.";
-          }
-        ];
-
         my.backup.items.revue = {
           tier = "secure";
           sqlite = lib.optional (cfg.databaseUrl == null) "${cfg.hostDataDir}/data/revue.db";
