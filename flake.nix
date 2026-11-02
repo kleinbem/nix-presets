@@ -43,6 +43,10 @@
       inputs.nix-packages.follows = "nix-packages";
     };
     nix-gantry.inputs.nixpkgs.follows = "nixpkgs";
+    revue = {
+      url = "github:kleinbem-dev/revue";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -304,6 +308,7 @@
               garage-ui = import ./containers/garage-ui.nix { inherit self; };
               miniflux = import ./containers/miniflux.nix { inherit self; };
               forgejo = import ./containers/forgejo.nix { inherit self; };
+              revue = import ./containers/revue.nix { inherit self inputs; };
             };
 
             # `all` leaves out dashboard-homer: it declares the same
