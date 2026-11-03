@@ -202,7 +202,12 @@ in
                 dashboards.settings.providers = [
                   {
                     name = "dashboards";
-                    options.path = ./grafana-dashboards;
+                    options = {
+                      path = ./grafana-dashboards;
+                      foldersFromFilesStructure = true;
+                    };
+                    disableDeletion = true;
+                    allowUiUpdates = true;
                   }
                 ];
               };
