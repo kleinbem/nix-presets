@@ -286,6 +286,7 @@
               android-emulator = import ./nixosModules/android-emulator.nix;
               claude = import ./nixosModules/claude.nix;
               bottles = import ./nixosModules/bottles.nix;
+              photo-frame = ./nixosModules/photo-frame;
               sandboxed-apps = import ./nixosModules/sandboxed-apps.nix { inherit inputs; };
 
               home-assistant = import ./containers/home-assistant.nix { inherit self; };
