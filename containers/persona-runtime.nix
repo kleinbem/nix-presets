@@ -10,20 +10,6 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
-  # Bridge for NixOS/nixpkgs#569679: aider raises on litellm's new
-  # VectorStoreSearchError on every send. Skipped once nixpkgs has the patch.
-  aider-chat =
-    if
-      lib.any (p: lib.hasSuffix "add-vector-store-search-error.patch" (toString p)) (
-        pkgs.aider-chat.patches or [ ]
-      )
-    then
-      pkgs.aider-chat
-    else
-      pkgs.aider-chat.overridePythonAttrs (old: {
-        patches = (old.patches or [ ]) ++ [ ./patches/aider-vector-store-search-error.patch ];
-      });
-
   # tool → binary in the container + the env var for its API key. Hosts only
   # name the `tool`, as in nix-config/personas.nix.
   toolSpecs = {
@@ -322,7 +308,7 @@ in
           # when first used through this container.
           environment.systemPackages = [
             pkgs.claude-code
-            aider-chat
+            pkgs.aider-chat
           ];
 
           # No programs.git: /etc/gitconfig is bind-mounted and rewritten per
