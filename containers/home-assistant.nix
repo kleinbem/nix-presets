@@ -93,15 +93,10 @@ in
             );
           in
           {
-            # paho-mqtt 2.1.0's tests fail under Python 3.14, which breaks the
-            # whole HA closure. Remove once it builds in nixpkgs.
             nixpkgs.overlays = [
               (_final: prev: {
                 pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
                   (_pyfinal: pyprev: {
-                    paho-mqtt = pyprev.paho-mqtt.overridePythonAttrs (_: {
-                      doCheck = false;
-                    });
                     # HA pins pywizlight 0.6.3; 0.6.6's multi-zone API makes
                     # `bulb.state` a list and breaks every WiZ entity.
                     # nixpkgs reverted to 0.6.3 (NixOS/nixpkgs#576178): remove once
