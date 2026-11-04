@@ -15,7 +15,7 @@ let
         nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ pkgs.asar ];
         postInstall = (oldAttrs.postInstall or "") + ''
           # Patch Google OAuth deep-link callback handling in app.asar to prevent silent eviction on Linux second-instance handoff
-          # Upstream fix tracked in NixOS/nixpkgs#537215 / minegameYTB/nixpkgs#2
+          # Upstream fix tracked in NixOS/nixpkgs#537215
           asar extract "$out/lib/claude-desktop/resources/app.asar" asar-unpacked
           mainChunk=$(grep -l "desktop_login_callback_evicted" asar-unpacked/.vite/build/index.chunk-*.js)
 
