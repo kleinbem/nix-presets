@@ -1,0 +1,77 @@
+{ self }:
+{
+  config,
+  lib,
+  ...
+}:
+let
+  cfg = config.my.containers.anythingllm;
+  inherit (self.lib) mkContainer;
+in
+{
+  options.my.containers.anythingllm = {
+    enable = lib.mkEnableOption "AnythingLLM Container";
+    ip = lib.mkOption { type = lib.types.str; };
+    hostDataDir = lib.mkOption { type = lib.types.str; };
+    llmUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "https://litellm.internal";
+      description = "OpenAI-compatible LLM endpoint URL.";
+    };
+    modelName = lib.mkOption {
+      type = lib.types.str;
+      default = "google/gemma-2b";
+      description = "Default model name for AnythingLLM.";
+    };
+    memoryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "2G";
+    };
+  };
+
+  config = lib.mkIf cfg.enable (mkContainer {
+    inherit config;
+    name = "anythingllm";
+    inherit cfg;
+    # Bundles the 15m pull timeout, nesting caps/devices, podman's own
+    # registries.conf, and persistent podman image storage — see
+    # factory.nix's usesPodman doc comment.
+    usesPodman = true;
+    innerConfig = {
+      virtualisation = {
+        oci-containers = {
+          backend = "podman";
+          containers.anythingllm = {
+            image = "mintplexlabs/anythingllm:latest";
+            ports = [ "3001:3001" ];
+            volumes = [
+              "/var/lib/anythingllm:/app/server/storage"
+            ];
+            environment = {
+              STORAGE_DIR = "/app/server/storage";
+              # --- AI Configuration ---
+              LLM_PROVIDER = "openai";
+              OPENAI_API_BASE = cfg.llmUrl;
+              OPENAI_API_KEY = "dummy";
+              FREE_MODEL_NAME = cfg.modelName;
+              FREE_MODEL_MAX_TOKENS = "4096";
+              # AnythingLLM's defaults, pinned because nix-config's
+              # vault-anythingllm-sync depends on them. No fleet service
+              # serves embeddings, so this stays on the bundled CPU embedder.
+              EMBEDDING_ENGINE = "native";
+              VECTOR_DB = "lancedb";
+            };
+          };
+        };
+      };
+
+      networking.firewall.allowedTCPPorts = [ 3001 ];
+    };
+    bindMounts = {
+      "/var/lib/anythingllm" = {
+        hostPath = cfg.hostDataDir;
+        isReadOnly = false;
+      };
+    };
+  });
+}

@@ -1,0 +1,339 @@
+{ self }:
+{
+  config,
+  lib,
+  ...
+}:
+let
+  cfg = config.my.containers.home-assistant;
+  inherit (self.lib) mkContainer;
+in
+{
+  imports = [ ../nixosModules/backup-engine ];
+
+  options.my.containers.home-assistant = {
+    enable = lib.mkEnableOption "Home Assistant Container";
+    ip = lib.mkOption { type = lib.types.str; };
+    hostDataDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/home-assistant";
+    };
+    enableUSB = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable USB passthrough for Zigbee/Z-Wave sticks.";
+    };
+    enableBluetooth = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable Bluetooth passthrough.";
+    };
+    memoryLimit = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "4G";
+    };
+    lanUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "10.0.0.21:8123";
+      description = "host:port where LAN clients reach Home Assistant (the host's DNAT to the container). Used for internal_url and the embedded host-service dashboards.";
+    };
+  };
+
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      (mkContainer {
+        inherit config;
+        name = "home-assistant";
+        inherit cfg;
+        inherit (cfg) enableUSB;
+        # habluetooth needs both to manage/recover the adapter over bluez;
+        # with NET_ADMIN alone it logs "Missing required permissions for
+        # Bluetooth management" and can't reset a wedged adapter.
+        additionalCapabilities = lib.optionals cfg.enableBluetooth [
+          "CAP_NET_ADMIN"
+          "CAP_NET_RAW"
+        ];
+
+        innerConfig =
+          { pkgs, ... }:
+          let
+            # HA keeps HTTP settings in .storage/http and reads YAML `http:` only
+            # once, as a migration that reverts unless confirmed in the UI. So write
+            # the store on every start (format: homeassistant/components/http/config.py).
+            httpStore = pkgs.writeText "home-assistant-http-store.json" (
+              builtins.toJSON {
+                version = 2;
+                minor_version = 2;
+                key = "http";
+                data = {
+                  stable = {
+                    server_port = 8123;
+                    cors_allowed_origins = [ "https://cast.home-assistant.io" ];
+                    use_x_forwarded_for = true;
+                    trusted_proxies = [
+                      "127.0.0.1/32"
+                      "::1/128"
+                      "10.85.49.1/32" # Hass-Pi Gateway/Bridge (host DNAT + masquerade)
+                      "10.85.48.107/32" # Caddy Container (Core-Pi)
+                      "10.0.0.22/32" # Core-Pi LAN
+                      "100.117.146.201/32" # Core-Pi NetBird Mesh IP
+                    ];
+                    login_attempts_threshold = -1;
+                    ip_ban_enabled = true;
+                    ssl_profile = "modern";
+                    use_x_frame_options = true;
+                    created_at = "2026-10-25T00:00:00+00:00";
+                    error = null;
+                    error_message = null;
+                  };
+                  pending = null;
+                  yaml_migration_done = true;
+                };
+              }
+            );
+          in
+          {
+            nixpkgs.overlays = [
+              (_final: prev: {
+                pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
+                  (_pyfinal: pyprev: {
+                    # HA pins pywizlight 0.6.3; 0.6.6's multi-zone API makes
+                    # `bulb.state` a list and breaks every WiZ entity.
+                    # nixpkgs reverted to 0.6.3 (NixOS/nixpkgs#576178): remove once
+                    # our nixpkgs has that revert.
+                    pywizlight = pyprev.pywizlight.overridePythonAttrs (_: {
+                      version = "0.6.3";
+                      src = prev.fetchFromGitHub {
+                        owner = "sbidy";
+                        repo = "pywizlight";
+                        tag = "v0.6.3";
+                        hash = "sha256-rCoWdqvFLSLNBAHeFJ6f9kZpIg4WyE8VJLpmsYl+gJM=";
+                      };
+                    });
+                  })
+                ];
+              })
+            ];
+
+            services.home-assistant = {
+              enable = true;
+              # HA on NixOS can't pip-install, so every configured integration
+              # needs its deps here. Keep in sync with .storage/core.config_entries.
+              extraComponents = [
+                "met"
+                "radio_browser"
+                "esphome"
+                "sun"
+                "weather"
+                "mobile_app"
+                "prometheus" # Enable metrics for Grafana
+                # restored from the HAOS backup
+                "androidtv_remote"
+                "backup"
+                "bluetooth"
+                "bthome"
+                "cast"
+                "go2rtc"
+                "google_translate"
+                "lifx"
+                "matter"
+                "netgear"
+                "openai_conversation"
+                "oralb"
+                "renault"
+                "shelly"
+                "shopping_list"
+                "upnp"
+                "wiz"
+                # Thread radio (SkyConnect) — deps only; the dongle + OTBR
+                # (services.openthread-border-router) still have to move over.
+                "thread"
+                "otbr"
+                "homeassistant_sky_connect"
+                # Discovery finds a QNAP switch and a Google device; without
+                # the libs each logs an import error on every start.
+                "nest"
+                "qnap_qsw"
+                # alarmo imports homeassistant.components.mqtt at load time
+                # although its manifest lists mqtt only as optional, so without
+                # paho-mqtt it fails to set up at all (nielsfaber/alarmo#572).
+                # This adds the libraries only; no broker is configured.
+                "mqtt"
+                # Local voice: the host's Whisper (10300) and Piper (10200)
+                # servers, used by the voice pipeline of the ESPHome panels.
+                "wyoming"
+                # Players and library of the Music Assistant server
+                # (my.containers.music-assistant).
+                "music_assistant"
+              ];
+
+              # From nixpkgs, not HACS. Lovelace resource path for button-card:
+              # /local/nixos-lovelace-modules/button-card.js
+              customComponents = with pkgs.home-assistant-custom-components; [
+                alarmo
+                # "Sign in with Authentik" next to the local login (OIDC, public
+                # client + PKCE, no secret). The Authentik side is
+                # nix/infra/authentik.tf's oidc_apps.home-assistant; config below.
+                auth_oidc
+                # In-process HA-MCP server (87 tools) for Claude Code & co. UI-configured
+                # (admin token + access mode); the client side is modules.mcp.homeAssistant
+                # in ../mcp.nix.
+                ha_mcp_tools
+              ];
+              customLovelaceModules = with pkgs.home-assistant-custom-lovelace-modules; [ button-card ];
+
+              config = {
+                # Basic configuration
+                homeassistant = {
+                  name = "Home";
+                  unit_system = "metric";
+                  time_zone = "Europe/Dublin";
+                  external_url = "https://hass.kleinbem.dev";
+                  # NOT the container address: internal_url is what the companion
+                  # app and other LAN clients are told to use, and cfg.ip lives on
+                  # the host's private bridge. The host DNATs its LAN port 8123 to
+                  # the container (hosts/hass-pi/default.nix).
+                  internal_url = "http://${cfg.lanUrl}";
+                };
+
+                # Enable the default UI and features
+                default_config = { };
+
+                frontend = {
+                  themes = "!include themes.yaml";
+                };
+
+                # Sidebar entries for the host's ESPHome builder and Node-RED: no
+                # add-on panels and no panel_iframe, so one iframe dashboard each
+                # (files linked by tmpfiles below). Keys must contain a hyphen; no
+                # top-level `mode`, which HA deprecated.
+                lovelace = {
+                  dashboards = {
+                    esphome-builder = {
+                      mode = "yaml";
+                      title = "ESPHome Builder";
+                      icon = "mdi:chip";
+                      show_in_sidebar = true;
+                      require_admin = true;
+                      filename = "dashboards/esphome-builder.yaml";
+                    };
+                    node-red = {
+                      mode = "yaml";
+                      title = "Node-RED";
+                      icon = "mdi:sitemap";
+                      show_in_sidebar = true;
+                      require_admin = true;
+                      filename = "dashboards/node-red.yaml";
+                    };
+                  };
+                };
+
+                # Performance tuning for RPi
+                recorder = {
+                  purge_keep_days = 7;
+                  commit_interval = 30;
+                };
+
+                # No `http:` here, see httpStore.
+
+                # Declarative logic (Nix-managed hooks)
+                automation = "!include automations.yaml";
+                script = "!include scripts.yaml";
+                scene = "!include scenes.yaml";
+
+                # Authentik as OIDC login (custom component auth_oidc above).
+                # Public client, so nothing secret lives here. Users come in as
+                # "<authentik username>" and get HA's admin role via the staff
+                # group; the local owner account stays as break-glass login.
+                auth_oidc = {
+                  client_id = "home-assistant";
+                  discovery_url = "https://auth.kleinbem.dev/application/o/home-assistant/.well-known/openid-configuration";
+                  display_name = "Authentik";
+                  # Authentik's profile scope already carries `groups`; asking for a
+                  # separate `groups` scope it doesn't define would be rejected.
+                  features.include_groups_scope = false;
+                  roles.admin = "staff";
+                };
+
+                # Monitoring
+                prometheus = {
+                  namespace = "hass";
+                };
+              };
+            };
+
+            # Ensure the themes and logic files exist or are linked
+            systemd.tmpfiles.rules =
+              let
+                iframeDashboard =
+                  name: title: url:
+                  (pkgs.formats.yaml { }).generate "${name}.yaml" {
+                    inherit title;
+                    views = [
+                      {
+                        inherit title;
+                        panel = true;
+                        cards = [
+                          {
+                            type = "iframe";
+                            inherit url;
+                            aspect_ratio = "100%";
+                          }
+                        ];
+                      }
+                    ];
+                  };
+                lanHost = builtins.head (lib.splitString ":" cfg.lanUrl);
+              in
+              [
+                "d /var/lib/hass/dashboards 0755 hass hass -"
+                "L+ /var/lib/hass/dashboards/esphome-builder.yaml - - - - ${
+                  iframeDashboard "esphome-builder" "ESPHome Builder" "http://${lanHost}:6052"
+                }"
+                "L+ /var/lib/hass/dashboards/node-red.yaml - - - - ${
+                  iframeDashboard "node-red" "Node-RED" "http://${lanHost}:1880"
+                }"
+                "f /var/lib/hass/themes.yaml 0644 hass hass - {}"
+                "f /var/lib/hass/automations.yaml 0644 hass hass - {}"
+                "f /var/lib/hass/scripts.yaml 0644 hass hass - {}"
+                "f /var/lib/hass/scenes.yaml 0644 hass hass - {}"
+              ];
+
+            systemd.services.home-assistant.preStart = lib.mkAfter ''
+              install -d -m 0700 /var/lib/hass/.storage
+              install -m 0600 ${httpStore} /var/lib/hass/.storage/http
+            '';
+
+            networking.firewall.allowedTCPPorts = [ 8123 ];
+          };
+        bindMounts = {
+          "/var/lib/hass" = {
+            hostPath = cfg.hostDataDir;
+            isReadOnly = false;
+          };
+          # Bluetooth support requires access to the host's dbus
+          "/run/dbus" = lib.mkIf cfg.enableBluetooth {
+            hostPath = "/run/dbus";
+            isReadOnly = true;
+          };
+        };
+      })
+      {
+        # The recorder DB is written constantly; copy it with sqlite's
+        # `.backup` instead of the live files. HA's own backup archives,
+        # the TTS cache and logs are left out.
+        my.backup.items.home-assistant = {
+          tier = "bulk";
+          sqlite = [ "${cfg.hostDataDir}/home-assistant_v2.db" ];
+          paths = [ cfg.hostDataDir ];
+          exclude = [
+            "${cfg.hostDataDir}/home-assistant_v2.db*"
+            "${cfg.hostDataDir}/backups"
+            "${cfg.hostDataDir}/tts"
+            "${cfg.hostDataDir}/home-assistant.log*"
+          ];
+        };
+      }
+    ]
+  );
+}

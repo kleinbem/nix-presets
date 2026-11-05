@@ -1,0 +1,511 @@
+{ self }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.containers.monitoring;
+  inherit (self.lib) mkContainer;
+  # In-container paths the host-side secret files are bind-mounted to.
+  grafanaOidcClientSecretPath = "/run/secrets/grafana-oidc-client-secret";
+  alertmanagerNtfyAuthPath = "/run/secrets/alertmanager-ntfy.yml";
+in
+{
+  options.my.containers.monitoring = {
+    enable = lib.mkEnableOption "Centralized Monitoring (VictoriaMetrics + Grafana)";
+    ip = lib.mkOption { type = lib.types.str; };
+    hostDataDir = lib.mkOption { type = lib.types.str; };
+    nodeTargets = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "10.85.46.1" ];
+      description = "List of node IPs to scrape for metrics.";
+    };
+    vllmTargets = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "List of vLLM IPs to scrape for metrics.";
+    };
+    ollamaTargets = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "List of Ollama container IPs to scrape for metrics.";
+    };
+    lokiUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "http://10.85.47.116:3100";
+      description = "Loki endpoint for log queries.";
+    };
+    githubMetrics = {
+      enable = lib.mkEnableOption "GitHub Actions metrics (prometheus-json-exporter scraping the GitHub API)";
+      repos = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "kleinbem/nix" ];
+        description = "owner/repo list to scrape (runner + run-count metrics per repo).";
+      };
+      configFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "json-exporter config (module mappings + GitHub API bearer token). Provide via a sops template so the PAT stays encrypted.";
+      };
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 7979;
+      };
+      scrapeInterval = lib.mkOption {
+        type = lib.types.str;
+        default = "60s";
+      };
+    };
+    grafanaOidc = {
+      enable = lib.mkEnableOption "Grafana login via Authentik OIDC (nix/infra/authentik.tf's grafana Provider), replacing Authelia forward-auth for this service";
+      clientId = lib.mkOption {
+        type = lib.types.str;
+        default = "grafana";
+      };
+      clientSecretFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          File containing the OAuth2 client secret (Authentik's
+          authentik_provider_oauth2.grafana output, sops-managed — see
+          hosts/core-pi/secrets.nix). null while grafanaOidc.enable is
+          true would leave Grafana unable to complete the OAuth exchange;
+          container-factory only needs this option to exist, not be set.
+        '';
+      };
+    };
+    ntfy = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Forward Alertmanager alerts to ntfy via alertmanager-ntfy";
+      };
+      url = lib.mkOption {
+        type = lib.types.str;
+        default = "https://ntfy.kleinbem.dev";
+        description = "ntfy server URL";
+      };
+      topic = lib.mkOption {
+        type = lib.types.str;
+        default = "alerts";
+        description = ''
+          ntfy topic for monitoring alerts. The default is a guessable
+          public name; on an open ntfy server anyone can subscribe to it.
+          Leave it and set the real topic (plus credentials) through
+          authConfigFile instead, which never enters the nix store.
+        '';
+      };
+      authConfigFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = ''
+          Host path to an alertmanager-ntfy YAML snippet merged on top of
+          `settings` (bind-mounted into the container, loaded through
+          systemd LoadCredential). Carries the secret topic name and the
+          ntfy credentials:
+
+            ntfy:
+              auth:
+                basic:
+                  username: monitoring
+                  password: <password of the ntfy user>
+              notification:
+                topic: <secret alert topic>
+        '';
+      };
+    };
+  };
+
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      {
+        # nspawn won't start if a bind-mount source is missing, and the
+        # factory creates only hostDataDir, not these subdirs.
+        systemd.tmpfiles.rules = [
+          "d ${cfg.hostDataDir}/db 0755 1000 100 - -"
+          "d ${cfg.hostDataDir}/grafana 0755 1000 100 - -"
+        ];
+      }
+      (mkContainer {
+        inherit config;
+        name = "monitoring";
+        inherit cfg;
+        timeout = "5m";
+        innerConfig = {
+          services = {
+            victoriametrics = {
+              enable = true;
+              listenAddress = ":8428";
+              extraOptions = [
+                "-promscrape.config=/etc/vmagent/scrape.yml"
+                "-storageDataPath=/var/lib/victoria-metrics"
+              ];
+            };
+
+            grafana = {
+              enable = true;
+              settings = {
+                # The NixOS module defaults http_addr to 127.0.0.1, which
+                # Caddy can't reach from outside the container.
+                server = {
+                  http_addr = "0.0.0.0";
+                  http_port = 3000;
+                  # Without these, links and the Origin/CSRF check use
+                  # localhost:3000 instead of the proxied hostname.
+                  domain = "grafana.kleinbem.dev";
+                  root_url = "https://grafana.kleinbem.dev/";
+                };
+                security.secret_key = "antigravity-monitoring-key-2026";
+                # "system" follows the browser's prefers-color-scheme
+                # (Grafana 10+); no need to hardcode a theme.
+                users.default_theme = "system";
+              }
+              // lib.optionalAttrs cfg.grafanaOidc.enable {
+                auth.disable_login_form = true;
+                "auth.generic_oauth" = {
+                  enabled = true;
+                  name = "Authentik";
+                  client_id = cfg.grafanaOidc.clientId;
+                  # Grafana reads the bind-mounted file at startup, so the
+                  # secret stays out of the Nix store.
+                  client_secret = "$__file{${grafanaOidcClientSecretPath}}";
+                  scopes = "openid email profile";
+                  auth_url = "https://auth.kleinbem.dev/application/o/authorize/";
+                  token_url = "https://auth.kleinbem.dev/application/o/token/";
+                  api_url = "https://auth.kleinbem.dev/application/o/userinfo/";
+                  # Authentik already lets only staff in (nix/infra/authentik.tf),
+                  # so everyone who logs in is Admin.
+                  role_attribute_path = "'Admin'";
+                };
+              };
+              provision = {
+                enable = true;
+                datasources.settings.datasources = [
+                  {
+                    name = "VictoriaMetrics";
+                    uid = "victoriametrics";
+                    type = "prometheus";
+                    url = "http://localhost:8428";
+                    isDefault = true;
+                  }
+                  {
+                    name = "Loki";
+                    uid = "loki";
+                    type = "loki";
+                    url = cfg.lokiUrl;
+                  }
+                ];
+                # Not gated on githubMetrics: the router dashboard is needed anyway,
+                # and the github-actions panels just read empty.
+                dashboards.settings.providers = [
+                  {
+                    name = "dashboards";
+                    options = {
+                      path = ./grafana-dashboards;
+                      foldersFromFilesStructure = true;
+                    };
+                    disableDeletion = true;
+                    allowUiUpdates = true;
+                  }
+                ];
+              };
+            };
+
+            prometheus = {
+              alertmanager-ntfy = lib.mkIf cfg.ntfy.enable {
+                enable = true;
+                extraConfigFiles = lib.optional (cfg.ntfy.authConfigFile != null) alertmanagerNtfyAuthPath;
+                settings = {
+                  http.addr = "127.0.0.1:8000";
+                  ntfy = {
+                    baseurl = cfg.ntfy.url;
+                    notification = {
+                      topic = cfg.ntfy.topic;
+                    };
+                  };
+                };
+              };
+
+              alertmanager = {
+                enable = true;
+                port = 9093;
+                configuration = {
+                  route = {
+                    receiver = if cfg.ntfy.enable then "ntfy" else "default";
+                    group_by = [
+                      "alertname"
+                      "instance"
+                    ];
+                    group_wait = "30s";
+                    group_interval = "5m";
+                    repeat_interval = "4h";
+                  };
+                  receivers = [
+                    {
+                      name = "default";
+                    }
+                  ]
+                  ++ lib.optionals cfg.ntfy.enable [
+                    {
+                      name = "ntfy";
+                      webhook_configs = [
+                        {
+                          url = "http://127.0.0.1:8000/";
+                          send_resolved = true;
+                        }
+                      ];
+                    }
+                  ];
+                };
+              };
+
+              # GitHub Actions metrics: json-exporter scrapes the GitHub REST API
+              # (config + bearer token come from cfg.githubMetrics.configFile, bind-mounted).
+              exporters.json = lib.mkIf cfg.githubMetrics.enable {
+                enable = true;
+                inherit (cfg.githubMetrics) port;
+                configFile = "/etc/json-exporter.yml";
+              };
+            };
+          };
+
+          environment.etc = {
+            # JSON is valid YAML, so we render the scrape config with toJSON to avoid
+            # hand-indented heredoc YAML (esp. the json-exporter probe jobs).
+            "vmagent/scrape.yml".text = builtins.toJSON {
+              scrape_configs = [
+                {
+                  job_name = "node-exporters";
+                  static_configs = [ { targets = map (t: "${t}:9100") cfg.nodeTargets; } ];
+                }
+                {
+                  job_name = "vllm";
+                  static_configs = [ { targets = map (t: "${t}:8000") cfg.vllmTargets; } ];
+                }
+                {
+                  job_name = "ollama";
+                  static_configs = [ { targets = map (t: "${t}:11434") cfg.ollamaTargets; } ];
+                }
+              ]
+              ++ lib.optionals cfg.githubMetrics.enable (
+                let
+                  # blackbox-style probe: VM passes the GitHub URL as ?target=, json-exporter
+                  # fetches it (with the bearer token from its config) and returns metrics.
+                  relabel = [
+                    {
+                      source_labels = [ "__address__" ];
+                      target_label = "__param_target";
+                    }
+                    {
+                      target_label = "__address__";
+                      replacement = "localhost:${toString cfg.githubMetrics.port}";
+                    }
+                  ];
+                  ghJob = name: module: url: extraLabels: {
+                    job_name = name;
+                    metrics_path = "/probe";
+                    params.module = [ module ];
+                    scrape_interval = cfg.githubMetrics.scrapeInterval;
+                    static_configs = [
+                      {
+                        targets = [ url ];
+                        labels = extraLabels;
+                      }
+                    ];
+                    relabel_configs = relabel;
+                  };
+                in
+                lib.concatMap (repo: [
+                  (ghJob "gh-runners-${repo}" "runners" "https://api.github.com/repos/${repo}/actions/runners" {
+                    inherit repo;
+                  })
+                  (ghJob "gh-runs-queued-${repo}" "runs_count"
+                    "https://api.github.com/repos/${repo}/actions/runs?status=queued"
+                    {
+                      inherit repo;
+                      run_status = "queued";
+                    }
+                  )
+                  (ghJob "gh-runs-inprogress-${repo}" "runs_count"
+                    "https://api.github.com/repos/${repo}/actions/runs?status=in_progress"
+                    {
+                      inherit repo;
+                      run_status = "in_progress";
+                    }
+                  )
+                ]) cfg.githubMetrics.repos
+              );
+            };
+
+            "vmalert/rules.yml".text = ''
+              groups:
+                - name: system-health
+                  rules:
+                    - alert: HostDown
+                      expr: up == 0
+                      for: 2m
+                      labels:
+                        severity: critical
+                      annotations:
+                        summary: "Host {{ $labels.instance }} is down"
+                        description: "Target has been unresponsive for more than 2 minutes."
+                    - alert: HighDiskUsage
+                      expr: 'node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100 < 15'
+                      for: 5m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "High disk usage on {{ $labels.instance }}"
+                        description: "Disk space on / has fallen below 15% for more than 5 minutes."
+                    # node_rtc_* and node_chrony_* come from node-time-metrics
+                    # (monitoring-node.nix). A wrong RTC makes every boot start
+                    # in the past, and the clock step then fires every timer at once.
+                    - alert: RTCDrift
+                      expr: 'abs(node_rtc_offset_seconds) > 120'
+                      for: 1h
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Hardware clock off on {{ $labels.instance }}"
+                        description: "RTC {{ $labels.device }} ({{ $labels.name }}) is {{ $value | humanizeDuration }} away from system time; the next boot will start at the wrong time."
+                    - alert: ClockNotSynced
+                      expr: 'node_chrony_synchronized == 0'
+                      for: 30m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Clock not synchronised on {{ $labels.instance }}"
+                        description: "chrony has not been synchronised to NTP for 30 minutes."
+                - name: network-edge
+                  # Router-relevant health. Metric names follow node_exporter;
+                  # the OpenWrt node-exporter-lua aims for compatibility —
+                  # verify against a live router (a wrong name = silent no-data,
+                  # not an error). Fires to Alertmanager → ntfy.
+                  rules:
+                    - alert: HighTemperature
+                      expr: 'node_hwmon_temp_celsius > 85'
+                      for: 5m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "High temperature on {{ $labels.instance }}"
+                        description: "SoC/sensor temperature above 85°C for 5 minutes (BPI-R4 runs hot — check the fan)."
+                    - alert: ConntrackNearLimit
+                      expr: 'node_nf_conntrack_entries / node_nf_conntrack_entries_limit > 0.85'
+                      for: 5m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Conntrack table filling on {{ $labels.instance }}"
+                        description: "Connection-tracking table above 85% — a device may be flooding connections."
+                    - alert: HighLoad
+                      expr: 'node_load1 > 6'
+                      for: 10m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "High load on {{ $labels.instance }}"
+                        description: "1-min load above 6 for 10 minutes."
+                - name: systemd-services
+                  rules:
+                    - alert: ServiceFlapping
+                      expr: 'increase(node_systemd_service_restart_total[10m]) > 3'
+                      for: 1m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Service {{ $labels.name }} is crash-looping on {{ $labels.instance }}"
+                        description: "Service {{ $labels.name }} has restarted {{ $value | printf \"%.0f\" }} times in the last 10 minutes."
+                    - alert: SystemdUnitFailed
+                      expr: 'node_systemd_unit_state{state="failed"} == 1'
+                      for: 2m
+                      labels:
+                        severity: critical
+                      annotations:
+                        summary: "Systemd unit {{ $labels.name }} failed on {{ $labels.instance }}"
+                        description: "Systemd unit {{ $labels.name }} on {{ $labels.instance }} has entered failed state."
+            '';
+          };
+
+          systemd.services = {
+            vmalert = {
+              description = "vmalert service";
+              wantedBy = [ "multi-user.target" ];
+              after = [
+                "network.target"
+                "victoriametrics.service"
+              ];
+              serviceConfig = {
+                DynamicUser = true;
+                Restart = "on-failure";
+                ExecStart = "${pkgs.victoriametrics}/bin/vmalert -datasource.url=http://localhost:8428 -notifier.url=http://localhost:9093 -rule=/etc/vmalert/rules.yml";
+                ExecReload = "${pkgs.coreutils}/bin/kill -SIGHUP $MAINPID";
+              };
+            };
+
+            victoriametrics = {
+              serviceConfig = {
+                DynamicUser = lib.mkForce false;
+                User = "victoriametrics";
+                Group = "victoriametrics";
+                ExecStartPre = [
+                  "+${pkgs.coreutils}/bin/chown -R victoriametrics:victoriametrics /var/lib/victoria-metrics"
+                ];
+              };
+            };
+
+            grafana = {
+              serviceConfig.ExecStartPre = [
+                "+${pkgs.coreutils}/bin/chown -R grafana:grafana /var/lib/grafana"
+              ];
+            };
+          };
+
+          networking.firewall.allowedTCPPorts = [
+            3000
+            8428
+            9093
+          ];
+
+          users = {
+            users.victoriametrics = {
+              isSystemUser = true;
+              group = "victoriametrics";
+            };
+            groups.victoriametrics = { };
+          };
+        };
+        bindMounts = {
+          "/var/lib/victoria-metrics" = {
+            hostPath = "${cfg.hostDataDir}/db";
+            isReadOnly = false;
+          };
+          "/var/lib/grafana" = {
+            hostPath = "${cfg.hostDataDir}/grafana";
+            isReadOnly = false;
+          };
+        }
+        // lib.optionalAttrs (cfg.grafanaOidc.enable && cfg.grafanaOidc.clientSecretFile != null) {
+          ${grafanaOidcClientSecretPath} = {
+            hostPath = cfg.grafanaOidc.clientSecretFile;
+            isReadOnly = true;
+          };
+        }
+        // lib.optionalAttrs (cfg.githubMetrics.enable && cfg.githubMetrics.configFile != null) {
+          "/etc/json-exporter.yml" = {
+            hostPath = cfg.githubMetrics.configFile;
+            isReadOnly = true;
+          };
+        }
+        // lib.optionalAttrs (cfg.ntfy.enable && cfg.ntfy.authConfigFile != null) {
+          ${alertmanagerNtfyAuthPath} = {
+            hostPath = cfg.ntfy.authConfigFile;
+            isReadOnly = true;
+          };
+        };
+      })
+    ]
+  );
+}
