@@ -5,7 +5,8 @@
 # login stays off, garage-ui makes it full admin:
 # https://github.com/Noooste/garage-ui/issues/148), and a scoped admin token
 # (`just containers::garage-ui-token` in nix-config) makes Garage refuse changes.
-# That scope needs GetKeyInfo, which reads every key's secret, so keep the token
+# That scope needs GetKeyInfo, which reads every key's secret, write-capable keys
+# too, so whoever holds the token can still write objects through S3: keep it
 # secret (https://github.com/Noooste/garage-ui/issues/149).
 # Without a login method garage-ui serves everything unauthenticated, hence the
 # assertion below. no-link: reported to upstream privately.
