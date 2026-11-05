@@ -157,6 +157,8 @@ let
     );
 
   # `<script> <outdir>` → <outdir>/<item>/{<sqlite basename>,postgres-*.sql,command.dump}
+  # Each item dumps on its own: a failed one (a stopped container, a missing
+  # mount) is left out and the script exits 1 after dumping all the others.
   mkDumpScript =
     tier: items:
     pkgs.writeShellScript "backup-dump-${tier}" ''
@@ -165,8 +167,12 @@ let
       out="$1"
       rm -rf "$out"
       mkdir -p "$out"
+      failed=0
       ${lib.concatStrings (
         lib.mapAttrsToList (name: item: ''
+          set +e
+          (
+          set -e
           mkdir -p "$out"/${esc name}
           ${lib.concatMapStrings (p: ''
             ${pkgs.sqlite}/bin/sqlite3 ${esc p} ".backup '$out/${name}/${baseNameOf p}'"
@@ -179,8 +185,17 @@ let
             ( ${item.command} ) > "$out"/${esc name}/command.dump
             test -s "$out"/${esc name}/command.dump
           ''}
+          )
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "ERROR: dump of ${name} failed (exit $rc); left out" >&2
+            rm -rf "$out"/${esc name}
+            failed=1
+          fi
         '') items
       )}
+      exit "$failed"
     '';
 
   inherit (cfg) stateDir;
@@ -216,7 +231,21 @@ let
       work=$(mktemp -d)
       trap 'rm -rf "$work"' EXIT
 
-      ${mkDumpScript "secure" secureItems} "$work/stage/dumps"
+      # A failed dump or a missing path still uploads the rest, then fails the
+      # job (alert, no marker, no prune).
+      complete=1
+      ${mkDumpScript "secure" secureItems} "$work/stage/dumps" || complete=0
+      tarpaths=()
+      for p in ${lib.concatMapStringsSep " " (p: esc (lib.removePrefix "/" p)) paths}; do
+        if [ -e "/$p" ] || [ -L "/$p" ]; then
+          tarpaths+=("$p")
+        else
+          echo "ERROR: /$p is missing; left out" >&2
+          complete=0
+        fi
+      done
+      tarargs=()
+      [ "''${#tarpaths[@]}" -eq 0 ] || tarargs=(-C / "''${tarpaths[@]}")
 
       # tar exit 1 = "file changed as we read it" on live paths: acceptable
       # (dumps are the consistent part); anything above 1 is fatal.
@@ -224,15 +253,12 @@ let
       tar --anchored ${
         lib.concatMapStringsSep " " (e: "--exclude=${esc (lib.removePrefix "/" e)}") excludes
       } \
-        -czf "$work/bundle.tar.gz" -C "$work/stage" dumps \
-        ${
-          lib.optionalString (paths != [ ])
-            "-C / ${lib.concatMapStringsSep " " (p: esc (lib.removePrefix "/" p)) paths}"
-        } \
+        -czf "$work/bundle.tar.gz" -C "$work/stage" dumps "''${tarargs[@]}" \
         || rc=$?
       [ "$rc" -le 1 ] || exit "$rc"
 
-      name=${esc host}-$ts.tar.gz.age
+      # A partial bundle says so in its name; a full restore takes the newest without it.
+      name=${esc host}-$ts$([ "$complete" -eq 1 ] || echo -partial).tar.gz.age
       age ${lib.concatMapStringsSep " " (r: "-r ${esc r}") cfg.secure.recipients} \
         -o "$work/$name" "$work/bundle.tar.gz"
       rm -f "$work/bundle.tar.gz"
@@ -246,7 +272,7 @@ let
             && rclone --config ${esc d.rcloneConfigFile} copyto "$work/$name.sha256" "$dst/$name.sha256"; then
             echo "secure → ${dname}: ok"
             ${lib.optionalString (d.pruneSecureAfterDays != null) ''
-              rclone --config ${esc d.rcloneConfigFile} delete --min-age ${toString d.pruneSecureAfterDays}d "$dst" \
+              [ "$complete" -eq 0 ] || rclone --config ${esc d.rcloneConfigFile} delete --min-age ${toString d.pruneSecureAfterDays}d "$dst" \
                 || echo "WARN: prune on ${dname} failed" >&2
             ''}
           else
@@ -266,6 +292,7 @@ let
         '') secureDests
       )}
       [ "$failed" -eq 0 ]
+      [ "$complete" -eq 1 ] || { echo "ERROR: uploaded without the failed items above" >&2; exit 1; }
       ${touchMarker "secure"}
       ${hbPing "secure"}
       echo "secure backup $ts ok ($(du -h "$work/$name" | cut -f1))"
