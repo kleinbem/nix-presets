@@ -12,6 +12,8 @@ let
 
   agentNames = lib.attrNames cfg.agents;
   taskAgent = if cfg.task.agent != null then cfg.task.agent else lib.head (agentNames ++ [ "" ]);
+  agentModel = a: if a.llm != null then a.llm else cfg.model;
+  managerModel = if cfg.manager.llm != null then cfg.manager.llm else cfg.model;
 
   # main.py reads the team from JSON, so roles and goals need no Python quoting.
   teamJson = pkgs.writeText "agent-team.json" (
@@ -25,6 +27,7 @@ let
           verbose
           ;
         allow_delegation = a.allowDelegation;
+        llm = agentModel a;
       }) cfg.agents;
       task = {
         inherit (cfg.task) description;
@@ -33,19 +36,37 @@ let
         human_input = cfg.manager.humanInTheLoop;
       };
       inherit (cfg.manager) process;
-      manager_llm = cfg.manager.llm;
+      manager_llm = managerModel;
+      langfuse = cfg.langfuse.enable;
     }
   );
 
   mainPy = pkgs.writeText "main.py" ''
     import json
 
-    from crewai import Agent, Crew, Process, Task
+    from crewai import LLM, Agent, Crew, Process, Task
 
     with open("${teamJson}") as f:
         team = json.load(f)
 
-    agents = {name: Agent(**spec) for name, spec in team["agents"].items()}
+    if team["langfuse"]:
+        from langfuse import get_client
+        from openinference.instrumentation.crewai import CrewAIInstrumentor
+
+        langfuse = get_client()
+        CrewAIInstrumentor().instrument(skip_dep_check=True)
+
+
+    # custom_openai sends any model name to OPENAI_API_BASE (LiteLLM) instead
+    # of inferring a provider from it.
+    def llm(model):
+        return LLM(model=model, custom_openai=True)
+
+
+    agents = {
+        name: Agent(**{**spec, "llm": llm(spec["llm"])})
+        for name, spec in team["agents"].items()
+    }
 
     task = Task(
         description=team["task"]["description"],
@@ -56,7 +77,7 @@ let
 
     crew_args = {}
     if team["process"] == "hierarchical":
-        crew_args["manager_llm"] = team["manager_llm"]
+        crew_args["manager_llm"] = llm(team["manager_llm"])
 
     crew = Crew(
         agents=list(agents.values()),
@@ -68,7 +89,11 @@ let
 
     if __name__ == "__main__":
         print("CrewAI team starting:", ", ".join(agents))
-        print(crew.kickoff())
+        try:
+            print(crew.kickoff())
+        finally:
+            if team["langfuse"]:
+                langfuse.flush()
   '';
 
   venv = "/app/state/venv";
@@ -84,7 +109,8 @@ let
     if [ ! -x ${venv}/bin/python ]; then
       rm -rf ${venv}.tmp
       ${pkgs.uv}/bin/uv venv --relocatable --python ${python}/bin/python3 ${venv}.tmp
-      ${pkgs.uv}/bin/uv pip install --no-cache --python ${venv}.tmp/bin/python crewai langfuse
+      ${pkgs.uv}/bin/uv pip install --no-cache --python ${venv}.tmp/bin/python \
+        crewai langfuse openinference-instrumentation-crewai
       rm -rf ${venv}
       mv -T ${venv}.tmp ${venv}
     fi
@@ -99,7 +125,7 @@ let
     set +a
     : "''${OPENAI_API_KEY:?set OPENAI_API_KEY (the LiteLLM key) in secretsFile}"
     export OPENAI_API_BASE=${lib.escapeShellArg cfg.litellmUrl}
-    export LANGFUSE_HOST=${lib.escapeShellArg cfg.langfuse.host}
+    export LANGFUSE_BASE_URL=${lib.escapeShellArg cfg.langfuse.host}
     ${lib.optionalString (cfg.langfuse.publicKey != "") ''
       export LANGFUSE_PUBLIC_KEY=''${LANGFUSE_PUBLIC_KEY:-${lib.escapeShellArg cfg.langfuse.publicKey}}
     ''}
@@ -167,11 +193,23 @@ in
               type = lib.types.bool;
               default = true;
             };
+            llm = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "Model name on LiteLLM for this agent. null = `model`.";
+            };
           };
         }
       );
       default = { };
       description = "Definition of agents in the team. Maps to CrewAI Agent class. At least one is required.";
+    };
+
+    model = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "gpt-4o-mini";
+      description = "Default model name on LiteLLM for agents and the manager.";
     };
 
     task = {
@@ -212,7 +250,7 @@ in
         type = lib.types.nullOr lib.types.str;
         default = null;
         example = "gpt-4o";
-        description = "Model name (on LiteLLM) for the manager. Required when process is hierarchical.";
+        description = "Model name on LiteLLM for the manager (hierarchical process). null = `model`.";
       };
     };
 
@@ -259,8 +297,12 @@ in
             message = "my.containers.agent-team.task.agent must be one of: ${lib.concatStringsSep ", " agentNames}.";
           }
           {
-            assertion = cfg.manager.process == "hierarchical" -> cfg.manager.llm != null;
-            message = ''my.containers.agent-team.manager.process = "hierarchical" needs manager.llm (CrewAI's manager_llm).'';
+            assertion = lib.all (a: agentModel a != null) (lib.attrValues cfg.agents);
+            message = "my.containers.agent-team: set model, or llm on every agent.";
+          }
+          {
+            assertion = cfg.manager.process == "hierarchical" -> managerModel != null;
+            message = ''my.containers.agent-team.manager.process = "hierarchical" needs manager.llm or model (CrewAI's manager_llm).'';
           }
           {
             assertion = cfg.langfuse.secretKey == "";
