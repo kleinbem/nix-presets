@@ -12,9 +12,9 @@ on:
     - cron: '0 5 * * 2'
   workflow_dispatch:
 
+# Everything goes through the App token below.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   update:
@@ -23,12 +23,14 @@ jobs:
     steps:
       - name: Mint GitHub App installation token
         id: app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
 
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: false
@@ -56,9 +58,10 @@ jobs:
         if: steps.update.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ steps.update.outputs.version }}
+          REPO: ${{ github.repository }}
         run: |
           BRANCH_NAME="auto-update/freecad-mcp"
-          REPO="${{ github.repository }}"
           MAIN_SHA=$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)
 
           if gh api "repos/$REPO/git/ref/heads/$BRANCH_NAME" >/dev/null 2>&1; then
@@ -71,7 +74,7 @@ jobs:
             --arg repo "$REPO" \
             --arg branch "$BRANCH_NAME" \
             --arg sha "$MAIN_SHA" \
-            --arg headline "chore: update freecad-mcp to ${{ steps.update.outputs.version }}" \
+            --arg headline "chore: update freecad-mcp to ${VERSION}" \
             --arg content "$(base64 -w0 mcp.nix)" \
             --arg query 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }' \
             '{query: $query, variables: {input: {
@@ -86,7 +89,7 @@ jobs:
           ## freecad-mcp update
 
           Bumps the pinned `neka-nat/freecad-mcp` source in `mcp.nix` to the
-          latest git tag: **${{ steps.update.outputs.version }}**. The
+          latest git tag: **@VERSION@**. The
           source hash was re-derived from that tag's GitHub archive tarball.
 
           ✅ The actual `buildPythonPackage` output was rebuilt standalone
@@ -96,9 +99,10 @@ jobs:
           ---
           🤖 Opened automatically by the update-freecad-mcp workflow.
           EOF
+          sed -i "s|@VERSION@|${VERSION}|" "$BODY_FILE"
 
           gh pr create \
-            --title "chore: update freecad-mcp to ${{ steps.update.outputs.version }}" \
+            --title "chore: update freecad-mcp to ${VERSION}" \
             --body-file "$BODY_FILE" \
             --head "$BRANCH_NAME" \
             --base main \
