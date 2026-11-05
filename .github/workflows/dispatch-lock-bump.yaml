@@ -5,7 +5,9 @@ name: Dispatch nix-config lock bump
 # nix-config to bump just this input in its lock PR. The App token is scoped
 # to nix-config and needs only the contents permission.
 on:
-  workflow_run: # zizmor: ignore[dangerous-triggers] main-branch success only, no checkout
+  # no-link: zizmor flags every workflow_run; this one only reacts to a
+  # successful main run and checks nothing out.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: ["Check Flake"]
     branches: [main]
     types: [completed]
