@@ -206,7 +206,8 @@ class Server(ThreadingHTTPServer):
 
 
 def main() -> None:
-    host = os.environ.get("LISTEN_HOST", "0.0.0.0")
+    # Panels on the LAN fetch from it; the module opens the port only on openFirewallOn.
+    host = os.environ.get("LISTEN_HOST", "0.0.0.0")  # noqa: S104
     port = int(os.environ.get("LISTEN_PORT", "8099"))
     Server((host, port), Handler).serve_forever()
 

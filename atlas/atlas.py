@@ -54,8 +54,8 @@ class AtlasEngine:
                     content = f.read().strip()
                     if content:
                         return content
-            except Exception:
-                pass
+            except Exception as e:
+                log(f"Could not read {sys_path}: {e}", YELLOW)
 
         # 2. Check Home Manager sops-nix path
         user_path = os.path.expanduser(f"~/.config/sops-nix/secrets/{key}")
@@ -65,8 +65,8 @@ class AtlasEngine:
                     content = f.read().strip()
                     if content:
                         return content
-            except Exception:
-                pass
+            except Exception as e:
+                log(f"Could not read {user_path}: {e}", YELLOW)
 
         # 3. Fall back to the sops CLI against kleinbem-secrets. Keys are spread
         # over several files, so try each candidate until one has the key.
