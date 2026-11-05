@@ -1,0 +1,17 @@
+# Extended pre-commit config with version consistency check
+# Note: .pre-commit-config.yaml is symlinked to Nix store output
+# To use this version check, run: cp .pre-commit-config-with-version-check.yaml .pre-commit-config.yaml
+# Then manually add the version-check hook to your git-hooks config in flake.nix
+
+# Temporary workaround until git-hooks.nix supports local hooks
+# See: https://github.com/cachix/git-hooks.nix/issues/XXX
+
+repos:
+  - repo: local
+    hooks:
+      - id: check-version-consistency
+        name: Check version pinning consistency
+        entry: bash ../kleinbem/tools/check-version-consistency.sh
+        language: system
+        pass_filenames: false
+        files: '\.nix$'

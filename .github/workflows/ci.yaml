@@ -1,0 +1,50 @@
+name: Check Flake
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: kleinbem/actions/nix-setup@7ec628296d5194e6e10031706387b992a10a1638 # v1.0.1
+        with:
+          nix-path: nixpkgs=channel:nixos-unstable
+          # Read-only Attic over NetBird; skipped when the secrets are
+          # absent (fork PRs, Dependabot).
+          netbird-setup-key: ${{ secrets.NETBIRD_SETUP_KEY_EPHEMERAL }}
+          attic-token: ${{ secrets.ATTIC_PULL_TOKEN }}
+          # held-open-webui builds open-webui with all optional dependencies.
+          free-disk-space: 'true'
+      # Build the NixOS VM test on its own first: alone it passes in ~30 s,
+      # and -L shows the guest console if it breaks.
+      - name: Build the backup-engine VM test
+        run: nix build -L --no-link .#checks.x86_64-linux.backup-engine --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages
+      # Not `nix flake check`: it evaluates all module-* checks (each a full
+      # NixOS system) in one process that never frees them and outgrows the
+      # 16 GiB runner (NixOS/nix#13483). nix-fast-build uses memory-capped
+      # eval workers.
+      - name: Build all checks
+        run: >-
+          nix run github:Mic92/nix-fast-build --
+          --flake .#checks.x86_64-linux
+          --systems x86_64-linux
+          --eval-workers 2
+          --eval-max-memory-size 4096
+          --no-nom --no-link --skip-cached
+          --override-input nix-devshells github:kleinbem/nix-devshells
+          --override-input nix-packages github:kleinbem/nix-packages
+      # The rest of what `nix flake check` covered: packages and dev shells
+      # must evaluate (they are not built here).
+      - name: Evaluate packages and dev shells
+        run: |
+          for out in packages devShells; do
+            nix eval --json ".#$out.x86_64-linux" --apply 'builtins.mapAttrs (_: d: d.drvPath)' \
+              --override-input nix-devshells github:kleinbem/nix-devshells \
+              --override-input nix-packages github:kleinbem/nix-packages >/dev/null
+          done
+      - run: nix fmt --override-input nix-devshells github:kleinbem/nix-devshells --override-input nix-packages github:kleinbem/nix-packages -- --fail-on-change

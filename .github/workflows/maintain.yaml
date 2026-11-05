@@ -1,0 +1,108 @@
+name: Maintain Flake
+on:
+  workflow_dispatch:
+  schedule:
+    # 02:30 UTC — layer 3 (depends on nix-devshells + nix-packages,
+    # both of which run earlier in the same window).
+    - cron: '30 2 * * *'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint GitHub App installation token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: kleinbem/actions/nix-setup@7ec628296d5194e6e10031706387b992a10a1638 # v1.0.1
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          nix-path: nixpkgs=channel:nixos-unstable
+
+      - name: Update flake inputs
+        run: nix flake update
+
+      - name: Validate flake (eval-only — blocks a bad lock from landing)
+        run: nix flake check --no-build
+
+      # App tokens live one hour and the eval above takes 40-75 minutes, so the
+      # first token is expired by now (2026-10-31: the PR step got HTTP 401).
+      - name: Mint a fresh token for the PR step
+        id: pr-token
+        if: github.ref == 'refs/heads/main'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          # Branch ref + commit, then open/reopen the PR and arm auto-merge.
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Open PR for flake.lock updates (auto-merges once Check Flake is green)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ steps.pr-token.outputs.token }}
+        run: |
+          if git diff --quiet flake.lock; then
+            echo "flake.lock unchanged — nothing to do."
+            exit 0
+          fi
+
+          BRANCH_NAME="update-flake-lock"
+          REPO="${{ github.repository }}"
+          MAIN_SHA=$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)
+
+          # Reset (or create) the branch to point at current main, then commit
+          # via GraphQL createCommitOnBranch — GitHub signs these commits
+          # automatically ("Verified", committer=GitHub), satisfying the
+          # required_signatures ruleset without any key material in CI.
+          if gh api "repos/$REPO/git/ref/heads/$BRANCH_NAME" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPO/git/refs/heads/$BRANCH_NAME" -f sha="$MAIN_SHA" -F force=true >/dev/null
+          else
+            gh api "repos/$REPO/git/refs" -f ref="refs/heads/$BRANCH_NAME" -f sha="$MAIN_SHA" >/dev/null
+          fi
+
+          jq -n \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH_NAME" \
+            --arg sha "$MAIN_SHA" \
+            --arg content "$(base64 -w0 flake.lock)" \
+            --arg query 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }' \
+            '{query: $query, variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+                message: {headline: "chore: update flake.lock (auto)"},
+                expectedHeadOid: $sha,
+                fileChanges: {additions: [{path: "flake.lock", contents: $content}]}
+            }}}' | gh api graphql --input -
+
+          # Resetting the branch makes it identical to main for an instant, and
+          # GitHub sometimes closes the open PR for it right then (zero-diff
+          # detection) before the new commit lands. Reopen it instead of leaving
+          # the bump stranded on the branch with every error swallowed.
+          PR_JSON=$(gh pr list --head "$BRANCH_NAME" --state all --limit 1 --json number,state --jq '.[0] // empty')
+          PR_NUMBER=$(jq -r '.number // empty' <<<"$PR_JSON")
+          PR_STATE=$(jq -r '.state // empty' <<<"$PR_JSON")
+          if [ "$PR_STATE" = "CLOSED" ]; then
+            echo "PR #$PR_NUMBER was closed by the branch reset — reopening it."
+            gh pr reopen "$PR_NUMBER"
+          elif [ "$PR_STATE" != "OPEN" ]; then
+            gh pr create \
+              --title "chore: update flake.lock" \
+              --body "Automated lockfile update. Check Flake re-validates the new inputs on this PR; auto-merge is enabled and lands this once it's green." \
+              --head "$BRANCH_NAME" \
+              --base main
+          fi
+
+          gh pr merge "$BRANCH_NAME" --auto --squash || true
+
+          # Fail the run if the bump is not on its way: an open PR with auto-merge
+          # armed, or already merged.
+          gh pr view "$BRANCH_NAME" --json state,autoMergeRequest \
+            --jq 'if .state == "MERGED" or (.state == "OPEN" and .autoMergeRequest != null) then "lock bump PR: \(.state), auto-merge armed" else error("no open PR with auto-merge for the lock bump (state: \(.state))") end'

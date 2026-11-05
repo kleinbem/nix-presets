@@ -1,0 +1,256 @@
+{
+  pkgs,
+  lib,
+  ...
+}:
+
+let
+  commonData = import ./code-common/settings.nix;
+
+  # VS Code forks sharing one config. Extension bundles are synced by
+  # `just extensions::sync`, not nixos-rebuild. Antigravity is left out: its
+  # IDE comes from nix-packages (google-antigravity-ide) and uses ~/.antigravity-ide.
+  codeFamily = [
+    {
+      name = "Cursor";
+      configDir = ".config/cursor";
+      extDir = ".config/cursor/extensions";
+    }
+    {
+      name = "Windsurf";
+      configDir = ".config/windsurf";
+      extDir = ".config/windsurf/extensions";
+    }
+  ];
+
+  # Helper to write JSON config
+  mkConfigs = app: {
+    "${app.configDir}/settings.json".text = builtins.toJSON commonData.settings;
+    "${app.configDir}/keybindings.json".text = builtins.toJSON commonData.keybindings;
+  };
+
+  # Wrapper generator for strict isolation
+  mkIsolatedEditor =
+    app:
+    let
+      # Use the exact package names confirmed from search.nixos.org
+      # (windsurf was rebranded upstream: package + binary are now devin-desktop)
+      pkg = if app.name == "Windsurf" then pkgs.devin-desktop else pkgs.code-cursor-fhs;
+
+      # Correct binary names for the FHS wrappers
+      binName = if app.name == "Cursor" then "cursor" else "devin-desktop";
+    in
+    pkgs.writeShellScriptBin (lib.toLower app.name) ''
+      exec ${pkg}/bin/${binName} \
+        --user-data-dir "$HOME/${app.configDir}/data" \
+        --extensions-dir "$HOME/${app.extDir}" \
+        "$@"
+    '';
+
+in
+{
+  imports = [
+    ./mcp.nix
+  ];
+
+  home = {
+    packages = with pkgs; [
+      # Unified Code Platform Editors (Isolated Wrappers)
+      (mkIsolatedEditor (builtins.elemAt codeFamily 0)) # Cursor
+      (mkIsolatedEditor (builtins.elemAt codeFamily 1)) # Windsurf
+
+      warp-terminal
+      pavucontrol
+      nwg-look
+      mission-center # System Monitor (Task Manager)
+      sticky # Modern GTK4 Wayland Sticky Notes App
+      hicolor-icon-theme # Base XDG icon theme index for GTK apps
+      p7zip # Archives
+      rclone-browser # GUI for Rclone
+      restic-browser # GUI for Restic Backups
+      restic # CLI Tool (Required for Restic Browser)
+
+      # Discord, Signal, Element: nixpak sandboxes, installed system-wide
+      # by nixosModules/sandboxed-apps.nix (my.desktop.sandboxedApps).
+
+      # -- Apps (Sandboxed via Firejail on host) --
+      obsidian
+      mpv
+      (google-chrome.override {
+        # No managed policy any more (nix-config modules/nixos/desktop.nix) —
+        # these are just our own launch defaults, not enterprise policy.
+        commandLineArgs = lib.concatStringsSep " " [
+          # GNOME-drawn title bar under Wayland — replaces the old
+          # UseSystemTitleBar policy, which only existed as a policy (no
+          # normal chrome://settings equivalent on Linux).
+          "--enable-features=WaylandWindowDecorations"
+        ];
+      })
+      zathura
+      imv # Image Viewer
+      pkgs.rbw
+      pkgs.rofi-rbw-wayland
+      pkgs.brotab # Browser Automation (asked by user)
+      pkgs.cliphist # Clipboard history
+      pkgs.wl-clipboard # Required for cliphist
+
+      nixd # Nix Language Server
+    ];
+
+    # Generate declarative config files for all agents
+    file = lib.mkMerge (map mkConfigs codeFamily);
+
+  };
+
+  # Declaratively ensure user directories exist via systemd tmpfiles rules
+  systemd.user.tmpfiles.rules = [
+    "d %h/GoogleDrive 0755 - - -"
+    "d %h/OneDrive 0755 - - -"
+    "d %h/.config/cursor/data 0755 - - -"
+    "d %h/.config/cursor/extensions 0755 - - -"
+    "d %h/.config/windsurf/data 0755 - - -"
+    "d %h/.config/windsurf/extensions 0755 - - -"
+  ];
+
+  # Catppuccin Mocha Blue, the palette rofi hand-codes in
+  # nix-config/modules/home-manager/gnome.nix. Qt follows via the gtk3
+  # platform theme below, so no separate Kvantum/qt5ct theme is needed.
+  gtk = {
+    enable = true;
+    theme = {
+      name = "catppuccin-mocha-blue-standard";
+      package = pkgs.catppuccin-gtk.override {
+        accents = [ "blue" ];
+        variant = "mocha";
+        size = "standard";
+      };
+    };
+    iconTheme = {
+      name = "Papirus-Dark";
+      package = pkgs.catppuccin-papirus-folders.override {
+        flavor = "mocha";
+        accent = "blue";
+      };
+    };
+  };
+
+  home.pointerCursor = {
+    enable = true;
+    package = pkgs.catppuccin-cursors.mochaBlue;
+    name = "catppuccin-mocha-blue-cursors";
+    size = 24;
+    gtk.enable = true;
+    x11.enable = true;
+  };
+
+  # Native GNOME setting to enable crisp window borders and contrast
+  dconf.settings."org/gnome/desktop/interface" = {
+    color-scheme = "prefer-dark";
+    high-contrast = true;
+  };
+
+  qt = {
+    enable = true;
+    platformTheme.name = "gtk3";
+  };
+
+  xdg.mimeApps = {
+    enable = true;
+    defaultApplications = {
+      "x-scheme-handler/x-github-client" = [ "github-desktop.desktop" ];
+      "text/html" = [ "google-chrome.desktop" ];
+      "x-scheme-handler/http" = [ "google-chrome.desktop" ];
+      "x-scheme-handler/https" = [ "google-chrome.desktop" ];
+      "x-scheme-handler/about" = [ "google-chrome.desktop" ];
+      "x-scheme-handler/unknown" = [ "google-chrome.desktop" ];
+      "x-scheme-handler/obsidian" = [ "obsidian.desktop" ];
+    };
+  };
+
+  # Create a custom "Fortress" launcher for BOI
+  xdg.desktopEntries = { };
+
+  programs.waybar.enable = true;
+
+  systemd.user.services = {
+    rclone-gdrive-mount = {
+      Unit = {
+        Description = "Mount Google Drive via Rclone";
+        After = [ "network-online.target" ];
+      };
+      Service = {
+        Type = "simple";
+        Environment = "PATH=/run/wrappers/bin:$PATH";
+        # Wait for network to be fully ready before mounting
+        ExecStartPre = [
+          "${pkgs.coreutils}/bin/sleep 5"
+          "${pkgs.coreutils}/bin/mkdir -p %h/GoogleDrive"
+        ];
+        ExecStart = ''
+          ${pkgs.rclone}/bin/rclone mount gdrive: %h/GoogleDrive \
+            --allow-other \
+            --allow-non-empty \
+            --vfs-cache-mode full \
+            --vfs-cache-max-size 10G \
+            --vfs-cache-max-age 24h \
+            --dir-cache-time 1000h \
+            --log-level INFO
+        '';
+        ExecStop = "/run/wrappers/bin/fusermount3 -uz %h/GoogleDrive";
+        TimeoutStopSec = "10s";
+        Restart = "on-failure";
+        RestartSec = "10s";
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
+      };
+    };
+
+    rclone-onedrive-mount = {
+      Unit = {
+        Description = "Mount OneDrive via Rclone";
+        After = [ "network-online.target" ];
+      };
+      Service = {
+        Type = "simple";
+        Environment = "PATH=/run/wrappers/bin:$PATH";
+        # Wait for network to be fully ready before mounting
+        ExecStartPre = [
+          "${pkgs.coreutils}/bin/sleep 5"
+          "${pkgs.coreutils}/bin/mkdir -p %h/OneDrive"
+        ];
+        ExecStart = ''
+          ${pkgs.rclone}/bin/rclone mount onedrive: %h/OneDrive \
+            --allow-other \
+            --allow-non-empty \
+            --vfs-cache-mode full \
+            --vfs-cache-max-size 10G \
+            --vfs-cache-max-age 24h \
+            --dir-cache-time 1000h \
+            --log-level INFO
+        '';
+        ExecStop = "/run/wrappers/bin/fusermount3 -uz %h/OneDrive";
+        TimeoutStopSec = "10s";
+        Restart = "on-failure";
+        RestartSec = "10s";
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
+      };
+    };
+
+    cliphist = {
+      Unit = {
+        Description = "Clipboard history service (cliphist)";
+        After = [ "graphical-session.target" ];
+      };
+      Service = {
+        ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --watch ${pkgs.cliphist}/bin/cliphist store";
+        Restart = "on-failure";
+      };
+      Install = {
+        WantedBy = [ "graphical-session.target" ];
+      };
+    };
+  };
+}
