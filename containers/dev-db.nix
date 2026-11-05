@@ -87,6 +87,9 @@ in
             enable = true;
             bind = "0.0.0.0";
             port = cfg.redisPort;
+            # Without a password, protected mode answers only loopback, so devshells
+            # on the host got DENIED. Same trust as postgres above.
+            settings.protected-mode = "no";
           };
 
           networking.firewall.allowedTCPPorts = [
