@@ -5,7 +5,7 @@
 let
   # TEST-ONLY keypair — generated for this VM test, protects nothing.
   agePub = "age1wrks5p2phce3znhnfj974frygk2dlpa69qw70wd7q4caljsm3c0s8rxzap";
-  ageKey = "AGE-SECRET-KEY-1GFQZKXESH0R862VMN6ZY5WZMGRZ7U5ZCT2NQ3FEM8YCJP688PF4QTAG99C";
+  ageKey = "AGE-SECRET-KEY-1GFQZKXESH0R862VMN6ZY5WZMGRZ7U5ZCT2NQ3FEM8YCJP688PF4QTAG99C"; # gitleaks:allow test-only key, see above
 
   fixtures = pkgs.writeShellScriptBin "setup-fixtures" ''
     set -euo pipefail
