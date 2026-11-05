@@ -231,9 +231,21 @@ let
       work=$(mktemp -d)
       trap 'rm -rf "$work"' EXIT
 
-      # A failed dump still uploads the rest, then fails the job (alert, no marker).
-      dumps_ok=1
-      ${mkDumpScript "secure" secureItems} "$work/stage/dumps" || dumps_ok=0
+      # A failed dump or a missing path still uploads the rest, then fails the
+      # job (alert, no marker, no prune).
+      complete=1
+      ${mkDumpScript "secure" secureItems} "$work/stage/dumps" || complete=0
+      tarpaths=()
+      for p in ${lib.concatMapStringsSep " " (p: esc (lib.removePrefix "/" p)) paths}; do
+        if [ -e "/$p" ]; then
+          tarpaths+=("$p")
+        else
+          echo "ERROR: /$p is missing; left out" >&2
+          complete=0
+        fi
+      done
+      tarargs=()
+      [ "''${#tarpaths[@]}" -eq 0 ] || tarargs=(-C / "''${tarpaths[@]}")
 
       # tar exit 1 = "file changed as we read it" on live paths: acceptable
       # (dumps are the consistent part); anything above 1 is fatal.
@@ -241,11 +253,7 @@ let
       tar --anchored ${
         lib.concatMapStringsSep " " (e: "--exclude=${esc (lib.removePrefix "/" e)}") excludes
       } \
-        -czf "$work/bundle.tar.gz" -C "$work/stage" dumps \
-        ${
-          lib.optionalString (paths != [ ])
-            "-C / ${lib.concatMapStringsSep " " (p: esc (lib.removePrefix "/" p)) paths}"
-        } \
+        -czf "$work/bundle.tar.gz" -C "$work/stage" dumps "''${tarargs[@]}" \
         || rc=$?
       [ "$rc" -le 1 ] || exit "$rc"
 
@@ -263,7 +271,7 @@ let
             && rclone --config ${esc d.rcloneConfigFile} copyto "$work/$name.sha256" "$dst/$name.sha256"; then
             echo "secure → ${dname}: ok"
             ${lib.optionalString (d.pruneSecureAfterDays != null) ''
-              rclone --config ${esc d.rcloneConfigFile} delete --min-age ${toString d.pruneSecureAfterDays}d "$dst" \
+              [ "$complete" -eq 0 ] || rclone --config ${esc d.rcloneConfigFile} delete --min-age ${toString d.pruneSecureAfterDays}d "$dst" \
                 || echo "WARN: prune on ${dname} failed" >&2
             ''}
           else
@@ -283,7 +291,7 @@ let
         '') secureDests
       )}
       [ "$failed" -eq 0 ]
-      [ "$dumps_ok" -eq 1 ] || { echo "ERROR: uploaded without the failed dumps above" >&2; exit 1; }
+      [ "$complete" -eq 1 ] || { echo "ERROR: uploaded without the failed items above" >&2; exit 1; }
       ${touchMarker "secure"}
       ${hbPing "secure"}
       echo "secure backup $ts ok ($(du -h "$work/$name" | cut -f1))"

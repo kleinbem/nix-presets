@@ -11,6 +11,7 @@ let
     set -euo pipefail
     mkdir -p /srv/app/cache /srv/media
     echo secret-file > /srv/app/keep.pem
+    mkdir -p /srv/extra && echo extra-file > /srv/extra/f
     echo junk > /srv/app/cache/x
     ${pkgs.sqlite}/bin/sqlite3 /srv/app/app.db "create table t(v); insert into t values('sqlite-canary');"
     echo photo > /srv/media/p.jpg
@@ -91,6 +92,7 @@ pkgs.testers.runNixOSTest {
             tier = "secure";
             # Fails once /run/break-dumps exists (last subtest).
             command = "[ ! -e /run/break-dumps ] && echo command-canary";
+            paths = [ "/srv/extra" ];
           };
           media = {
             tier = "bulk";
@@ -147,6 +149,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed("grep pg-canary /restore/dumps/app/postgres-host.sql")
         machine.succeed("grep command-canary /restore/dumps/extra/command.dump")
         machine.succeed("grep secret-file /restore/srv/app/keep.pem")
+        machine.succeed("grep extra-file /restore/srv/extra/f")
         machine.fail("test -e /restore/srv/app/cache")
         machine.fail("test -e /restore/srv/app/app.db")
         machine.succeed("test -f /var/lib/backup/secure.last-success")
@@ -184,13 +187,15 @@ pkgs.testers.runNixOSTest {
         machine.wait_until_succeeds("grep -x /test-ping-key/machine-backup-bulk-flaky/fail /var/log/hc-pings")
         machine.fail("grep -x /test-ping-key/machine-backup-bulk-flaky /var/log/hc-pings")
 
-    with subtest("a failed dump leaves the other items in the bundle"):
-        machine.succeed("rm /var/lib/backup/secure.last-success && sleep 1 && touch /run/break-dumps")
+    with subtest("a failed dump or missing path leaves the other items in the bundle"):
+        machine.succeed("rm -r /var/lib/backup/secure.last-success /srv/extra && sleep 1 && touch /run/break-dumps")
         machine.fail("systemctl start backup-secure.service")
         f = machine.succeed("ls -t /srv/dest-a/secure/machine/*.tar.gz.age | head -1").strip()
         machine.succeed(f"mkdir /restore2 && age -d -i /etc/backup-test/age-key {f} | tar -xz -C /restore2")
         machine.succeed("grep pg-canary /restore2/dumps/app/postgres-host.sql")
         machine.fail("test -e /restore2/dumps/extra")
+        machine.fail("test -e /restore2/srv/extra")
+        machine.succeed("grep secret-file /restore2/srv/app/keep.pem")
         machine.fail("test -e /var/lib/backup/secure.last-success")
         machine.wait_until_succeeds("grep -x /test-ping-key/machine-backup-secure/fail /var/log/hc-pings")
   '';
