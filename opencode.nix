@@ -32,6 +32,16 @@ in
 {
   options.modules.opencode = {
     enable = lib.mkEnableOption "OpenCode AI Agent";
+
+    googleApiKeyFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "/run/secrets/gemini_api_key";
+      description = ''
+        File holding a Gemini API key for the Google provider. OpenCode reads it
+        at runtime, so the key stays out of the store. Null: no key configured.
+      '';
+    };
   };
 
   config = lib.mkIf config.modules.opencode.enable {
@@ -65,29 +75,31 @@ in
     '';
 
     # OpenCode 2.x config schema: https://opencode.ai/config.json
-    xdg.configFile."opencode/opencode.json".text = builtins.toJSON {
-      "$schema" = "https://opencode.ai/config.json";
+    xdg.configFile."opencode/opencode.json".text = builtins.toJSON (
+      {
+        "$schema" = "https://opencode.ai/config.json";
 
-      # Gemini through the paid subscription. 2.x is the first release OpenCode 2
-      # can load. no-link: unpinned, it resolves to a leftover OpenCode 1 copy in
-      # ~/.cache/opencode/node_modules (local state, not an upstream bug).
-      plugins = [ "opencode-gemini-auth@2.0.1" ];
+        instructions = [ "${config.xdg.configHome}/opencode/instructions.md" ];
 
-      instructions = [ "${config.xdg.configHome}/opencode/instructions.md" ];
+        # The -latest aliases follow Google's current models.
+        model = "google/gemini-pro-latest";
+        small_model = "google/gemini-flash-latest";
 
-      # The -latest aliases follow Google's current models.
-      model = "google/gemini-pro-latest";
-      small_model = "google/gemini-flash-latest";
-
-      mcp.servers.local_tools = {
-        type = "local";
-        command = [
-          "${pkgs.nodejs_22}/bin/npx"
-          "-y"
-          "@modelcontextprotocol/server-filesystem"
-          config.home.homeDirectory
-        ];
-      };
-    };
+        mcp.servers.local_tools = {
+          type = "local";
+          command = [
+            "${pkgs.nodejs_22}/bin/npx"
+            "-y"
+            "@modelcontextprotocol/server-filesystem"
+            config.home.homeDirectory
+          ];
+        };
+      }
+      # Consumer Gemini plans can't use Gemini CLI OAuth any more, so the native
+      # provider gets an API key.
+      // lib.optionalAttrs (config.modules.opencode.googleApiKeyFile != null) {
+        providers.google.settings.apiKey = "{file:${config.modules.opencode.googleApiKeyFile}}";
+      }
+    );
   };
 }
