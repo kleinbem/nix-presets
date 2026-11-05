@@ -32,6 +32,16 @@ in
 {
   options.modules.opencode = {
     enable = lib.mkEnableOption "OpenCode AI Agent";
+
+    googleApiKeyFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "/run/secrets/gemini_api_key";
+      description = ''
+        File holding a Gemini API key for the Google provider. OpenCode reads it
+        at runtime, so the key stays out of the store. Null: no key configured.
+      '';
+    };
   };
 
   config = lib.mkIf config.modules.opencode.enable {
@@ -55,54 +65,31 @@ in
       ];
     };
 
-    # 3. Configure OpenCode (The "Safe" Paid Gemini Setup)
-    xdg.configFile."opencode/opencode.json".text = builtins.toJSON {
-      "$schema" = "https://opencode.ai/config.json";
+    xdg.configFile."opencode/instructions.md".text = ''
+      You are my coding assistant on NixOS.
 
-      # The safe plugin for your paid subscription
-      "plugin" = [ "opencode-gemini-auth" ];
+      A code comment says why the code is this way, in 1-3 lines. History, dates,
+      debugging stories and alternatives tried go in the commit message, not the file.
 
-      "system_prompt" =
-        "You are my coding assistant on NixOS. When writing code comments, write them in the first person ('I') as if I (the user) wrote them myself (e.g., 'I chose this list comprehension for speed'). All output must be in Markdown. Do not wrap markdown in code blocks.";
+      All output must be in Markdown. Do not wrap markdown in code blocks.
+    '';
 
-      "mcp" = {
-        "local_tools" = {
-          "command" = "${pkgs.nodejs_22}/bin/npx";
-          "args" = [
-            "-y"
-            "@modelcontextprotocol/server-filesystem"
-            "${config.home.homeDirectory}"
-          ];
-        };
-        "workspace-atlas" = {
-          "command" = "${pkgs.python3}/bin/python3";
-          "args" = [
-            "-u"
-            "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
-          ];
-        };
-      };
+    # OpenCode 2.x config schema: https://opencode.ai/config.json
+    xdg.configFile."opencode/opencode.json".text = builtins.toJSON (
+      {
+        "$schema" = "https://opencode.ai/config.json";
 
-      "provider" = {
-        "google" = {
-          "models" = {
-            "gemini-2.0-flash-thinking-exp-01-21" = {
-              "name" = "Gemini 2.0 Flash Thinking";
-              "limit" = {
-                "context" = 1000000;
-                "output" = 65536;
-              };
-            };
-            "gemini-exp-1206" = {
-              "name" = "Gemini Exp 1206";
-              "limit" = {
-                "context" = 2000000;
-                "output" = 8192;
-              };
-            };
-          };
-        };
-      };
-    };
+        instructions = [ "${config.xdg.configHome}/opencode/instructions.md" ];
+
+        # The -latest aliases follow Google's current models.
+        model = "google/gemini-pro-latest";
+        small_model = "google/gemini-flash-latest";
+      }
+      # Consumer Gemini plans can't use Gemini CLI OAuth any more, so the native
+      # provider gets an API key.
+      // lib.optionalAttrs (config.modules.opencode.googleApiKeyFile != null) {
+        providers.google.settings.apiKey = "{file:${config.modules.opencode.googleApiKeyFile}}";
+      }
+    );
   };
 }
