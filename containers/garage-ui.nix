@@ -1,17 +1,15 @@
 # Garage UI (Noooste/garage-ui): web dashboard for the host-native Garage S3
 # cluster. It reaches Garage's S3 and admin APIs on the host bridge address.
 #
-# View-only in two layers: users in oidc.viewerGroup may only look and download
-# (token login stays off, since garage-ui makes it full admin:
+# View-only in two layers: oidc.viewerGroup may only look and download (token
+# login stays off, garage-ui makes it full admin:
 # https://github.com/Noooste/garage-ui/issues/148), and a scoped admin token
-# (`just containers::garage-ui-token` in nix-config) makes Garage refuse bucket,
-# key and layout changes. The scope needs GetKeyInfo, which also reads every S3
-# key's secret, write keys included, so object data is protected only by the UI
-# layer and by keeping the token secret
-# (https://github.com/Noooste/garage-ui/issues/149).
-#
-# garage-ui must never run without a login method, hence the assertion below.
-# no-link: private security report to upstream
+# (`just containers::garage-ui-token` in nix-config) makes Garage refuse changes.
+# That scope needs GetKeyInfo, which reads every key's secret, write-capable keys
+# too, so whoever holds the token can still write objects through S3: keep it
+# secret (https://github.com/Noooste/garage-ui/issues/149).
+# Without a login method garage-ui serves everything unauthenticated, hence the
+# assertion below. no-link: reported to upstream privately.
 { self }:
 {
   config,
