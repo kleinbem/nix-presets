@@ -237,7 +237,7 @@ let
       ${mkDumpScript "secure" secureItems} "$work/stage/dumps" || complete=0
       tarpaths=()
       for p in ${lib.concatMapStringsSep " " (p: esc (lib.removePrefix "/" p)) paths}; do
-        if [ -e "/$p" ]; then
+        if [ -e "/$p" ] || [ -L "/$p" ]; then
           tarpaths+=("$p")
         else
           echo "ERROR: /$p is missing; left out" >&2
