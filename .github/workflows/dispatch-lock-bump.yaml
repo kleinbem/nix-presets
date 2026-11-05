@@ -5,7 +5,9 @@ name: Dispatch nix-config lock bump
 # nix-config to bump just this input in its lock PR. The App token is scoped
 # to nix-config and needs only the contents permission.
 on:
-  workflow_run:
+  # no-link: zizmor flags every workflow_run; this one only reacts to a
+  # successful main run and checks nothing out.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: ["Check Flake"]
     branches: [main]
     types: [completed]
@@ -25,6 +27,7 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: nix-config
+          permission-contents: write
 
       - name: Ask Maintain Flake to bump this input
         env:

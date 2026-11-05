@@ -6,6 +6,9 @@ on:
     # both of which run earlier in the same window).
     - cron: '30 2 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -16,10 +19,13 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          # Only checkout and nix fetches; the PR step mints its own token.
+          permission-contents: read
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
 
       - uses: kleinbem/actions/nix-setup@7ec628296d5194e6e10031706387b992a10a1638 # v1.0.1
         with:
