@@ -50,12 +50,6 @@ in
         user = {
           inherit (my.git) name email;
         };
-        ui.diff.tool = [
-          "difft"
-          "--color=always"
-          "$left"
-          "$right"
-        ];
         signing = {
           # Signs every own commit as it's written, so `sign-unsigned` is only
           # a backstop. Needs the no-touch FIDO key to stay touchless.

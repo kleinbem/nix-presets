@@ -97,7 +97,10 @@ pkgs.testers.runNixOSTest {
           media = {
             tier = "bulk";
             paths = [ "/srv/media" ];
-            exclude = [ "/srv/media/*.tmp" ];
+            exclude = [
+              "/srv/media/*.tmp"
+              "/srv/media/index.db*"
+            ];
             sqlite = [ "/srv/media/index.db" ];
           };
         };
@@ -165,6 +168,7 @@ pkgs.testers.runNixOSTest {
         )
         machine.succeed("grep photo /rrestore/srv/media/p.jpg")
         machine.fail("test -e /rrestore/srv/media/x.tmp")
+        machine.fail("test -e /rrestore/srv/media/index.db")
         machine.succeed(
             "sqlite3 /rrestore/var/lib/backup/staging/bulk-primary/dumps/media/index.db 'select v from i' "
             "| grep index-canary"

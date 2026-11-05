@@ -354,20 +354,20 @@
         # Ensure Atlas and Python with MCP are available in the home environment
         packages = [
           (pkgs.callPackage ./atlas/default.nix { })
-          freecadMcpPkg
           pythonWithMcp
         ]
+        ++ lib.optional config.modules.mcp.freecad.enable freecadMcpPkg
         ++ lib.optional config.modules.mcp.gimp.enable pkgs.gimp3;
 
-        file = {
-          # Install FreeCAD MCP Addon declaratively
-          ".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecad-mcp-src}/addon/FreeCADMCP";
-        }
-        // lib.optionalAttrs config.modules.mcp.gimp.enable {
-          # GIMP keeps a settings folder per minor version (e.g. 3.2)
-          ".config/GIMP/${lib.versions.majorMinor pkgs.gimp3.version}/plug-ins/gimp-mcp-plugin/gimp-mcp-plugin.py".source =
-            "${gimp3McpPlugin}/gimp-mcp-plugin.py";
-        };
+        file =
+          lib.optionalAttrs config.modules.mcp.freecad.enable {
+            ".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecad-mcp-src}/addon/FreeCADMCP";
+          }
+          // lib.optionalAttrs config.modules.mcp.gimp.enable {
+            # GIMP keeps a settings folder per minor version (e.g. 3.2)
+            ".config/GIMP/${lib.versions.majorMinor pkgs.gimp3.version}/plug-ins/gimp-mcp-plugin/gimp-mcp-plugin.py".source =
+              "${gimp3McpPlugin}/gimp-mcp-plugin.py";
+          };
 
         # ---------------------------------------------------------
         # Editor & AI Assistant (Claude, Antigravity, Roo-Cline, etc.) Integration
