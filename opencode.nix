@@ -69,7 +69,8 @@ in
       "$schema" = "https://opencode.ai/config.json";
 
       # Gemini through the paid subscription. 2.x is the first release OpenCode 2
-      # can load; unpinned, it picks the old 1.x copy in ~/.cache/opencode.
+      # can load. no-link: unpinned, it resolves to a leftover OpenCode 1 copy in
+      # ~/.cache/opencode/node_modules (local state, not an upstream bug).
       plugins = [ "opencode-gemini-auth@2.0.1" ];
 
       instructions = [ "${config.xdg.configHome}/opencode/instructions.md" ];
