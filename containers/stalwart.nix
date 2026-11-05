@@ -141,6 +141,13 @@ in
                 }
                 { "else" = "'relay'"; }
               ];
+              # Credentials go to the relay, so no plaintext fallback and no
+              # retry with invalid certs (the default strategy's 'invalid-tls').
+              queue.strategy.tls = "'relay-tls'";
+              queue.tls.relay-tls = {
+                starttls = "require";
+                allow-invalid-certs = false;
+              };
               queue.route.relay = {
                 type = "relay";
                 address = "email-smtp.eu-central-1.amazonaws.com";
