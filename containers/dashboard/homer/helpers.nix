@@ -23,8 +23,8 @@
       # Map a node to a Homer item
       mkItem = _: node: {
         inherit (node.meta) name;
-        subtitle = node.meta.description;
-        inherit (node.meta) icon; # Homer supports some icons, might need mapping but let's try raw
+        subtitle = node.meta.description or "";
+        icon = node.meta.icon or "";
         url = mkLink node;
       };
 

@@ -47,7 +47,6 @@ in
         # doc comment.
         inherit (cfg) secretsFile;
         innerConfig = {
-          nixpkgs.config.allowUnfree = true;
           services.n8n = {
             enable = true;
             openFirewall = true;
@@ -57,11 +56,13 @@ in
               N8N_PROTOCOL = "http";
               N8N_SECURE_COOKIE = "false";
               N8N_CORS_ALLOWED_ORIGINS = "*";
-              N8N_RUNNERS_AUTH_TOKEN_FILE = "/dev/null";
               OLLAMA_HOST = "http://localhost:11434";
               QDRANT_HOST = "http://localhost:6333";
             };
           };
+          # Root instead of DynamicUser: systemd would move the bind-mounted
+          # /var/lib/n8n to /var/lib/private and fail. The rest loosens the
+          # module's sandbox to match. no-link: our bind-mount layout, not a bug.
           systemd.services.n8n.serviceConfig = {
             DynamicUser = lib.mkForce false;
             User = lib.mkForce "root";
@@ -80,7 +81,7 @@ in
             NoNewPrivileges = lib.mkForce false;
             PrivateUsers = lib.mkForce false;
             ReadWritePaths = [ "/var/lib/n8n" ];
-            EnvironmentFile = "/run/secrets/n8n.env";
+            EnvironmentFile = lib.optional (cfg.secretsFile != null) "/run/secrets/n8n.env";
           };
         };
         bindMounts = {
