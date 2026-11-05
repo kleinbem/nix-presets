@@ -21,5 +21,7 @@ modules = [
 ];
 ```
 
-Presets default to `enable = false`; the host opts in (`my.*` for NixOS,
-`modules.*` for Home Manager).
+NixOS presets default to `enable = false`; the host opts in under `my.*`.
+Of the Home Manager modules, `herdr`, `mcp` and `opencode` have a
+`modules.<name>.enable` switch; `desktop`, `dx`, `terminal` and `vcs` apply
+their config as soon as they are imported.
