@@ -19,9 +19,10 @@
     };
     hermes = {
       # Held at the last rev that builds on our nixpkgs: from df722c88 on,
-      # hermes ships node 26.12.1 prebuilt, and patchelf 0.19.2 (nixpkgs
-      # 02c087f) leaves it with overlapping LOAD segments, so it segfaults
-      # on start (npm config in hermes-tui/web). Unpin once that is fixed.
+      # hermes ships node 26.12.1 prebuilt, and patchelf 0.19.2 leaves it with
+      # overlapping LOAD segments, so it segfaults on start (hermes-tui/web).
+      # upstream: NixOS/patchelf#672 (0.19.3), NixOS/nixpkgs#582116.
+      # Drop once nixpkgs has patchelf >= 0.19.3.
       url = "github:NousResearch/hermes-agent/81a55437f3f31a9f12a30c53b6c5d49d420898aa";
       inputs.nixpkgs.follows = "nixpkgs";
     };

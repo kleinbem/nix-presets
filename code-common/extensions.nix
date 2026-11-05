@@ -19,7 +19,7 @@ in
     # --- Coding & Git ---
     mkt.waderyan.gitblame
     mkt.visualjj.visualjj
-    # mkt.ms-python.python  # disabled: jedi-language-server-0.46.0 requires jedi<0.20, nixpkgs has 0.20.0
+    mkt.ms-python.python
 
     # --- Productivity ---
     mkt.usernamehw.errorlens
@@ -35,8 +35,7 @@ in
   ai = [
     mkt.github.copilot
     mkt.rooveterinaryinc.roo-cline
-    # WAITING: temporarily disabled because the extension depends on the yanked 2.1.88 src!
-    # pkgs.vscode-extensions.anthropic.claude-code
+    pkgs.vscode-extensions.anthropic.claude-code
   ];
 
   # VS Code & Antigravity specific (copilot-chat needs a pin for compat)
