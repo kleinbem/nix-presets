@@ -72,7 +72,8 @@ let
   '';
 
   venv = "/app/state/venv";
-  # crewai's requires-python stops below 3.14.
+  # crewai's requires-python stops below 3.14. no-link: a declared support
+  # range, not a bug; the 3.14 request crewAIInc/crewAI#5109 went stale.
   python = pkgs.python313;
 
   # A venv left half-built by a failed install never counts as ready: it's
@@ -306,6 +307,8 @@ in
                   Type = "simple";
                   ExecStartPre = prepareVenv;
                   ExecStart = "${crewRun}/bin/crew-run";
+                  # The first start downloads crewai's whole dependency tree.
+                  TimeoutStartSec = "30min";
                   Restart = "on-failure";
                   RestartSec = "10s";
                 };
