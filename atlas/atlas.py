@@ -133,7 +133,8 @@ class GitHubAuth:
                 "Accept": "application/vnd.github+json",
             }
 
-            resp = requests.post(url, headers=headers)
+            resp = requests.post(url, headers=headers, timeout=(5, 15))
+            resp.raise_for_status()
             return resp.json()["token"]
         except ImportError:
             log(

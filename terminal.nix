@@ -47,7 +47,7 @@
         fi
 
         # --- System Health Check ---
-        if systemctl is-system-running --quiet | grep -q "degraded"; then
+        if [[ $(systemctl is-system-running 2>/dev/null) == degraded ]]; then
           echo -e "\e[1;31m  🚨 SYSTEM DEGRADED: Some services failed to start.\e[0m"
           echo -e "  \e[33mRun 'systemctl --failed' to investigate.\e[0m\n"
         fi

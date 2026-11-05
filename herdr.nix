@@ -116,23 +116,23 @@ let
     '';
   };
 
-  pluginDir = pkgs.writeTextDir "herdr-plugin.toml" (
-    builtins.readFile (
-      (pkgs.formats.toml { }).generate "herdr-plugin.toml" {
-        id = "kleinbem.fleet";
-        name = "kleinbem fleet";
-        version = "0.1.0";
-        min_herdr_version = "0.9.0";
-        platforms = [ "linux" ];
-        events = [
-          {
-            on = "pane.agent_status_changed";
-            command = [ (lib.getExe agentNotify) ];
-          }
-        ];
+  pluginToml = (pkgs.formats.toml { }).generate "herdr-plugin.toml" {
+    id = "kleinbem.fleet";
+    name = "kleinbem fleet";
+    version = "0.1.0";
+    min_herdr_version = "0.9.0";
+    platforms = [ "linux" ];
+    events = [
+      {
+        on = "pane.agent_status_changed";
+        command = [ (lib.getExe agentNotify) ];
       }
-    )
-  );
+    ];
+  };
+
+  pluginDir = pkgs.runCommand "herdr-plugin" { } ''
+    install -Dm644 ${pluginToml} $out/herdr-plugin.toml
+  '';
 
   herdrConfigFile = (pkgs.formats.toml { }).generate "herdr-config" {
     session.resume_agents_on_restore = true;
@@ -323,10 +323,15 @@ in
           run ${pkgs.herdr}/bin/herdr integration install hermes || true
           run ${pkgs.herdr}/bin/herdr integration install cursor || true
 
-          # Synchronize Herdr agent skills for autonomous AI tools
-          run mkdir -p "${config.home.homeDirectory}/.gemini/config/skills/herdr" "${config.home.homeDirectory}/.claude/skills/herdr"
-          ${pkgs.herdr}/bin/herdr --skill > "${config.home.homeDirectory}/.gemini/config/skills/herdr/SKILL.md"
-          ${pkgs.herdr}/bin/herdr --skill > "${config.home.homeDirectory}/.claude/skills/herdr/SKILL.md"
+          # Export to a temp file first, so a failed export keeps the old skills.
+          skill=$(${pkgs.coreutils}/bin/mktemp)
+          if ${pkgs.herdr}/bin/herdr --skill >"$skill"; then
+            run ${pkgs.coreutils}/bin/install -Dm644 "$skill" "${config.home.homeDirectory}/.gemini/config/skills/herdr/SKILL.md"
+            run ${pkgs.coreutils}/bin/install -Dm644 "$skill" "${config.home.homeDirectory}/.claude/skills/herdr/SKILL.md"
+          else
+            warnEcho "herdr --skill failed; keeping the old skill files"
+          fi
+          rm -f "$skill"
         '';
       };
     };
