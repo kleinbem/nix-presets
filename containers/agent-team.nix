@@ -129,6 +129,10 @@ let
     ${lib.optionalString (cfg.langfuse.publicKey != "") ''
       export LANGFUSE_PUBLIC_KEY=''${LANGFUSE_PUBLIC_KEY:-${lib.escapeShellArg cfg.langfuse.publicKey}}
     ''}
+    ${lib.optionalString cfg.langfuse.enable ''
+      : "''${LANGFUSE_PUBLIC_KEY:?langfuse is on: set LANGFUSE_PUBLIC_KEY in secretsFile or langfuse.publicKey}"
+      : "''${LANGFUSE_SECRET_KEY:?langfuse is on: set LANGFUSE_SECRET_KEY in secretsFile}"
+    ''}
     export OTEL_SDK_DISABLED=${if cfg.langfuse.enable then "false" else "true"}
     export CREWAI_TELEMETRY_OPT_OUT=true
     export PYTHONUNBUFFERED=1
