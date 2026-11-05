@@ -16,7 +16,7 @@ in
     llmUrl = lib.mkOption {
       type = lib.types.str;
       default = "https://litellm.internal";
-      description = "OpenAI-compatible LLM endpoint URL.";
+      description = "OpenAI-compatible LLM endpoint URL, without the /v1 suffix.";
     };
     modelName = lib.mkOption {
       type = lib.types.str;
@@ -50,11 +50,13 @@ in
             environment = {
               STORAGE_DIR = "/app/server/storage";
               # --- AI Configuration ---
-              LLM_PROVIDER = "openai";
-              OPENAI_API_BASE = cfg.llmUrl;
-              OPENAI_API_KEY = "dummy";
-              FREE_MODEL_NAME = cfg.modelName;
-              FREE_MODEL_MAX_TOKENS = "4096";
+              # The native "openai" provider can't take a base URL, so LiteLLM
+              # goes through the generic OpenAI-compatible one.
+              LLM_PROVIDER = "generic-openai";
+              GENERIC_OPEN_AI_BASE_PATH = "${lib.removeSuffix "/" cfg.llmUrl}/v1";
+              GENERIC_OPEN_AI_API_KEY = "dummy";
+              GENERIC_OPEN_AI_MODEL_PREF = cfg.modelName;
+              GENERIC_OPEN_AI_MODEL_TOKEN_LIMIT = "4096";
               # AnythingLLM's defaults, pinned because nix-config's
               # vault-anythingllm-sync depends on them. No fleet service
               # serves embeddings, so this stays on the bundled CPU embedder.

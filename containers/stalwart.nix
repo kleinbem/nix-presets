@@ -18,6 +18,7 @@ let
   # No mailboxes here: persona emails live in kleinbem-secrets, and presets
   # must not import nix-config. nix-config/scripts/persona-scaffold.sh creates
   # accounts via POST /api/principal (stalwart-cli doesn't work with this 0.15.5).
+  # no-link: version skew, the 1.x stalwart-cli reads the schema API of newer servers.
   # The NixOS module already defaults to a persistent internal directory.
 in
 {
@@ -87,8 +88,7 @@ in
             stateVersion = "26.05";
 
             # Human fallback administrator, loaded via LoadCredential and
-            # referenced by macro. TODO(phase1): confirm
-            # `authentication.fallback-admin` is still the 0.15 key.
+            # referenced by macro (`authentication.fallback-admin` in 0.15).
             credentials = lib.mkIf hasAdmin {
               admin_secret = "/run/secrets/stalwart-admin-secret";
             };
@@ -131,22 +131,31 @@ in
               };
             }
             // lib.optionalAttrs hasRelay {
-              # Outbound smart host; without relaySecretFile Stalwart delivers
-              # directly. v0.13+ routes via `queue.route.<id>`; the old
-              # `queue.*.next-hop` fails an assertion.
-              # TODO(phase1): validate against stalwart 0.15 once relay creds exist.
-              queue.strategy.route = "'relay'";
+              # Outbound smart host for remote domains; local domains keep
+              # Stalwart's default local delivery. Keys as parsed by 0.15's
+              # parse_route (`address`, not `host`).
+              queue.strategy.route = [
+                {
+                  "if" = "is_local_domain('*', rcpt_domain)";
+                  "then" = "'local'";
+                }
+                { "else" = "'relay'"; }
+              ];
               queue.route.relay = {
                 type = "relay";
-                host = "email-smtp.eu-central-1.amazonaws.com";
+                address = "email-smtp.eu-central-1.amazonaws.com";
                 port = 587;
                 protocol = "smtp";
                 tls.implicit = false;
-                auth.username = "%{file:/run/secrets/stalwart-relay}%{env:USERNAME}";
-                auth.secret = "%{file:/run/secrets/stalwart-relay}%{env:PASSWORD}";
+                # USERNAME/PASSWORD come from relaySecretFile via EnvironmentFile.
+                auth.username = "%{env:USERNAME}%";
+                auth.secret = "%{env:PASSWORD}%";
               };
             };
           };
+
+          systemd.services.stalwart.serviceConfig.EnvironmentFile =
+            lib.mkIf hasRelay "/run/secrets/stalwart-relay";
 
           networking.firewall.allowedTCPPorts = [
             25
