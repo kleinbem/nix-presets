@@ -84,16 +84,6 @@ in
         # The -latest aliases follow Google's current models.
         model = "google/gemini-pro-latest";
         small_model = "google/gemini-flash-latest";
-
-        mcp.servers.local_tools = {
-          type = "local";
-          command = [
-            "${pkgs.nodejs_22}/bin/npx"
-            "-y"
-            "@modelcontextprotocol/server-filesystem"
-            config.home.homeDirectory
-          ];
-        };
       }
       # Consumer Gemini plans can't use Gemini CLI OAuth any more, so the native
       # provider gets an API key.
