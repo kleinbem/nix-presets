@@ -66,10 +66,7 @@
         let
           pkgsUnfree = import inputs.nixpkgs {
             inherit system;
-            config = {
-              allowUnfree = true;
-              android_sdk.accept_license = true;
-            };
+            config.allowUnfree = true;
           };
           pkgsWithExts = pkgsUnfree.extend inputs.nix-vscode-extensions.overlays.default;
           bundles = import ./code-common/bundles.nix { pkgs = pkgsWithExts; };
@@ -125,11 +122,7 @@
                         config = {
                           boot.isContainer = true;
                           system.stateVersion = "25.11";
-                          nixpkgs.config = {
-                            allowUnfree = true;
-                            android_sdk.accept_license = true;
-
-                          };
+                          nixpkgs.config.allowUnfree = true;
                           # Mock sops if used
                           sops.templates = lib.mkOptionDefault { };
                           sops.secrets = lib.mkOptionDefault { };
@@ -283,7 +276,6 @@
               loki = import ./containers/loki.nix { inherit self; };
               crowdsec = import ./containers/crowdsec.nix { inherit self; };
               netdata = import ./containers/netdata.nix { inherit self; };
-              android-emulator = import ./nixosModules/android-emulator.nix;
               claude = import ./nixosModules/claude.nix;
               bottles = import ./nixosModules/bottles.nix;
               photo-frame = ./nixosModules/photo-frame;
