@@ -28,7 +28,7 @@ When in doubt, start in `nix-config/modules/nixos/`; promote to `nix-presets` on
 2. Register it in `flake.nix` under `nixosModules`.
 3. Import it from a host: `inputs.nix-presets.nixosModules.<name>` in the imports list.
 4. Opt in: `my.containers.<name>.enable = true;`.
-5. From repo root, run `just maintenance::sync-agent` to refresh `../nix-config/docs/OPTIONS.md`.
+5. In nix-config, run `just dev::sync-agent` to refresh `docs/OPTIONS.md`.
 
 ## Don't
 
