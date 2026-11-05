@@ -85,16 +85,6 @@ in
               5353
             ];
           };
-
-          interfaces.eth0.ipv4.routes = [
-            {
-              address = "10.0.0.0";
-              prefixLength = 16;
-              # Route through the host's bridge IP (per-host; was hard-coded to
-              # nixos-nvme's 10.85.46.1, which broke routing on core-pi).
-              via = config.my.network.hostAddress;
-            }
-          ];
         };
 
         # Ensure Avahi works for mDNS printer discovery
