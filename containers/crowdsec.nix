@@ -26,6 +26,8 @@ in
         inherit config;
         name = "crowdsec";
         cfg = cfg // {
+          # The host journal is bind-mounted read-only; with a uid shift its
+          # files show up unmapped and CrowdSec can't read them.
           privateUsers = "no";
           # The host directory is created as root, but the container's tmpfiles
           # will recursively chown it to crowdsec:crowdsec.

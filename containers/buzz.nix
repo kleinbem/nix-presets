@@ -206,7 +206,7 @@ in
               };
               # With DynamicUser, systemd tries to move the bind-mounted
               # /var/lib/typesense to /var/lib/private and fails ("Device or
-              # resource busy").
+              # resource busy"). no-link: systemd's DynamicUser semantics, not a bug.
               typesense = {
                 isSystemUser = true;
                 group = "typesense";
@@ -349,6 +349,7 @@ in
                   # Turning it off only skips the check: concurrent pushes to
                   # one repo could lose an update. Accepted while git hosting
                   # is unused; chat and media don't use this path.
+                  # upstream: https://git.deuxfleurs.fr/Deuxfleurs/garage/issues/1052
                   BUZZ_GIT_CONFORMANCE_PROBE = "false";
                 };
                 # Secrets come from secretsFile (see its option doc), per-host

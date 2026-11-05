@@ -13,10 +13,29 @@ let
   # CUDA build for the Orin Nano. Dynamic dispatch is off because CUDA pins
   # GCC 13 and its armv9.2+sme variant needs GCC 14. Drop once nixpkgs'
   # llama-cpp includes ggml-org/llama.cpp#26103 (probes each ARM variant).
-  llamaPackage = pkgs.llama-cpp.override {
-    cudaSupport = true;
-    cpuArchDynamicDispatch = false;
-  };
+  llamaPackage =
+    if cfg.enableCuda then
+      pkgs.llama-cpp.override {
+        cudaSupport = true;
+        cpuArchDynamicDispatch = false;
+      }
+    else
+      pkgs.llama-cpp;
+
+  # Jetson (nvgpu/nvhost) device nodes the CUDA runtime opens.
+  gpuDevices = [
+    "/dev/nvmap"
+    "/dev/nvgpu/igpu0/as"
+    "/dev/nvgpu/igpu0/channel"
+    "/dev/nvgpu/igpu0/ctrl"
+    "/dev/nvgpu/igpu0/power"
+    "/dev/nvgpu/igpu0/sched"
+    "/dev/nvgpu/igpu0/tsg"
+    "/dev/nvhost-ctrl-gpu"
+    "/dev/nvhost-gpu"
+    "/dev/nvhost-as-gpu"
+    "/dev/nvhost-prof-gpu"
+  ];
 in
 {
   options.my.containers.llama-cpp = {
@@ -58,67 +77,24 @@ in
     inherit config;
     name = "llama-cpp";
     cfg = cfg // {
-      extraAllowedDevices = [
-        {
-          node = "/dev/nvmap";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/dri";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/dri/renderD128";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/dri/card0";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvgpu/igpu0/as";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvgpu/igpu0/channel";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvgpu/igpu0/ctrl";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvgpu/igpu0/power";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvgpu/igpu0/sched";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvgpu/igpu0/tsg";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvhost-ctrl-gpu";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvhost-gpu";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvhost-as-gpu";
-          modifier = "rw";
-        }
-        {
-          node = "/dev/nvhost-prof-gpu";
-          modifier = "rw";
-        }
-      ];
+      extraAllowedDevices = lib.optionals cfg.enableCuda (
+        map
+          (node: {
+            inherit node;
+            modifier = "rw";
+          })
+          (
+            [
+              "/dev/dri"
+              "/dev/dri/renderD128"
+              "/dev/dri/card0"
+            ]
+            ++ gpuDevices
+          )
+      );
     };
 
-    enableGPU = true;
+    enableGPU = cfg.enableCuda;
     timeout = "5m";
 
     innerConfig = _: {
@@ -129,23 +105,11 @@ in
       services.udisks2.enable = false;
       boot.isContainer = true;
 
-      # Ensure we have the right license for CUDA components
-      nixpkgs = {
-        config = {
-          allowUnfree = true;
-          allowUnfreePredicate = _: true;
-        };
-      };
-
       # ─── Lean Inference Service ──────────────────────────────
       systemd.services.llama-server = {
         description = "Ultra-lean llama.cpp server";
         after = [ "network.target" ];
         wantedBy = [ "multi-user.target" ];
-        environment = lib.optionalAttrs (!cfg.enableCuda) {
-          CUDA_VISIBLE_DEVICES = "";
-        };
-
         serviceConfig = {
           # Run directly with optimized flags
           ExecStart =
@@ -164,7 +128,7 @@ in
 
           # Hardening & Minimalism
           DynamicUser = true;
-          SupplementaryGroups = [
+          SupplementaryGroups = lib.optionals cfg.enableCuda [
             "video"
             "render"
           ];
@@ -182,58 +146,18 @@ in
         hostPath = cfg.modelPath;
         isReadOnly = true;
       };
-      "/run/opengl-driver" = {
-        hostPath = "/run/opengl-driver";
-        isReadOnly = true;
-      };
-      "/dev/dri" = {
-        hostPath = "/dev/dri";
+    }
+    // lib.optionalAttrs cfg.enableCuda (
+      {
+        "/run/opengl-driver" = {
+          hostPath = "/run/opengl-driver";
+          isReadOnly = true;
+        };
+      }
+      // lib.genAttrs gpuDevices (dev: {
+        hostPath = dev;
         isReadOnly = false;
-      };
-      "/dev/nvmap" = {
-        hostPath = "/dev/nvmap";
-        isReadOnly = false;
-      };
-      "/dev/nvgpu/igpu0/as" = {
-        hostPath = "/dev/nvgpu/igpu0/as";
-        isReadOnly = false;
-      };
-      "/dev/nvgpu/igpu0/channel" = {
-        hostPath = "/dev/nvgpu/igpu0/channel";
-        isReadOnly = false;
-      };
-      "/dev/nvgpu/igpu0/ctrl" = {
-        hostPath = "/dev/nvgpu/igpu0/ctrl";
-        isReadOnly = false;
-      };
-      "/dev/nvgpu/igpu0/power" = {
-        hostPath = "/dev/nvgpu/igpu0/power";
-        isReadOnly = false;
-      };
-      "/dev/nvgpu/igpu0/sched" = {
-        hostPath = "/dev/nvgpu/igpu0/sched";
-        isReadOnly = false;
-      };
-      "/dev/nvgpu/igpu0/tsg" = {
-        hostPath = "/dev/nvgpu/igpu0/tsg";
-        isReadOnly = false;
-      };
-      "/dev/nvhost-ctrl-gpu" = {
-        hostPath = "/dev/nvhost-ctrl-gpu";
-        isReadOnly = false;
-      };
-      "/dev/nvhost-gpu" = {
-        hostPath = "/dev/nvhost-gpu";
-        isReadOnly = false;
-      };
-      "/dev/nvhost-as-gpu" = {
-        hostPath = "/dev/nvhost-as-gpu";
-        isReadOnly = false;
-      };
-      "/dev/nvhost-prof-gpu" = {
-        hostPath = "/dev/nvhost-prof-gpu";
-        isReadOnly = false;
-      };
-    };
+      })
+    );
   });
 }
