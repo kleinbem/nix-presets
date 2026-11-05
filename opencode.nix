@@ -55,53 +55,37 @@ in
       ];
     };
 
-    # 3. Configure OpenCode (The "Safe" Paid Gemini Setup)
+    xdg.configFile."opencode/instructions.md".text = ''
+      You are my coding assistant on NixOS.
+
+      A code comment says why the code is this way, in 1-3 lines. History, dates,
+      debugging stories and alternatives tried go in the commit message, not the file.
+
+      All output must be in Markdown. Do not wrap markdown in code blocks.
+    '';
+
+    # OpenCode 2.x config schema: https://opencode.ai/config.json
     xdg.configFile."opencode/opencode.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
 
-      # The safe plugin for your paid subscription
-      "plugin" = [ "opencode-gemini-auth" ];
+      # Gemini through the paid subscription. 2.x is the first release OpenCode 2
+      # can load; unpinned, it picks the old 1.x copy in ~/.cache/opencode.
+      plugins = [ "opencode-gemini-auth@2.0.1" ];
 
-      "system_prompt" =
-        "You are my coding assistant on NixOS. When writing code comments, write them in the first person ('I') as if I (the user) wrote them myself (e.g., 'I chose this list comprehension for speed'). All output must be in Markdown. Do not wrap markdown in code blocks.";
+      instructions = [ "${config.xdg.configHome}/opencode/instructions.md" ];
 
-      "mcp" = {
-        "local_tools" = {
-          "command" = "${pkgs.nodejs_22}/bin/npx";
-          "args" = [
-            "-y"
-            "@modelcontextprotocol/server-filesystem"
-            "${config.home.homeDirectory}"
-          ];
-        };
-        "workspace-atlas" = {
-          "command" = "${pkgs.python3}/bin/python3";
-          "args" = [
-            "-u"
-            "${config.home.homeDirectory}/Develop/github.com/kleinbem/nix/scripts/workspace-mcp.py"
-          ];
-        };
-      };
+      # The -latest aliases follow Google's current models.
+      model = "google/gemini-pro-latest";
+      small_model = "google/gemini-flash-latest";
 
-      "provider" = {
-        "google" = {
-          "models" = {
-            "gemini-2.0-flash-thinking-exp-01-21" = {
-              "name" = "Gemini 2.0 Flash Thinking";
-              "limit" = {
-                "context" = 1000000;
-                "output" = 65536;
-              };
-            };
-            "gemini-exp-1206" = {
-              "name" = "Gemini Exp 1206";
-              "limit" = {
-                "context" = 2000000;
-                "output" = 8192;
-              };
-            };
-          };
-        };
+      mcp.servers.local_tools = {
+        type = "local";
+        command = [
+          "${pkgs.nodejs_22}/bin/npx"
+          "-y"
+          "@modelcontextprotocol/server-filesystem"
+          config.home.homeDirectory
+        ];
       };
     };
   };
