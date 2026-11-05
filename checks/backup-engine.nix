@@ -143,6 +143,7 @@ pkgs.testers.runNixOSTest {
     with subtest("secure tier: backup, decrypt, restore"):
         machine.succeed("systemctl start backup-secure.service")
         f = machine.succeed("ls /srv/dest-a/secure/machine/*.tar.gz.age").strip()
+        assert not f.endswith("-partial.tar.gz.age"), f
         machine.succeed(f"test -s {f}.sha256")
         machine.succeed(f"mkdir /restore && age -d -i /etc/backup-test/age-key {f} | tar -xz -C /restore")
         machine.succeed("sqlite3 /restore/dumps/app/app.db 'select v from t' | grep sqlite-canary")
@@ -190,7 +191,7 @@ pkgs.testers.runNixOSTest {
     with subtest("a failed dump or missing path leaves the other items in the bundle"):
         machine.succeed("rm -r /var/lib/backup/secure.last-success /srv/extra && sleep 1 && touch /run/break-dumps")
         machine.fail("systemctl start backup-secure.service")
-        f = machine.succeed("ls -t /srv/dest-a/secure/machine/*.tar.gz.age | head -1").strip()
+        f = machine.succeed("ls /srv/dest-a/secure/machine/*-partial.tar.gz.age").strip()
         machine.succeed(f"mkdir /restore2 && age -d -i /etc/backup-test/age-key {f} | tar -xz -C /restore2")
         machine.succeed("grep pg-canary /restore2/dumps/app/postgres-host.sql")
         machine.fail("test -e /restore2/dumps/extra")

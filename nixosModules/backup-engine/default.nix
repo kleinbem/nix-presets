@@ -257,7 +257,8 @@ let
         || rc=$?
       [ "$rc" -le 1 ] || exit "$rc"
 
-      name=${esc host}-$ts.tar.gz.age
+      # A partial bundle says so in its name; a full restore takes the newest without it.
+      name=${esc host}-$ts$([ "$complete" -eq 1 ] || echo -partial).tar.gz.age
       age ${lib.concatMapStringsSep " " (r: "-r ${esc r}") cfg.secure.recipients} \
         -o "$work/$name" "$work/bundle.tar.gz"
       rm -f "$work/bundle.tar.gz"
