@@ -23,7 +23,8 @@ in
       default = "256M";
     };
     secretsFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+      # str, not path: a path value would copy the secret into the store.
+      type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
         Host path to an env file (bind-mounted to /run/secrets/ntfy.env)

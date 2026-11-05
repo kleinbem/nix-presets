@@ -70,7 +70,8 @@
         else if (lowerName == "monitoring") then
           {
             type = "grafana";
-            url = "http://${node.ip}:${toString node.port}";
+            # https: the widget sends Basic auth.
+            url = if node ? domain then "https://${node.domain}" else "http://${node.ip}:${toString node.port}";
             username = "admin";
             password = "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}";
           }

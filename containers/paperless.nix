@@ -31,7 +31,8 @@ in
       default = "2G";
     };
     passwordFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+      # str, not path: a path value would copy the secret into the store.
+      type = lib.types.nullOr lib.types.str;
       default = null;
       description = "Path to a file containing the admin password.";
     };

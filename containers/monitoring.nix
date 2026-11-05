@@ -17,6 +17,16 @@ in
     enable = lib.mkEnableOption "Centralized Monitoring (VictoriaMetrics + Grafana)";
     ip = lib.mkOption { type = lib.types.str; };
     hostDataDir = lib.mkOption { type = lib.types.str; };
+    grafanaEnvFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Host path to an env file for Grafana (bind-mounted to
+        /run/secrets/grafana.env), holding `GF_SECURITY_SECRET_KEY=<key>`.
+        Read as an optional EnvironmentFile, so the shared closure runs with
+        or without it.
+      '';
+    };
     nodeTargets = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ "10.85.46.1" ];
@@ -98,7 +108,8 @@ in
         '';
       };
       authConfigFile = lib.mkOption {
-        type = lib.types.nullOr lib.types.path;
+        # str, not path: a path value would copy the secret into the store.
+        type = lib.types.nullOr lib.types.str;
         default = null;
         description = ''
           Host path to an alertmanager-ntfy YAML snippet merged on top of
@@ -133,6 +144,8 @@ in
         name = "monitoring";
         inherit cfg;
         timeout = "5m";
+        secretsFile = cfg.grafanaEnvFile;
+        secretsFilePath = "/run/secrets/grafana.env";
         innerConfig = {
           services = {
             victoriametrics = {
@@ -157,6 +170,8 @@ in
                   domain = "grafana.kleinbem.dev";
                   root_url = "https://grafana.kleinbem.dev/";
                 };
+                # Public, so only a fallback until grafanaEnvFile sets the real
+                # key. tracking: kleinbem/nix-presets#187
                 security.secret_key = "antigravity-monitoring-key-2026";
                 # "system" follows the browser's prefers-color-scheme
                 # (Grafana 10+); no need to hardcode a theme.
@@ -430,6 +445,8 @@ in
           };
 
           systemd.services = {
+            grafana.serviceConfig.EnvironmentFile = "-/run/secrets/grafana.env";
+
             vmalert = {
               description = "vmalert service";
               wantedBy = [ "multi-user.target" ];

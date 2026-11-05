@@ -45,6 +45,18 @@ in
       type = lib.types.port;
       default = 6379;
     };
+    allowedClients = lib.mkOption {
+      # IPv4 CIDRs: pg_hba needs the mask, the nft rule matches `ip saddr`.
+      type = lib.types.listOf (lib.types.strMatching "[0-9.]+/[0-9]+");
+      default = [ ];
+      example = [ "10.85.46.1/32" ];
+      description = ''
+        Source CIDRs allowed to reach Postgres and Redis. Both run without
+        passwords (Postgres `trust`, `dev` is superuser), so keep this to the
+        hosts that use them, e.g. the host's bridge address for its devshells.
+        Empty means loopback only.
+      '';
+    };
   }
   // tlsOpts;
 
@@ -76,11 +88,18 @@ in
                 };
               }
             ];
-            # Local trust for dev environment
-            authentication = lib.mkForce ''
-              local all all trust
-              host all all all trust
-            '';
+            # Passwordless for devshells, so only allowedClients get in.
+            authentication = lib.mkForce (
+              ''
+                local all all trust
+                host all all 127.0.0.1/32 trust
+                host all all ::1/128 trust
+              ''
+              + lib.concatMapStrings (c: "host all all ${c} trust\n") cfg.allowedClients
+              + ''
+                host all all all reject
+              ''
+            );
           };
 
           services.redis.servers."" = {
@@ -89,10 +108,10 @@ in
             port = cfg.redisPort;
           };
 
-          networking.firewall.allowedTCPPorts = [
-            cfg.postgresPort
-            cfg.redisPort
-          ];
+          # Redis has no auth, so the firewall is its client check.
+          networking.firewall.extraInputRules = lib.optionalString (cfg.allowedClients != [ ]) ''
+            ip saddr { ${lib.concatStringsSep ", " cfg.allowedClients} } tcp dport { ${toString cfg.postgresPort}, ${toString cfg.redisPort} } accept
+          '';
         };
 
         bindMounts = {

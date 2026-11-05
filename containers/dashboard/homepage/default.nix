@@ -9,6 +9,8 @@ let
   cfg = config.my.containers.dashboard;
   inv = myInventory.network;
 
+  caCertPath = "/run/caddy-ca/root.crt";
+
   # Import Homepage specific helpers
   h = import ./helpers.nix { inherit lib inv; };
 
@@ -46,8 +48,9 @@ in
           # Disable Host header check (Next.js specific)
           "NEXT_PUBLIC_DISABLE_HOST_CHECK" = "true";
           "HOSTNAME" = "0.0.0.0";
-          # Disable TLS verification so health pings succeed against internal Caddy CA
-          "NODE_TLS_REJECT_UNAUTHORIZED" = "0";
+          # Trust the Caddy CA for health pings. Set unconditionally so the
+          # cached closure fits every host; Node only warns if it's missing.
+          "NODE_EXTRA_CA_CERTS" = caCertPath;
         };
 
         # `-` prefix: optional. Without a secretsFile, widgets that need an
@@ -58,12 +61,19 @@ in
         # Allow port 8082
         networking.firewall.allowedTCPPorts = [ 8082 ];
       };
-      bindMounts = lib.optionalAttrs (cfg.secretsFile != null) {
-        "/run/secrets/homepage.env" = {
-          hostPath = cfg.secretsFile;
-          isReadOnly = true;
+      bindMounts =
+        lib.optionalAttrs (cfg.secretsFile != null) {
+          "/run/secrets/homepage.env" = {
+            hostPath = cfg.secretsFile;
+            isReadOnly = true;
+          };
+        }
+        // lib.optionalAttrs (cfg.caCertFile != null) {
+          ${caCertPath} = {
+            hostPath = cfg.caCertFile;
+            isReadOnly = true;
+          };
         };
-      };
     }
   );
 }

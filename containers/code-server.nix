@@ -56,6 +56,8 @@ in
           '';
         };
 
+        # No login of its own: Caddy forward_auth gates it, and nix-config's
+        # forward-auth-guard drops anything else that isn't Caddy or the host.
         services.code-server = {
           enable = true;
           inherit (cfg) user;
@@ -64,10 +66,7 @@ in
           auth = "none";
           disableTelemetry = true;
         };
-        networking.firewall.allowedTCPPorts = [
-          8080
-          4444
-        ];
+        networking.firewall.allowedTCPPorts = [ 4444 ];
       };
     bindMounts = {
       "/home/${cfg.user}/Develop" = {
