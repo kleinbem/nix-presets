@@ -10,6 +10,105 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
+  agentNames = lib.attrNames cfg.agents;
+  taskAgent = if cfg.task.agent != null then cfg.task.agent else lib.head (agentNames ++ [ "" ]);
+
+  # main.py reads the team from JSON, so roles and goals need no Python quoting.
+  teamJson = pkgs.writeText "agent-team.json" (
+    builtins.toJSON {
+      agents = lib.mapAttrs (_: a: {
+        inherit (a)
+          role
+          goal
+          backstory
+          memory
+          verbose
+          ;
+        allow_delegation = a.allowDelegation;
+      }) cfg.agents;
+      task = {
+        inherit (cfg.task) description;
+        expected_output = cfg.task.expectedOutput;
+        agent = taskAgent;
+        human_input = cfg.manager.humanInTheLoop;
+      };
+      inherit (cfg.manager) process;
+      manager_llm = cfg.manager.llm;
+    }
+  );
+
+  mainPy = pkgs.writeText "main.py" ''
+    import json
+
+    from crewai import Agent, Crew, Process, Task
+
+    with open("${teamJson}") as f:
+        team = json.load(f)
+
+    agents = {name: Agent(**spec) for name, spec in team["agents"].items()}
+
+    task = Task(
+        description=team["task"]["description"],
+        expected_output=team["task"]["expected_output"],
+        agent=agents[team["task"]["agent"]],
+        human_input=team["task"]["human_input"],
+    )
+
+    crew_args = {}
+    if team["process"] == "hierarchical":
+        crew_args["manager_llm"] = team["manager_llm"]
+
+    crew = Crew(
+        agents=list(agents.values()),
+        tasks=[task],
+        process=Process(team["process"]),
+        verbose=True,
+        **crew_args,
+    )
+
+    if __name__ == "__main__":
+        print("CrewAI team starting:", ", ".join(agents))
+        print(crew.kickoff())
+  '';
+
+  venv = "/app/state/venv";
+  # crewai's requires-python stops below 3.14.
+  python = pkgs.python313;
+
+  # A venv left half-built by a failed install never counts as ready: it's
+  # built aside (relocatable, so its scripts survive the move) and moved into
+  # place only once the install succeeded.
+  prepareVenv = pkgs.writeShellScript "agent-team-venv" ''
+    set -eu
+    if [ ! -x ${venv}/bin/python ]; then
+      rm -rf ${venv}.tmp
+      ${pkgs.uv}/bin/uv venv --relocatable --python ${python}/bin/python3 ${venv}.tmp
+      ${pkgs.uv}/bin/uv pip install --no-cache --python ${venv}.tmp/bin/python crewai langfuse
+      rm -rf ${venv}
+      mv -T ${venv}.tmp ${venv}
+    fi
+    cp ${mainPy} /app/workspace/main.py
+  '';
+
+  # Used by the unit and by a human over ssh, so it sets up its own env.
+  crewRun = pkgs.writeShellScriptBin "crew-run" ''
+    set -eu
+    set -a
+    . /run/secrets/agent-team.env
+    set +a
+    : "''${OPENAI_API_KEY:?set OPENAI_API_KEY (the LiteLLM key) in secretsFile}"
+    export OPENAI_API_BASE=${lib.escapeShellArg cfg.litellmUrl}
+    export LANGFUSE_HOST=${lib.escapeShellArg cfg.langfuse.host}
+    ${lib.optionalString (cfg.langfuse.publicKey != "") ''
+      export LANGFUSE_PUBLIC_KEY=''${LANGFUSE_PUBLIC_KEY:-${lib.escapeShellArg cfg.langfuse.publicKey}}
+    ''}
+    export OTEL_SDK_DISABLED=${if cfg.langfuse.enable then "false" else "true"}
+    export CREWAI_TELEMETRY_OPT_OUT=true
+    export PYTHONUNBUFFERED=1
+    export PYTHONPATH=/app/workspace
+    cd /app/workspace
+    exec ${venv}/bin/python /app/workspace/main.py
+  '';
 in
 {
   options.my.containers.agent-team = {
@@ -38,6 +137,7 @@ in
     secretsFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
+      description = "Host path to an env file (KEY=VALUE lines) with OPENAI_API_KEY (the LiteLLM key) and, with langfuse, LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY. Required.";
     };
 
     authorizedKeys = lib.mkOption {
@@ -70,14 +170,34 @@ in
         }
       );
       default = { };
-      description = "Definition of agents in the team. Maps to CrewAI Agent class.";
+      description = "Definition of agents in the team. Maps to CrewAI Agent class. At least one is required.";
+    };
+
+    task = {
+      description = lib.mkOption {
+        type = lib.types.str;
+        default = "Audit the current NixOS security policies in the workspace and suggest improvements.";
+      };
+      expectedOutput = lib.mkOption {
+        type = lib.types.str;
+        default = "A detailed security audit report with actionable Nix code snippets.";
+      };
+      agent = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Name of the agent (a key of `agents`) the task goes to. null = the first agent by name.";
+      };
     };
 
     manager = {
       humanInTheLoop = lib.mkOption {
         type = lib.types.bool;
         default = true;
-        description = "Enable human-in-the-loop approval for tasks.";
+        description = ''
+          Ask a human to review the task result (CrewAI `human_input`). That
+          reads stdin, so the unit then only prepares the environment and the
+          crew runs when a human starts `crew-run` over ssh.
+        '';
       };
       process = lib.mkOption {
         type = lib.types.enum [
@@ -86,6 +206,12 @@ in
         ];
         default = "hierarchical";
         description = "How tasks are handed off between agents.";
+      };
+      llm = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "gpt-4o";
+        description = "Model name (on LiteLLM) for the manager. Required when process is hierarchical.";
       };
     };
 
@@ -103,10 +229,13 @@ in
       publicKey = lib.mkOption {
         type = lib.types.str;
         default = "";
+        description = "Langfuse public key. The secret key goes in secretsFile.";
       };
       secretKey = lib.mkOption {
         type = lib.types.str;
         default = "";
+        visible = false;
+        description = "Removed: an option value lands in the Nix store. Put LANGFUSE_SECRET_KEY in secretsFile.";
       };
       host = lib.mkOption {
         type = lib.types.str;
@@ -116,136 +245,94 @@ in
   }
   // tlsOpts;
 
-  config = lib.mkIf cfg.enable (mkContainer {
-    inherit config;
-    name = "agent-team";
-    inherit cfg;
-    # Bind-mounts to /run/secrets/agent-team.env — see factory.nix's
-    # secretsFile doc comment.
-    inherit (cfg) secretsFile;
-    innerConfig = {
-      # 1. Provide necessary packages natively (Distroless)
-      environment.systemPackages = [
-        pkgs.python3
-        pkgs.uv
-        pkgs.bash
-        pkgs.git # CrewAI often needs git for tools
-      ];
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      {
+        assertions = [
+          {
+            assertion = cfg.agents != { };
+            message = "my.containers.agent-team.agents is empty: define at least one agent.";
+          }
+          {
+            assertion = cfg.agents == { } || cfg.agents ? ${taskAgent};
+            message = "my.containers.agent-team.task.agent must be one of: ${lib.concatStringsSep ", " agentNames}.";
+          }
+          {
+            assertion = cfg.manager.process == "hierarchical" -> cfg.manager.llm != null;
+            message = ''my.containers.agent-team.manager.process = "hierarchical" needs manager.llm (CrewAI's manager_llm).'';
+          }
+          {
+            assertion = cfg.langfuse.secretKey == "";
+            message = "my.containers.agent-team.langfuse.secretKey is removed: an option value lands in the Nix store. Put LANGFUSE_SECRET_KEY in secretsFile.";
+          }
+          {
+            assertion = cfg.secretsFile != null;
+            message = "my.containers.agent-team.secretsFile is required: it carries OPENAI_API_KEY (the LiteLLM key).";
+          }
+        ];
+      }
+      (mkContainer {
+        inherit config;
+        name = "agent-team";
+        inherit cfg;
+        # Bind-mounts to /run/secrets/agent-team.env — see factory.nix's
+        # secretsFile doc comment.
+        inherit (cfg) secretsFile;
+        innerConfig = {
+          # Provide necessary packages natively (Distroless)
+          environment.systemPackages = [
+            python
+            pkgs.uv
+            pkgs.bash
+            pkgs.git # CrewAI often needs git for tools
+            crewRun
+          ];
 
-      # 2. Native Systemd Service (Orchestrator)
-      systemd.services.crew-orchestrator = {
-        description = "CrewAI Team Orchestrator (Nix-Native)";
-        after = [ "network.target" ];
-        wantedBy = [ "multi-user.target" ];
+          systemd.services.crew-orchestrator = {
+            description = "CrewAI Team Orchestrator (Nix-Native)";
+            after = [ "network-online.target" ];
+            wants = [ "network-online.target" ];
+            wantedBy = [ "multi-user.target" ];
+            environment.UV_PYTHON_DOWNLOADS = "never";
+            serviceConfig =
+              if cfg.manager.humanInTheLoop then
+                {
+                  Type = "oneshot";
+                  RemainAfterExit = true;
+                  ExecStart = prepareVenv;
+                }
+              else
+                {
+                  Type = "simple";
+                  ExecStartPre = prepareVenv;
+                  ExecStart = "${crewRun}/bin/crew-run";
+                  Restart = "on-failure";
+                  RestartSec = "10s";
+                };
+          };
 
-        environment = {
-          OPENAI_API_BASE = cfg.litellmUrl;
-          OPENAI_API_KEY = "sk-team-key";
-          OTEL_SDK_DISABLED = if cfg.langfuse.enable then "false" else "true";
-          LANGFUSE_PUBLIC_KEY = cfg.langfuse.publicKey;
-          LANGFUSE_SECRET_KEY = cfg.langfuse.secretKey;
-          LANGFUSE_HOST = cfg.langfuse.host;
-          CREWAI_TELEMETRY_OPT_OUT = "true";
-          # Python specific
-          PYTHONUNBUFFERED = "1";
-          PYTHONPATH = "/app/workspace";
-          UV_PROJECT_ENVIRONMENT = "/app/state/venv";
+          # Facilitate Human-in-the-Loop via SSH/Exec into the container
+          services.openssh.enable = true;
+          users.users.root.openssh.authorizedKeys.keys = cfg.authorizedKeys;
+
+          networking.firewall.allowedTCPPorts = [
+            8000
+            22
+          ];
         };
 
-        serviceConfig = {
-          Type = "simple";
-          WorkingDirectory = "/app/workspace";
-          EnvironmentFile = lib.optional (cfg.secretsFile != null) "/run/secrets/agent-team.env";
-          # First-run initialization and then start orchestrator
-          ExecStart =
-            let
-              # Helper to escape Python strings
-              pyStr = s: "'''${s}'''";
-
-              # Generate the Python agent definitions
-              agentsPy = lib.concatStringsSep "\n" (
-                lib.mapAttrsToList (name: agent: ''
-                  ${name} = Agent(
-                      role=${pyStr agent.role},
-                      goal=${pyStr agent.goal},
-                      backstory=${pyStr agent.backstory},
-                      allow_delegation=${if agent.allowDelegation then "True" else "False"},
-                      memory=${if agent.memory then "True" else "False"},
-                      verbose=${if agent.verbose then "True" else "False"}
-                  )
-                '') cfg.agents
-              );
-
-              mainPy = pkgs.writeText "main.py" ''
-                import os
-                from crewai import Agent, Task, Crew, Process
-
-                # Initialize Agents from Nix Configuration
-                ${agentsPy}
-
-                # Define a generic task for the team
-                # In a real scenario, this would be driven by an external API or file
-                task1 = Task(
-                    description="Audit the current NixOS security policies in the workspace and suggest improvements.",
-                    expected_output="A detailed security audit report with actionable Nix code snippets.",
-                    agent=auditor if 'auditor' in locals() else developer
-                )
-
-                # Instantiate the Crew
-                crew = Crew(
-                    agents=[${lib.concatStringsSep ", " (lib.attrNames cfg.agents)}],
-                    tasks=[task1],
-                    process=Process.${cfg.manager.process},
-                    verbose=True
-                )
-
-                if __name__ == "__main__":
-                    print("🚀 CrewAI Team starting task execution...")
-                    result = crew.kickoff()
-                    print("\n\n✨ FINAL RESULT:\n")
-                    print(result)
-              '';
-            in
-            pkgs.writeShellScript "start-crew" ''
-              if [ ! -d "/app/state/venv" ]; then
-                echo "⚙️ Initializing 'Distroless' Python environment with uv..."
-                ${pkgs.uv}/bin/uv venv --python ${pkgs.python3}/bin/python3 /app/state/venv
-                ${pkgs.uv}/bin/uv pip install --no-cache crewai langfuse
-              fi
-
-              source /app/state/venv/bin/activate
-
-              # Copy the Nix-generated main.py to the workspace if it doesn't exist or has changed
-              cp ${mainPy} /app/workspace/main.py
-
-              echo "🚀 CrewAI Team Ready. Roles Loaded: ${lib.concatStringsSep ", " (lib.attrNames cfg.agents)}"
-              python3 /app/workspace/main.py
-            '';
-          Restart = "on-failure";
-          RestartSec = "10s";
+        bindMounts = {
+          # Redirect internal paths to host persistence
+          "/app/workspace" = {
+            hostPath = "${cfg.hostDataDir}/workspace";
+            isReadOnly = false;
+          };
+          "/app/state" = {
+            hostPath = "${cfg.hostDataDir}/state";
+            isReadOnly = false;
+          };
         };
-      };
-
-      # Facilitate Human-in-the-Loop via SSH/Exec into the container
-      services.openssh.enable = true;
-      users.users.root.openssh.authorizedKeys.keys = cfg.authorizedKeys;
-
-      networking.firewall.allowedTCPPorts = [
-        8000
-        22
-      ];
-    };
-
-    bindMounts = {
-      # Redirect internal paths to host persistence
-      "/app/workspace" = {
-        hostPath = "${cfg.hostDataDir}/workspace";
-        isReadOnly = false;
-      };
-      "/app/state" = {
-        hostPath = "${cfg.hostDataDir}/state";
-        isReadOnly = false;
-      };
-    };
-  });
+      })
+    ]
+  );
 }
