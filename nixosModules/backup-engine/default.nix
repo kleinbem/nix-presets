@@ -157,6 +157,8 @@ let
     );
 
   # `<script> <outdir>` → <outdir>/<item>/{<sqlite basename>,postgres-*.sql,command.dump}
+  # Each item dumps on its own: a failed one (a stopped container, a missing
+  # mount) is left out and the script exits 1 after dumping all the others.
   mkDumpScript =
     tier: items:
     pkgs.writeShellScript "backup-dump-${tier}" ''
@@ -165,8 +167,12 @@ let
       out="$1"
       rm -rf "$out"
       mkdir -p "$out"
+      failed=0
       ${lib.concatStrings (
         lib.mapAttrsToList (name: item: ''
+          set +e
+          (
+          set -e
           mkdir -p "$out"/${esc name}
           ${lib.concatMapStrings (p: ''
             ${pkgs.sqlite}/bin/sqlite3 ${esc p} ".backup '$out/${name}/${baseNameOf p}'"
@@ -179,8 +185,17 @@ let
             ( ${item.command} ) > "$out"/${esc name}/command.dump
             test -s "$out"/${esc name}/command.dump
           ''}
+          )
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "ERROR: dump of ${name} failed (exit $rc); left out" >&2
+            rm -rf "$out"/${esc name}
+            failed=1
+          fi
         '') items
       )}
+      exit "$failed"
     '';
 
   inherit (cfg) stateDir;
@@ -216,7 +231,9 @@ let
       work=$(mktemp -d)
       trap 'rm -rf "$work"' EXIT
 
-      ${mkDumpScript "secure" secureItems} "$work/stage/dumps"
+      # A failed dump still uploads the rest, then fails the job (alert, no marker).
+      dumps_ok=1
+      ${mkDumpScript "secure" secureItems} "$work/stage/dumps" || dumps_ok=0
 
       # tar exit 1 = "file changed as we read it" on live paths: acceptable
       # (dumps are the consistent part); anything above 1 is fatal.
@@ -266,6 +283,7 @@ let
         '') secureDests
       )}
       [ "$failed" -eq 0 ]
+      [ "$dumps_ok" -eq 1 ] || { echo "ERROR: uploaded without the failed dumps above" >&2; exit 1; }
       ${touchMarker "secure"}
       ${hbPing "secure"}
       echo "secure backup $ts ok ($(du -h "$work/$name" | cut -f1))"
