@@ -28,6 +28,30 @@ let
   ntfyTokenPath = "/run/secrets/gatus-ntfy-token";
   envFile = "/run/gatus/alerting.env";
 
+  fallback = cfg.alerting.fallback;
+  hasFallback = fallback.topicFile != null;
+  hasEnv = hasNtfy || hasFallback;
+  fallbackTopicPath = "/run/secrets/gatus-fallback-topic";
+
+  # A second route that skips our own ntfy server and the tunnel in front of it.
+  # The custom provider substitutes placeholders in url and body only, not headers.
+  fallbackConfig = (pkgs.formats.yaml { }).generate "gatus-fallback.yaml" {
+    alerting.custom = {
+      url = "${fallback.url}/\${GATUS_FALLBACK_TOPIC}";
+      method = "POST";
+      headers = {
+        Title = "Gatus (fallback)";
+        Priority = toString fallback.priority;
+      };
+      body = "[ALERT_TRIGGERED_OR_RESOLVED]: [ENDPOINT_NAME] [ALERT_DESCRIPTION]";
+      default-alert = {
+        failure-threshold = 2;
+        success-threshold = 2;
+        send-on-resolved = true;
+      };
+    };
+  };
+
   # Topic and token stay out of the store: gatus expands ''${VAR} from its
   # environment, which gatus-config-setup fills from the bind-mounted files.
   # Two variants because the token is optional per host, decided at runtime.
@@ -96,6 +120,24 @@ in
         description = "ntfy priority of the alerts. Baked into the closure.";
       };
     };
+    # Endpoints use it with `alerts = [ { type = "custom"; } ]`.
+    alerting.fallback = {
+      url = lib.mkOption {
+        type = lib.types.str;
+        default = "https://ntfy.sh";
+        description = "Public ntfy server for the fallback route. Baked into the closure.";
+      };
+      topicFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Host path to a file with the fallback topic: 1-64 of [-_A-Za-z0-9], long and random, since public ntfy topics are open to anyone who knows the name. null disables the route.";
+      };
+      priority = lib.mkOption {
+        type = lib.types.ints.between 1 5;
+        default = 5;
+        description = "ntfy priority of fallback alerts. Baked into the closure.";
+      };
+    };
   }
   // tlsOpts;
 
@@ -107,7 +149,7 @@ in
       services.gatus = {
         enable = true;
         configFile = configDir;
-        environmentFile = lib.mkIf hasNtfy envFile;
+        environmentFile = lib.mkIf hasEnv envFile;
       };
 
       # Link the base config next to the bind-mounted endpoints file (in /run,
@@ -122,14 +164,28 @@ in
             mkdir -p ${configDir}
             ln -sf ${baseConfig} ${configDir}/00-base.yaml
           ''
-          + lib.optionalString hasNtfy ''
+          + lib.optionalString hasEnv ''
             umask 077
-            printf 'GATUS_NTFY_TOPIC=%s\n' "$(cat ${ntfyTopicPath})" > ${envFile}
+            : > ${envFile}
+          ''
+          + lib.optionalString hasNtfy ''
+            printf 'GATUS_NTFY_TOPIC=%s\n' "$(cat ${ntfyTopicPath})" >> ${envFile}
             if [ -r ${ntfyTokenPath} ]; then
               printf 'GATUS_NTFY_TOKEN=%s\n' "$(cat ${ntfyTokenPath})" >> ${envFile}
               ln -sf ${alertingConfig true} ${configDir}/05-alerting.yaml
             else
               ln -sf ${alertingConfig false} ${configDir}/05-alerting.yaml
+            fi
+          ''
+          + lib.optionalString hasFallback ''
+            # The topic goes into the URL; a bad one only drops the fallback, not Gatus.
+            fallbackTopic=$(cat ${fallbackTopicPath})
+            rm -f ${configDir}/06-fallback.yaml
+            if [[ "$fallbackTopic" =~ ^[-_A-Za-z0-9]{1,64}$ ]]; then
+              printf 'GATUS_FALLBACK_TOPIC=%s\n' "$fallbackTopic" >> ${envFile}
+              ln -sf ${fallbackConfig} ${configDir}/06-fallback.yaml
+            else
+              echo "gatus fallback topic must match [-_A-Za-z0-9]{1,64}; fallback alerts disabled" >&2
             fi
           '';
         };
@@ -159,6 +215,12 @@ in
       // lib.optionalAttrs (hasNtfy && ntfy.tokenFile != null) {
         ${ntfyTokenPath} = {
           hostPath = ntfy.tokenFile;
+          isReadOnly = true;
+        };
+      }
+      // lib.optionalAttrs hasFallback {
+        ${fallbackTopicPath} = {
+          hostPath = fallback.topicFile;
           isReadOnly = true;
         };
       };
