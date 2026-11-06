@@ -21,6 +21,30 @@ let
     web.port = cfg.port;
     ui.title = "kleinbem Status";
   };
+
+  ntfy = cfg.alerting.ntfy;
+  hasNtfy = ntfy.topicFile != null;
+  ntfyTopicPath = "/run/secrets/gatus-ntfy-topic";
+  ntfyTokenPath = "/run/secrets/gatus-ntfy-token";
+  envFile = "/run/gatus/alerting.env";
+
+  # Topic and token stay out of the store: gatus expands ''${VAR} from its
+  # environment, which gatus-config-setup fills from the bind-mounted files.
+  # Two variants because the token is optional per host, decided at runtime.
+  alertingConfig =
+    withToken:
+    (pkgs.formats.yaml { }).generate "gatus-alerting.yaml" {
+      alerting.ntfy = {
+        inherit (ntfy) url priority;
+        topic = "\${GATUS_NTFY_TOPIC}";
+        default-alert = {
+          failure-threshold = 2;
+          success-threshold = 2;
+          send-on-resolved = true;
+        };
+      }
+      // lib.optionalAttrs withToken { token = "\${GATUS_NTFY_TOKEN}"; };
+    };
 in
 {
   options.my.containers.gatus = {
@@ -49,6 +73,29 @@ in
         here (this preset stays portable).
       '';
     };
+    # Endpoints alert only when they list `alerts = [ { type = "ntfy"; } ]`.
+    alerting.ntfy = {
+      url = lib.mkOption {
+        type = lib.types.str;
+        default = "https://ntfy.sh";
+        description = "ntfy server gatus posts alerts to. Baked into the closure, so set it where the container is built.";
+      };
+      topicFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Host path to a file with the ntfy topic (e.g. a sops secret's .path), bind-mounted in. null disables alerting.";
+      };
+      tokenFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Host path to a file with an ntfy access token, for servers that require auth. Optional.";
+      };
+      priority = lib.mkOption {
+        type = lib.types.ints.between 1 5;
+        default = 4;
+        description = "ntfy priority of the alerts. Baked into the closure.";
+      };
+    };
   }
   // tlsOpts;
 
@@ -60,6 +107,7 @@ in
       services.gatus = {
         enable = true;
         configFile = configDir;
+        environmentFile = lib.mkIf hasNtfy envFile;
       };
 
       # Link the base config next to the bind-mounted endpoints file (in /run,
@@ -73,6 +121,16 @@ in
           script = ''
             mkdir -p ${configDir}
             ln -sf ${baseConfig} ${configDir}/00-base.yaml
+          ''
+          + lib.optionalString hasNtfy ''
+            umask 077
+            printf 'GATUS_NTFY_TOPIC=%s\n' "$(cat ${ntfyTopicPath})" > ${envFile}
+            if [ -r ${ntfyTokenPath} ]; then
+              printf 'GATUS_NTFY_TOKEN=%s\n' "$(cat ${ntfyTokenPath})" >> ${envFile}
+              ln -sf ${alertingConfig true} ${configDir}/05-alerting.yaml
+            else
+              ln -sf ${alertingConfig false} ${configDir}/05-alerting.yaml
+            fi
           '';
         };
         gatus = {
@@ -85,11 +143,24 @@ in
       networking.firewall.allowedTCPPorts = [ cfg.port ];
     };
 
-    bindMounts = lib.optionalAttrs hasEndpointsFile {
-      ${endpointsPath} = {
-        hostPath = "${cfg.endpointsFile}";
-        isReadOnly = true;
+    bindMounts =
+      lib.optionalAttrs hasEndpointsFile {
+        ${endpointsPath} = {
+          hostPath = "${cfg.endpointsFile}";
+          isReadOnly = true;
+        };
+      }
+      // lib.optionalAttrs hasNtfy {
+        ${ntfyTopicPath} = {
+          hostPath = ntfy.topicFile;
+          isReadOnly = true;
+        };
+      }
+      // lib.optionalAttrs (hasNtfy && ntfy.tokenFile != null) {
+        ${ntfyTokenPath} = {
+          hostPath = ntfy.tokenFile;
+          isReadOnly = true;
+        };
       };
-    };
   });
 }
