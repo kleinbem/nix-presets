@@ -196,13 +196,10 @@ in
             };
           })
           // {
-            # Manually mount the certificates to avoid the factory's sidecar conflict
+            # Only the CA: the certs dir holds every container's private key, and
+            # the edge proxy uses none of them.
             "/etc/pki/internal/ca.crt" = {
               hostPath = "/nix/persist/pki/internal/ca.crt";
-              isReadOnly = true;
-            };
-            "/etc/pki/internal/certs" = {
-              hostPath = "/nix/persist/pki/internal/certs";
               isReadOnly = true;
             };
           }
