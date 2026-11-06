@@ -73,6 +73,7 @@ in
     {
       proxyTargets,
       hostIP,
+      authUpstream ? null,
       isGlobalMaint,
       helpers,
     }:
@@ -126,7 +127,7 @@ in
                 # node with `auth = true` via one cookie_domain session, so .local
                 # aliases aren't covered. The outpost derives the post-login redirect.
                 authConfig = ''
-                  forward_auth 10.85.48.142:9000 {
+                  forward_auth ${authUpstream} {
                     uri /outpost.goauthentik.io/auth/caddy
                     copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt
                     trusted_proxies private_ranges

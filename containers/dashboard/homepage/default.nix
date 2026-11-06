@@ -46,8 +46,6 @@ in
           # Disable Host header check (Next.js specific)
           "NEXT_PUBLIC_DISABLE_HOST_CHECK" = "true";
           "HOSTNAME" = "0.0.0.0";
-          # Disable TLS verification so health pings succeed against internal Caddy CA
-          "NODE_TLS_REJECT_UNAUTHORIZED" = "0";
         };
 
         # `-` prefix: optional. Without a secretsFile, widgets that need an

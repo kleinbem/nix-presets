@@ -67,13 +67,8 @@
             type = "vllm";
             url = "http://${node.ip}:${toString node.port}";
           }
-        else if (lowerName == "monitoring") then
-          {
-            type = "grafana";
-            url = "http://${node.ip}:${toString node.port}";
-            username = "admin";
-            password = "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}";
-          }
+        # No Grafana widget: it sends admin's password, and Homepage's proxy
+        # never verifies TLS. upstream: gethomepage/homepage#7246 (feature request)
         else
           null;
 

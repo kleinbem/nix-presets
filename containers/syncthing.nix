@@ -29,7 +29,8 @@ in
       description = "Host directory for Syncthing configuration persistence.";
     };
     secretsFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+      # str, not path: a path value would copy the secret into the store.
+      type = lib.types.nullOr lib.types.str;
       default = null;
       description = "Path to a file containing secrets for Syncthing (e.g. STGUIADDRESS).";
     };

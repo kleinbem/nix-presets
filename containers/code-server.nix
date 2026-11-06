@@ -32,6 +32,17 @@ in
       type = lib.types.bool;
       default = true;
     };
+    allowedSources = lib.mkOption {
+      type = lib.types.listOf (lib.types.strMatching "[0-9.]+(/[0-9]+)?");
+      default = [ ];
+      example = [ "10.85.48.107" ];
+      description = ''
+        IPv4 addresses or CIDRs allowed to reach port 4444: the reverse proxy
+        doing forward_auth and the host. Containers on the same bridge are
+        switched past the host's forward rules, so this is the only check
+        against them. Empty leaves the port open to everyone.
+      '';
+    };
   }
   // tlsOpts;
 
@@ -56,6 +67,8 @@ in
           '';
         };
 
+        # No login of its own: Caddy forward_auth gates it, and only
+        # allowedSources may connect.
         services.code-server = {
           enable = true;
           inherit (cfg) user;
@@ -64,10 +77,12 @@ in
           auth = "none";
           disableTelemetry = true;
         };
-        networking.firewall.allowedTCPPorts = [
-          8080
-          4444
-        ];
+        networking.firewall = {
+          allowedTCPPorts = lib.mkIf (cfg.allowedSources == [ ]) [ 4444 ];
+          extraInputRules = lib.concatMapStrings (
+            src: "ip saddr ${src} tcp dport 4444 accept\n"
+          ) cfg.allowedSources;
+        };
       };
     bindMounts = {
       "/home/${cfg.user}/Develop" = {

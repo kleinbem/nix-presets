@@ -79,6 +79,13 @@ in
           ) cfg.egress.lanAllowlist;
         in
         {
+          # networking.nftables.tables is silently ignored without nftables.
+          assertions = [
+            {
+              assertion = config.networking.nftables.enable;
+              message = "my.containers.hermes.egress.restrictLan needs networking.nftables.enable on the host.";
+            }
+          ];
           networking.nftables.tables.zt-hermes-egress = {
             family = "inet";
             content = ''

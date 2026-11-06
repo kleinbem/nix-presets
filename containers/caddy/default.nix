@@ -47,13 +47,20 @@ in
         authExcludePaths, maintenance).
       '';
     };
+    authUpstream = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "10.85.48.142:9000";
+      description = "host:port of the Authentik outpost that `forward_auth` asks for proxyTargets with `auth = true`.";
+    };
     globalMaintenance = lib.mkOption {
       type = lib.types.bool;
       default = false;
       description = "When true, every proxied vhost serves a maintenance page instead of reverse-proxying.";
     };
     secretsFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
+      # str, not path: a path value would copy the secret into the store.
+      type = lib.types.nullOr lib.types.str;
       default = null;
       description = ''
         Host path to an env file (bind-mounted to /run/secrets/caddy.env)
@@ -93,6 +100,15 @@ in
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
+      {
+        assertions = [
+          {
+            assertion =
+              cfg.authUpstream != null || !lib.any (node: node.auth or false) (lib.attrValues cfg.proxyTargets);
+            message = "my.containers.caddy.authUpstream must be set when a proxyTarget has auth = true.";
+          }
+        ];
+      }
       (self.lib.mkContainer {
         inherit config;
         name = "caddy";
@@ -131,7 +147,7 @@ in
               # Restore the full generative logic with proven fixes
               virtualHosts =
                 (h.genVHosts {
-                  inherit (cfg) proxyTargets hostIP;
+                  inherit (cfg) proxyTargets hostIP authUpstream;
                   isGlobalMaint = cfg.globalMaintenance;
                   helpers = h;
                 })
