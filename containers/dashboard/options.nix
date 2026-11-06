@@ -11,11 +11,6 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "1G";
     };
-    caCertFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "Host path to the Caddy root CA, so health pings and widgets can verify the fleet's `tls internal` certificates.";
-    };
     secretsFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;

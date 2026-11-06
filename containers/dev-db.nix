@@ -109,9 +109,10 @@ in
           };
 
           # Redis has no auth, so the firewall is its client check.
-          networking.firewall.extraInputRules = lib.optionalString (cfg.allowedClients != [ ]) ''
-            ip saddr { ${lib.concatStringsSep ", " cfg.allowedClients} } tcp dport { ${toString cfg.postgresPort}, ${toString cfg.redisPort} } accept
-          '';
+          # One rule per client: overlapping CIDRs in one set fail to load.
+          networking.firewall.extraInputRules = lib.concatMapStrings (c: ''
+            ip saddr ${c} tcp dport { ${toString cfg.postgresPort}, ${toString cfg.redisPort} } accept
+          '') cfg.allowedClients;
         };
 
         bindMounts = {
