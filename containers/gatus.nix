@@ -156,7 +156,7 @@ in
           isReadOnly = true;
         };
       }
-      // lib.optionalAttrs (ntfy.tokenFile != null) {
+      // lib.optionalAttrs (hasNtfy && ntfy.tokenFile != null) {
         ${ntfyTokenPath} = {
           hostPath = ntfy.tokenFile;
           isReadOnly = true;
