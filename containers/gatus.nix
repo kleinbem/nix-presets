@@ -130,7 +130,7 @@ in
       topicFile = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
-        description = "Host path to a file with the fallback topic; keep it long and random, public ntfy topics are open to anyone who knows the name. null disables the route.";
+        description = "Host path to a file with the fallback topic: 1-64 of [-_A-Za-z0-9], long and random, since public ntfy topics are open to anyone who knows the name. null disables the route.";
       };
       priority = lib.mkOption {
         type = lib.types.ints.between 1 5;
@@ -178,8 +178,14 @@ in
             fi
           ''
           + lib.optionalString hasFallback ''
-            printf 'GATUS_FALLBACK_TOPIC=%s\n' "$(cat ${fallbackTopicPath})" >> ${envFile}
-            ln -sf ${fallbackConfig} ${configDir}/06-fallback.yaml
+            # The topic goes into the URL; a bad one only drops the fallback, not Gatus.
+            fallbackTopic=$(cat ${fallbackTopicPath})
+            if [[ "$fallbackTopic" =~ ^[-_A-Za-z0-9]{1,64}$ ]]; then
+              printf 'GATUS_FALLBACK_TOPIC=%s\n' "$fallbackTopic" >> ${envFile}
+              ln -sf ${fallbackConfig} ${configDir}/06-fallback.yaml
+            else
+              echo "gatus fallback topic must match [-_A-Za-z0-9]{1,64}; fallback alerts disabled" >&2
+            fi
           '';
         };
         gatus = {
