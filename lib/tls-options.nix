@@ -9,6 +9,16 @@
       default = 0;
       description = "The plain-HTTP service port to wrap with TLS (0 = no inbound sidecar).";
     };
+    allowedClients = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      example = [ "agent-team" ];
+      description = ''
+        Containers allowed to call the inbound listener; others get a 403.
+        Empty accepts any certificate from the internal CA. Needs a nix-gantry
+        with tls.allowedClients (kleinbem-dev/nix-gantry#30); older ones ignore it.
+      '';
+    };
     upstreams = lib.mkOption {
       type = lib.types.listOf (
         lib.types.submodule {
