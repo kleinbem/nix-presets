@@ -178,14 +178,18 @@ in
             fi
           ''
           + lib.optionalString hasFallback ''
-            # The topic goes into the URL; a bad one only drops the fallback, not Gatus.
-            fallbackTopic=$(cat ${fallbackTopicPath})
             rm -f ${configDir}/06-fallback.yaml
-            if [[ "$fallbackTopic" =~ ^[-_A-Za-z0-9]{1,64}$ ]]; then
-              printf 'GATUS_FALLBACK_TOPIC=%s\n' "$fallbackTopic" >> ${envFile}
-              ln -sf ${fallbackConfig} ${configDir}/06-fallback.yaml
-            else
-              echo "gatus fallback topic must match [-_A-Za-z0-9]{1,64}; fallback alerts disabled" >&2
+            # The factory-built closure has this branch on every host; only hosts
+            # with the secret mount the topic, so a missing file means "off".
+            if [ -r ${fallbackTopicPath} ]; then
+              # The topic goes into the URL; a bad one only drops the fallback, not Gatus.
+              fallbackTopic=$(cat ${fallbackTopicPath})
+              if [[ "$fallbackTopic" =~ ^[-_A-Za-z0-9]{1,64}$ ]]; then
+                printf 'GATUS_FALLBACK_TOPIC=%s\n' "$fallbackTopic" >> ${envFile}
+                ln -sf ${fallbackConfig} ${configDir}/06-fallback.yaml
+              else
+                echo "gatus fallback topic must match [-_A-Za-z0-9]{1,64}; fallback alerts disabled" >&2
+              fi
             fi
           '';
         };
