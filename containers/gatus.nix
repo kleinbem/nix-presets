@@ -180,6 +180,7 @@ in
           + lib.optionalString hasFallback ''
             # The topic goes into the URL; a bad one only drops the fallback, not Gatus.
             fallbackTopic=$(cat ${fallbackTopicPath})
+            rm -f ${configDir}/06-fallback.yaml
             if [[ "$fallbackTopic" =~ ^[-_A-Za-z0-9]{1,64}$ ]]; then
               printf 'GATUS_FALLBACK_TOPIC=%s\n' "$fallbackTopic" >> ${envFile}
               ln -sf ${fallbackConfig} ${configDir}/06-fallback.yaml
