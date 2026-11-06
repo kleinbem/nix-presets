@@ -14,9 +14,10 @@
       default = [ ];
       example = [ "agent-team" ];
       description = ''
-        Containers allowed to call the inbound listener; others get a 403.
-        Empty accepts any certificate from the internal CA. Needs a nix-gantry
-        with tls.allowedClients (kleinbem-dev/nix-gantry#30); older ones ignore it.
+        Containers allowed to call the inbound listener, matched on the client
+        certificate's first DNS SAN. A valid internal-CA certificate with another
+        name gets a 403; no or an untrusted certificate fails the TLS handshake.
+        Empty accepts any certificate from the internal CA. Needs serverPort > 0.
       '';
     };
     upstreams = lib.mkOption {
