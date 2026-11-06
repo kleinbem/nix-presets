@@ -8,9 +8,48 @@
 let
   cfg = config.my.containers.agent-team;
   inherit (self.lib) mkContainer;
-  tlsOpts = import ../lib/tls-options.nix { inherit lib; };
+  # The sidecar is on by default and routes to the fleet LiteLLM and Langfuse;
+  # both run an inbound mTLS sidecar on :443.
+  tlsOpts =
+    let
+      t = (import ../lib/tls-options.nix { inherit lib; }).tls;
+    in
+    {
+      tls = t // {
+        enable = t.enable // {
+          default = true;
+        };
+        upstreams = t.upstreams // {
+          default = [
+            {
+              name = "litellm";
+              target = "10.85.46.115";
+              port = 4000;
+            }
+            {
+              name = "langfuse";
+              target = "10.85.46.110";
+              port = 3000;
+            }
+          ];
+        };
+      };
+    };
 
   agentNames = lib.attrNames cfg.agents;
+
+  # The keys travel with every request, so plain HTTP only to the sidecar's
+  # loopback listener, which carries it on over mTLS.
+  sidecarPorts = lib.optionals cfg.tls.enable (map (u: toString u.port) cfg.tls.upstreams);
+  urlIsProtected =
+    url:
+    lib.hasPrefix "https://" url
+    || (
+      let
+        m = builtins.match "http://(127\\.0\\.0\\.1|localhost|\\[::1])(:([0-9]+))?(/.*)?" url;
+      in
+      m != null && builtins.elem (if lib.elemAt m 2 != null then lib.elemAt m 2 else "80") sidecarPorts
+    );
   taskAgent = if cfg.task.agent != null then cfg.task.agent else lib.head (agentNames ++ [ "" ]);
   agentModel = a: if a.llm != null then a.llm else cfg.model;
   managerModel = if cfg.manager.llm != null then cfg.manager.llm else cfg.model;
@@ -260,8 +299,8 @@ in
 
     litellmUrl = lib.mkOption {
       type = lib.types.str;
-      default = "http://10.85.46.115:4000";
-      description = "Connection string for the LiteLLM gateway.";
+      default = "http://127.0.0.1:4000";
+      description = "LiteLLM URL: https://, or http:// to the mTLS sidecar's loopback listener (a tls.upstreams port).";
     };
 
     langfuse = {
@@ -282,7 +321,8 @@ in
       };
       host = lib.mkOption {
         type = lib.types.str;
-        default = "http://10.85.46.110:3000";
+        default = "http://127.0.0.1:3000";
+        description = "Langfuse URL: https://, or http:// to the mTLS sidecar's loopback listener (a tls.upstreams port).";
       };
     };
   }
@@ -292,6 +332,14 @@ in
     lib.mkMerge [
       {
         assertions = [
+          {
+            assertion = urlIsProtected cfg.litellmUrl;
+            message = "my.containers.agent-team.litellmUrl (${cfg.litellmUrl}) must be https:// or http://127.0.0.1:<port> with a matching tls.upstreams entry.";
+          }
+          {
+            assertion = cfg.langfuse.enable -> urlIsProtected cfg.langfuse.host;
+            message = "my.containers.agent-team.langfuse.host (${cfg.langfuse.host}) must be https:// or http://127.0.0.1:<port> with a matching tls.upstreams entry.";
+          }
           {
             assertion = cfg.agents != { };
             message = "my.containers.agent-team.agents is empty: define at least one agent.";
