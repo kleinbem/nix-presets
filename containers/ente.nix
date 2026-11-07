@@ -344,6 +344,11 @@ in
                     (if useGarage then "ente-garage-setup.service" else "podman-minio.service")
                   ];
                   wants = after;
+                  # Don't start museum on missing or stale Garage credentials.
+                  requires = lib.optionals useGarage [
+                    "ente-env-setup.service"
+                    "ente-garage-setup.service"
+                  ];
                   serviceConfig.EnvironmentFile = [ "-/run/ente.env" ];
                 };
                 "podman-minio" = lib.mkIf cfg.minio.enable {
