@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Bump the pinned freecad-mcp (neka-nat/freecad-mcp) in mcp.nix to the latest
-# tag. `nix-prefetch-url --unpack` on GitHub's tarball gives the same hash
-# fetchFromGitHub expects, so no fake-hash build is needed.
+# Bump the pinned freecad-mcp (neka-nat/freecad-mcp) in pkgs/freecad-mcp.nix to
+# the latest tag. `nix-prefetch-url --unpack` on GitHub's tarball gives the same
+# hash fetchFromGitHub expects, so no fake-hash build is needed.
 # Usage: ./scripts/update-freecad-mcp.sh   (needs curl, jq, nix)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-PKG="mcp.nix"
+PKG="pkgs/freecad-mcp.nix"
 REPO_SLUG="neka-nat/freecad-mcp"
 
 log() { echo -e "\033[0;32m[INFO]\033[0m  $*" >&2; }
@@ -34,35 +34,22 @@ log "Fetching source hash..."
 NEW_HASH=$(nix-prefetch-url --unpack \
   "https://github.com/${REPO_SLUG}/archive/${LATEST_REV}.tar.gz" 2>/dev/null | tail -1)
 [[ -n $NEW_HASH ]] || err "Could not get source hash"
+NEW_HASH=$(nix hash convert --hash-algo sha256 --to sri "$NEW_HASH")
 log "Source hash: $NEW_HASH"
 
 # ── 3. Patch rev, hash, and version ──────────────────────────────────────────
 CURRENT_REV=$(grep -oP 'rev = "\K[a-f0-9]{40}' "$PKG" | head -1)
-CURRENT_HASH=$(grep -oP 'sha256 = "\K[^"]+' "$PKG" | head -1)
+CURRENT_HASH=$(grep -oP 'hash = "\K[^"]+' "$PKG" | head -1)
 
 sed -i "s/rev = \"${CURRENT_REV}\"/rev = \"${LATEST_REV}\"/" "$PKG"
-sed -i "s/sha256 = \"${CURRENT_HASH}\"/sha256 = \"${NEW_HASH}\"/" "$PKG"
+sed -i "s|hash = \"${CURRENT_HASH}\"|hash = \"${NEW_HASH}\"|" "$PKG"
 sed -i "s/version = \"${CURRENT}\"/version = \"${LATEST}\"/" "$PKG"
 
 # ── 4. Verify ────────────────────────────────────────────────────────────────
-# Build the package itself, not just the source, to catch packaging breakage
-# (new deps, metadata) as well as a bad hash.
+# Build the package file mcp.nix uses, so the check sees new deps or metadata
+# as well as a bad hash.
 log "Verifying build..."
-nix build --impure --no-link --expr "
-  let pkgs = import <nixpkgs> {};
-  in pkgs.python3.pkgs.buildPythonPackage {
-    pname = \"freecad-mcp\";
-    version = \"${LATEST}\";
-    pyproject = true;
-    src = pkgs.fetchFromGitHub {
-      owner = \"${REPO_SLUG%%/*}\";
-      repo = \"${REPO_SLUG##*/}\";
-      rev = \"${LATEST_REV}\";
-      sha256 = \"${NEW_HASH}\";
-    };
-    nativeBuildInputs = [ pkgs.python3.pkgs.hatchling ];
-    propagatedBuildInputs = with pkgs.python3.pkgs; [ mcp validators ];
-    meta.mainProgram = \"freecad-mcp\";
-  }"
+nix build --impure --no-link --expr \
+  "(import <nixpkgs> { }).python3.pkgs.callPackage $PWD/$PKG { }"
 
 log "Done. freecad-mcp $LATEST ($LATEST_REV) ready."
