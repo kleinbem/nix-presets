@@ -42,7 +42,10 @@ let
       kwargs = { };
     };
   };
-  presetFile = pkgs.writeText "agent-zero-default-preset.json" (builtins.toJSON cfg.modelPreset);
+  # The script replaces and selects "Default", so the name is fixed.
+  presetFile = pkgs.writeText "agent-zero-default-preset.json" (
+    builtins.toJSON (cfg.modelPreset // { name = "Default"; })
+  );
 
   # v2.x reads models only from the _model_config presets, not env vars.
   # Replace just Default so presets added in the UI survive.
@@ -99,7 +102,8 @@ in
       description = ''
         Agent Zero's "Default" model preset (chat/utility/embedding), written into
         usr/plugins/_model_config/presets.yaml before every start. UI edits to other
-        presets survive; edits to Default are replaced. null leaves presets alone.
+        presets survive; edits to Default are replaced. The name is always "Default";
+        null leaves presets alone.
       '';
     };
     memoryLimit = lib.mkOption {
