@@ -59,7 +59,8 @@ in
             CLI_ARGS = "--listen 0.0.0.0";
           };
           volumes = [
-            "${cfg.hostDataDir}/ComfyUI:/home/runner/ComfyUI"
+            # The image runs as root and keeps ComfyUI (models, outputs) in /root.
+            "${cfg.hostDataDir}/ComfyUI:/root/ComfyUI"
           ];
           extraOptions = [
             "--device=/dev/dri:/dev/dri"
