@@ -167,25 +167,8 @@
 
   config = lib.mkIf config.modules.mcp.enable (
     let
-      freecad-mcp-src = pkgs.fetchFromGitHub {
-        owner = "neka-nat";
-        repo = "freecad-mcp";
-        rev = "d85d8e2dad9d6deec4b36ec6826e323f68fad95e";
-        sha256 = "063nnlf8rmlxc89jw40mmbmsfyb6hpxvgg0sfxjrwxgjk7yw3s59";
-      };
-
-      freecadMcpPkg = pkgs.python3.pkgs.buildPythonPackage {
-        pname = "freecad-mcp";
-        version = "0.1.27";
-        pyproject = true;
-        src = freecad-mcp-src;
-        nativeBuildInputs = [ pkgs.python3.pkgs.hatchling ];
-        propagatedBuildInputs = with pkgs.python3.pkgs; [
-          mcp
-          validators
-        ];
-        meta.mainProgram = "freecad-mcp";
-      };
+      # Own file so the updater can bump and build exactly what ships here.
+      freecadMcpPkg = pkgs.python3.pkgs.callPackage ./pkgs/freecad-mcp.nix { };
 
       # Two halves: the MCP server (stdio, started by the AI client) and a
       # GIMP plugin that listens on localhost:9877 once started via
@@ -361,7 +344,7 @@
 
         file =
           lib.optionalAttrs config.modules.mcp.freecad.enable {
-            ".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecad-mcp-src}/addon/FreeCADMCP";
+            ".local/share/FreeCAD/Mod/FreeCADMCP".source = "${freecadMcpPkg.src}/addon/FreeCADMCP";
           }
           // lib.optionalAttrs config.modules.mcp.gimp.enable {
             # GIMP keeps a settings folder per minor version (e.g. 3.2)

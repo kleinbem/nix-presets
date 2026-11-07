@@ -170,6 +170,9 @@
                 module = self.nixosModules.forgejo;
               };
 
+              # Built here so a broken bump fails CI, not only the updater.
+              inherit (config.packages) freecad-mcp;
+
               pre-commit-check = inputs.git-hooks.lib.${system}.run {
                 src = ./.;
                 hooks = {
@@ -202,6 +205,8 @@
             element-desktop-sandboxed = sandboxedApps.element-desktop;
             signal-desktop-sandboxed = sandboxedApps.signal-desktop;
             discord-sandboxed = sandboxedApps.discord;
+            # The FreeCAD MCP server mcp.nix installs.
+            freecad-mcp = pkgs.python3.pkgs.callPackage ./pkgs/freecad-mcp.nix { };
           };
         };
 

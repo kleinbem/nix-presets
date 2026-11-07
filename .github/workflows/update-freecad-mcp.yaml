@@ -1,6 +1,6 @@
 name: "Update freecad-mcp"
 
-# Bumps the pinned neka-nat/freecad-mcp source in mcp.nix to the latest git
+# Bumps the pinned neka-nat/freecad-mcp source in pkgs/freecad-mcp.nix to the latest git
 # tag and opens a PR. No upstream flake/PyPI package — vendored via
 # fetchFromGitHub, so this discovers the tag, re-derives the source hash,
 # and rebuilds the actual Python package standalone to verify.
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   update:
-    name: "Bump mcp.nix & open PR"
+    name: "Bump freecad-mcp & open PR"
     runs-on: ubuntu-latest
     steps:
       - name: Mint GitHub App installation token
@@ -45,11 +45,11 @@ jobs:
         run: |
           chmod +x scripts/update-freecad-mcp.sh
           ./scripts/update-freecad-mcp.sh
-          if git diff --quiet -- mcp.nix; then
+          if git diff --quiet -- pkgs/freecad-mcp.nix; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            VER=$(grep -oP 'version = "\K[^"]+' mcp.nix | head -1)
+            VER=$(grep -oP 'version = "\K[^"]+' pkgs/freecad-mcp.nix | head -1)
             echo "version=$VER" >> "$GITHUB_OUTPUT"
           fi
 
@@ -75,20 +75,20 @@ jobs:
             --arg branch "$BRANCH_NAME" \
             --arg sha "$MAIN_SHA" \
             --arg headline "chore: update freecad-mcp to ${VERSION}" \
-            --arg content "$(base64 -w0 mcp.nix)" \
+            --arg content "$(base64 -w0 pkgs/freecad-mcp.nix)" \
             --arg query 'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }' \
             '{query: $query, variables: {input: {
                 branch: {repositoryNameWithOwner: $repo, branchName: $branch},
                 message: {headline: $headline},
                 expectedHeadOid: $sha,
-                fileChanges: {additions: [{path: "mcp.nix", contents: $content}]}
+                fileChanges: {additions: [{path: "pkgs/freecad-mcp.nix", contents: $content}]}
             }}}' | gh api graphql --input -
 
           BODY_FILE=$(mktemp)
           cat > "$BODY_FILE" <<'EOF'
           ## freecad-mcp update
 
-          Bumps the pinned `neka-nat/freecad-mcp` source in `mcp.nix` to the
+          Bumps the pinned `neka-nat/freecad-mcp` source in `pkgs/freecad-mcp.nix` to the
           latest git tag: **@VERSION@**. The
           source hash was re-derived from that tag's GitHub archive tarball.
 
