@@ -53,7 +53,7 @@ in
         oci-containers.backend = "podman";
         oci-containers.containers.agent-zero = {
           # Pinned, not :latest: v2.x moves fast, so bump deliberately.
-          image = "agent0ai/agent-zero:v2.12";
+          image = "agent0ai/agent-zero:v2.15";
           # The app listens on 80; 50001 is the fleet's externalPort in inventory.nix.
           ports = [ "50001:80" ];
           # A0_SET_<key> overrides usr/settings.json; keys are its lowercase field names.

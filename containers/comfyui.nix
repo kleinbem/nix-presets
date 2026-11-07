@@ -52,7 +52,8 @@ in
       virtualisation.oci-containers = {
         backend = "podman";
         containers.comfyui = {
-          image = "docker.io/yanwk/comfyui-boot:xpu";
+          # Dated tag: plain :xpu is rebuilt weekly.
+          image = "docker.io/yanwk/comfyui-boot:xpu-20261102";
           ports = [ "8188:8188" ];
           environment = {
             CLI_ARGS = "--listen 0.0.0.0";
