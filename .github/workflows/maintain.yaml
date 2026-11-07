@@ -27,6 +27,8 @@ jobs:
         for out in packages devShells; do
           nix eval --json ".#$out.x86_64-linux" --apply 'builtins.mapAttrs (_: d: d.drvPath)' >/dev/null
         done
+        # CI overrides nix-devshells, so only this checks the locked formatter.
+        nix eval --raw .#formatter.x86_64-linux.drvPath >/dev/null
     secrets:
       app-id: ${{ secrets.APP_ID }}
       app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
