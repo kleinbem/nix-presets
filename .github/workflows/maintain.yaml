@@ -13,6 +13,22 @@ jobs:
     uses: kleinbem/actions/.github/workflows/maintain-flake.yaml@4c768a74873b0de7772c1af40b777bacb7c68495 # v1.6.2
     with:
       nix-path: nixpkgs=channel:nixos-unstable
+      # Not `nix flake check --no-build`: it evaluates every module-* check (a
+      # full NixOS system each) in one process and outgrows the runner's 16 GiB
+      # (NixOS/nix#13483). nix-eval-jobs caps each worker, like ci.yaml does.
+      validate: |
+        nix run nixpkgs#nix-eval-jobs -- --flake .#checks.x86_64-linux \
+          --workers 2 --max-memory-size 4096 >"$RUNNER_TEMP/checks.jsonl"
+        [ -s "$RUNNER_TEMP/checks.jsonl" ] || { echo "no checks evaluated" >&2; exit 1; }
+        if jq -e -s 'any(.[]; .error)' "$RUNNER_TEMP/checks.jsonl" >/dev/null; then
+          jq -r 'select(.error) | "\(.attr): \(.error)"' "$RUNNER_TEMP/checks.jsonl" >&2
+          exit 1
+        fi
+        for out in packages devShells; do
+          nix eval --json ".#$out.x86_64-linux" --apply 'builtins.mapAttrs (_: d: d.drvPath)' >/dev/null
+        done
+        # CI overrides nix-devshells, so only this checks the locked formatter.
+        nix eval --raw .#formatter.x86_64-linux.drvPath >/dev/null
     secrets:
       app-id: ${{ secrets.APP_ID }}
       app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
