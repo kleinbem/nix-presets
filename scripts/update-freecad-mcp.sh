@@ -46,10 +46,9 @@ sed -i "s|hash = \"${CURRENT_HASH}\"|hash = \"${NEW_HASH}\"|" "$PKG"
 sed -i "s/version = \"${CURRENT}\"/version = \"${LATEST}\"/" "$PKG"
 
 # ── 4. Verify ────────────────────────────────────────────────────────────────
-# Build the package file mcp.nix uses, so the check sees new deps or metadata
-# as well as a bad hash.
+# Build the flake's package (same file and pinned nixpkgs as CI), so the check
+# sees new deps or metadata as well as a bad hash.
 log "Verifying build..."
-nix build --impure --no-link --expr \
-  "(import <nixpkgs> { }).python3.pkgs.callPackage $PWD/$PKG { }"
+nix build --no-link -L .#freecad-mcp
 
 log "Done. freecad-mcp $LATEST ($LATEST_REV) ready."

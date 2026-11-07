@@ -30,6 +30,7 @@ buildPythonPackage {
 
   # Upstream pins security floors (certifi, anyio, pyjwt) newer than nixpkgs
   # often ships; nixpkgs patches those itself, so take its versions.
+  # no-link: upstream raises the floors on purpose and nixpkgs lags by design.
   pythonRelaxDeps = true;
 
   pythonImportsCheck = [ "freecad_mcp" ];
