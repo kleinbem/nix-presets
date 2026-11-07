@@ -190,6 +190,7 @@ in
                   # Neither quay.io nor Docker Hub serves MinIO anonymously any
                   # more (minio/minio is archived): only the image already in
                   # the host's store can run, so never try to pull it.
+                  # no-link: not a bug to report; MinIO goes once Ente is on Garage.
                   image = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
                   pull = "never";
                   cmd = [
@@ -252,6 +253,12 @@ in
                     keyhash=$(${lib.optionalString (cfg.keyHashFile != null) "b64 ${keyHashPath}"})
                     s3key=${if useGarage then "$(b64 ${s3KeyIdPath})" else "admin"}
                     s3secret=${if useGarage then "$(b64 ${s3SecretPath})" else "$miniopass"}
+                    ${lib.optionalString useGarage ''
+                      if [ -z "$s3key" ] || [ -z "$s3secret" ]; then
+                        echo "ente-env-setup: empty Garage S3 key id or secret" >&2
+                        exit 1
+                      fi
+                    ''}
 
                     {
                       printf 'MINIO_ROOT_PASSWORD=%s\n' "$miniopass"
