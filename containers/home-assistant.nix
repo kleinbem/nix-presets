@@ -93,28 +93,6 @@ in
             );
           in
           {
-            nixpkgs.overlays = [
-              (_final: prev: {
-                pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
-                  (_pyfinal: pyprev: {
-                    # HA pins pywizlight 0.6.3; 0.6.6's multi-zone API makes
-                    # `bulb.state` a list and breaks every WiZ entity.
-                    # nixpkgs reverted to 0.6.3 (NixOS/nixpkgs#576178): remove once
-                    # our nixpkgs has that revert.
-                    pywizlight = pyprev.pywizlight.overridePythonAttrs (_: {
-                      version = "0.6.3";
-                      src = prev.fetchFromGitHub {
-                        owner = "sbidy";
-                        repo = "pywizlight";
-                        tag = "v0.6.3";
-                        hash = "sha256-rCoWdqvFLSLNBAHeFJ6f9kZpIg4WyE8VJLpmsYl+gJM=";
-                      };
-                    });
-                  })
-                ];
-              })
-            ];
-
             services.home-assistant = {
               enable = true;
               # HA on NixOS can't pip-install, so every configured integration
