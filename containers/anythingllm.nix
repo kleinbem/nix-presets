@@ -42,7 +42,8 @@ in
         oci-containers = {
           backend = "podman";
           containers.anythingllm = {
-            image = "mintplexlabs/anythingllm:latest";
+            # Release tag: :latest tracks master builds.
+            image = "mintplexlabs/anythingllm:1.19.0";
             ports = [ "3001:3001" ];
             volumes = [
               "/var/lib/anythingllm:/app/server/storage"
