@@ -43,7 +43,7 @@ in
           backend = "podman";
           containers.anythingllm = {
             # Release tag: :latest tracks master builds.
-            image = "mintplexlabs/anythingllm:1.18.0"; # image-bump: semver
+            image = "mintplexlabs/anythingllm:1.19.0"; # image-bump: semver
             ports = [ "3001:3001" ];
             volumes = [
               "/var/lib/anythingllm:/app/server/storage"
