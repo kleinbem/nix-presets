@@ -134,7 +134,7 @@ in
         oci-containers.backend = "podman";
         oci-containers.containers.agent-zero = {
           # Pinned, not :latest: v2.x moves fast, so bump deliberately.
-          image = "agent0ai/agent-zero:v2.15";
+          image = "agent0ai/agent-zero:v2.15"; # image-bump: semver
           # The app listens on 80; 50001 is the fleet's externalPort in inventory.nix.
           ports = [ "50001:80" ];
           # The app reads the provider's plain env var (OPENAI_API_KEY for "openai").

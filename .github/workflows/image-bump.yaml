@@ -1,0 +1,23 @@
+name: Image bump
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Report only, open no PRs
+        type: boolean
+        default: false
+  schedule:
+    - cron: '45 4 * * *'
+
+# Image tags in Nix/just files marked `# image-bump: <scheme>`: one PR per
+# image with a newer tag. Shared: kleinbem/actions' image-bump.
+permissions: {}
+
+jobs:
+  image-bump:
+    uses: kleinbem/actions/.github/workflows/image-bump.yaml@f1b4f5fc52ea31b1f9e53ca29170570fe4651c7d # v1.7.1
+    with:
+      dry-run: ${{ inputs.dry-run || false }}
+    secrets:
+      app-id: ${{ secrets.APP_ID }}
+      app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
