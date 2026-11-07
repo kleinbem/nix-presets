@@ -10,7 +10,7 @@ permissions: {}
 
 jobs:
   maintain:
-    uses: kleinbem/actions/.github/workflows/maintain-flake.yaml@c5fb62f7a90fc2986a153121ee650962a825929a # v1.6.0
+    uses: kleinbem/actions/.github/workflows/maintain-flake.yaml@4c768a74873b0de7772c1af40b777bacb7c68495 # v1.6.2
     with:
       nix-path: nixpkgs=channel:nixos-unstable
     secrets:
