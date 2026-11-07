@@ -48,6 +48,10 @@
       url = "github:kleinbem-dev/revue";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    foyer = {
+      url = "github:kleinbem-dev/foyer";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -260,6 +264,7 @@
               open-webui = import ./containers/open-webui.nix { inherit self; };
               dashboard-homer = import ./containers/dashboard/homer { inherit self; };
               dashboard-homepage = import ./containers/dashboard/homepage { inherit self; };
+              dashboard-foyer = import ./containers/dashboard/foyer { inherit self inputs; };
               qdrant = import ./containers/qdrant.nix { inherit self; };
               ntfy = import ./containers/ntfy.nix { inherit self; };
               stalwart = import ./containers/stalwart.nix { inherit self; };
@@ -315,6 +320,7 @@
             # wants it imports the modules it needs plus dashboard-homer, not `all`.
             variants = [
               "dashboard-homer"
+              "dashboard-foyer"
             ];
           in
           presets
