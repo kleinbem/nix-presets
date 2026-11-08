@@ -303,7 +303,11 @@ in
                     "garage.service"
                     "ente.service"
                   ];
-                  serviceConfig.Type = "oneshot";
+                  # Stays active, so museum's restarts don't rerun it into its start limit.
+                  serviceConfig = {
+                    Type = "oneshot";
+                    RemainAfterExit = true;
+                  };
                   script = ''
                     umask 077
                     miniopass=$(${
@@ -349,7 +353,19 @@ in
                     "ente-env-setup.service"
                     "ente-garage-setup.service"
                   ];
-                  serviceConfig.EnvironmentFile = [ "-/run/ente.env" ];
+                  # Retry with backoff and no start limit: a Postgres hiccup at
+                  # start otherwise trips the guest's 5-in-15m limit within seconds.
+                  unitConfig.StartLimitIntervalSec = 0;
+                  serviceConfig = {
+                    EnvironmentFile = [ "-/run/ente.env" ];
+                    RestartSec = "5s";
+                    RestartSteps = 5;
+                    RestartMaxDelaySec = "1min";
+                    # /var/lib/ente is the whole data mount, Postgres included.
+                    # StateDirectory=ente would chown all of it to museum whenever
+                    # its owner differs (as after a host tmpfiles run).
+                    StateDirectory = lib.mkForce [ "ente/configurations" ];
+                  };
                 };
                 "podman-minio" = lib.mkIf cfg.minio.enable {
                   after = [ "ente-env-setup.service" ];
