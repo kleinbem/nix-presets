@@ -365,6 +365,14 @@ in
                     User = "garage";
                     Group = "garage";
                     MemoryMax = cfg.garage.memoryMax;
+                    # Not tmpfiles: it refuses to create a garage-owned dir below
+                    # the host-owned /var/lib/ente ("unsafe path transition").
+                    StateDirectory = map (d: lib.removePrefix "/var/lib/" d) [
+                      garageDir
+                      "${garageDir}/meta"
+                      "${garageDir}/data"
+                    ];
+                    StateDirectoryMode = "0750";
                   };
                 };
 
@@ -402,11 +410,6 @@ in
               tmpfiles.rules = [
                 "d /var/lib/ente/minio 0755 root root - -"
                 "d /var/lib/ente/data 0755 root root - -"
-              ]
-              ++ lib.optionals cfg.garage.enable [
-                "d ${garageDir} 0750 garage garage - -"
-                "d ${garageDir}/meta 0750 garage garage - -"
-                "d ${garageDir}/data 0750 garage garage - -"
               ];
             };
           };
