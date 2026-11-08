@@ -68,6 +68,63 @@ in
     }
   '';
 
+  # SPA frontend serving static assets with fallback and reverse proxy for backend routes
+  mkSpa =
+    {
+      node,
+      authUpstream ? null,
+      helpers,
+    }:
+    if node ? spa then
+      let
+        backendPaths = node.spa.backendPaths or [ ];
+        pathsStr = lib.concatStringsSep " " backendPaths;
+        corsHeader =
+          if (node.cors or true) then
+            ''
+              header Access-Control-Allow-Origin *
+              header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, HEAD"
+              header Access-Control-Allow-Headers "Authorization, Content-Type, Origin, Accept"
+            ''
+          else
+            "";
+        upstream = helpers.mkUpstream node;
+        authConfig =
+          if (node.auth or false) && authUpstream != null then
+            ''
+              forward_auth ${authUpstream} {
+                uri /outpost.goauthentik.io/auth/caddy
+                copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Jwt
+                trusted_proxies private_ranges
+              }
+            ''
+          else
+            "";
+      in
+      ''
+        @cors_preflight method OPTIONS
+        handle @cors_preflight {
+          ${corsHeader}
+          respond 204
+        }
+        ${lib.optionalString (backendPaths != [ ]) ''
+          @spa_backend path ${pathsStr}
+          handle @spa_backend {
+            ${corsHeader}
+            ${authConfig}
+            reverse_proxy ${upstream}
+          }
+        ''}
+        handle {
+          ${authConfig}
+          root * ${node.spa.root}
+          try_files {path} {path}/ /200.html
+          file_server
+        }
+      ''
+    else
+      null;
+
   # Logic for mapping inventory to Caddy VirtualHosts
   genVHosts =
     {
@@ -101,6 +158,7 @@ in
             "${ipHostStr}${name}.local${customDomain}";
 
         isDown = isGlobalMaint || (node.maintenance or false);
+        spaBlock = helpers.mkSpa { inherit node authUpstream helpers; };
       in
       nameValuePair vhostName {
         logFormat = "output stderr";
@@ -109,6 +167,8 @@ in
           ${
             if isDown then
               helpers.mkMaintPage name
+            else if spaBlock != null then
+              helpers.mkExtraRoutes node + spaBlock
             else
               let
                 t = helpers.mkTransport node;

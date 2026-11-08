@@ -52,6 +52,10 @@
       url = "github:kleinbem-dev/foyer";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    attic-ui = {
+      url = "github:kleinbem-dev/attic-ui";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -258,7 +262,7 @@
               ollama = import ./containers/ollama.nix { inherit self; };
               llama-cpp = import ./containers/llama-cpp.nix { inherit self; };
               n8n = import ./containers/n8n.nix { inherit self; };
-              caddy = import ./containers/caddy { inherit self; };
+              caddy = import ./containers/caddy { inherit self inputs; };
               attic = import ./containers/attic.nix { inherit self; };
               code-server = import ./containers/code-server.nix { inherit self; };
               open-webui = import ./containers/open-webui.nix { inherit self; };
