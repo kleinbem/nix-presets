@@ -303,11 +303,10 @@ in
                     "garage.service"
                     "ente.service"
                   ];
-                  # Stays active, so museum's restarts don't rerun it into its start limit.
-                  serviceConfig = {
-                    Type = "oneshot";
-                    RemainAfterExit = true;
-                  };
+                  # museum's restarts rerun it (and so pick up rotated secrets);
+                  # they mustn't run it into the guest's start limit.
+                  unitConfig.StartLimitIntervalSec = 0;
+                  serviceConfig.Type = "oneshot";
                   script = ''
                     umask 077
                     miniopass=$(${

@@ -104,7 +104,9 @@ pkgs.testers.runNixOSTest {
 
     def pg_files_owned_by_postgres():
         # postgres is uid 71 in the container and, with privateUsers = no, on the host.
+        # The first find fails the check on a missing or empty data dir.
         out = machine.succeed(
+            "find /var/lib/images/ente/postgresql/17/global -uid 71 -name pg_control | grep -q . && "
             "find /var/lib/images/ente/postgresql -mindepth 1 ! -uid 71 -printf '%u:%g %p\\n' | head -n 20"
         )
         assert out.strip() == "", f"Postgres files not owned by postgres:\n{out}"
@@ -138,7 +140,10 @@ pkgs.testers.runNixOSTest {
 
         with subtest("museum keeps retrying while Postgres refuses it"):
             inside("runuser -u postgres -- psql -c 'ALTER ROLE ente NOLOGIN'")
+            env_before = inside("stat -c %.9Y /run/ente.env")
             inside("systemctl restart ente.service")
+            # A museum restart rebuilds the env file, so rotated secrets apply.
+            assert inside("stat -c %.9Y /run/ente.env") != env_before
             machine.wait_until_succeeds(
                 "test $(nixos-container run ente -- systemctl show -P NRestarts ente.service) -ge 6",
                 timeout=timedelta(minutes=5),
