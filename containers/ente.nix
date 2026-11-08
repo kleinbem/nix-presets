@@ -303,6 +303,9 @@ in
                     "garage.service"
                     "ente.service"
                   ];
+                  # museum's restarts rerun it (and so pick up rotated secrets);
+                  # they mustn't run it into the guest's start limit.
+                  unitConfig.StartLimitIntervalSec = 0;
                   serviceConfig.Type = "oneshot";
                   script = ''
                     umask 077
@@ -349,7 +352,19 @@ in
                     "ente-env-setup.service"
                     "ente-garage-setup.service"
                   ];
-                  serviceConfig.EnvironmentFile = [ "-/run/ente.env" ];
+                  # Retry with backoff and no start limit: a Postgres hiccup at
+                  # start otherwise trips the guest's 5-in-15m limit within seconds.
+                  unitConfig.StartLimitIntervalSec = 0;
+                  serviceConfig = {
+                    EnvironmentFile = [ "-/run/ente.env" ];
+                    RestartSec = "5s";
+                    RestartSteps = 5;
+                    RestartMaxDelaySec = "1min";
+                    # /var/lib/ente is the whole data mount, Postgres included.
+                    # StateDirectory=ente would chown all of it to museum whenever
+                    # its owner differs (as after a host tmpfiles run).
+                    StateDirectory = lib.mkForce [ "ente/configurations" ];
+                  };
                 };
                 "podman-minio" = lib.mkIf cfg.minio.enable {
                   after = [ "ente-env-setup.service" ];
@@ -365,6 +380,14 @@ in
                     User = "garage";
                     Group = "garage";
                     MemoryMax = cfg.garage.memoryMax;
+                    # Not tmpfiles: it refuses to create a garage-owned dir below
+                    # the host-owned /var/lib/ente ("unsafe path transition").
+                    StateDirectory = map (d: lib.removePrefix "/var/lib/" d) [
+                      garageDir
+                      "${garageDir}/meta"
+                      "${garageDir}/data"
+                    ];
+                    StateDirectoryMode = "0750";
                   };
                 };
 
@@ -402,11 +425,6 @@ in
               tmpfiles.rules = [
                 "d /var/lib/ente/minio 0755 root root - -"
                 "d /var/lib/ente/data 0755 root root - -"
-              ]
-              ++ lib.optionals cfg.garage.enable [
-                "d ${garageDir} 0750 garage garage - -"
-                "d ${garageDir}/meta 0750 garage garage - -"
-                "d ${garageDir}/data 0750 garage garage - -"
               ];
             };
           };
