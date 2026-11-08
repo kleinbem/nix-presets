@@ -178,6 +178,11 @@
                 module = self.nixosModules.forgejo;
               };
 
+              ente = import ./checks/ente.nix {
+                inherit pkgs;
+                module = self.nixosModules.ente;
+              };
+
               # Built here so a broken bump fails CI, not only the updater.
               inherit (config.packages) freecad-mcp;
 
