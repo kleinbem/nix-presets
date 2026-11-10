@@ -108,7 +108,14 @@ let
       label=$(herdr workspace get "$ws" 2>/dev/null | jq -r '.result.workspace.label // empty' || true)
       body=$(jq -r '.result.pane.terminal_title_stripped // empty' <<<"$pane_json")
 
-      curl -fsS --max-time 15 \
+      # The header goes through a file descriptor, not argv (/proc/*/cmdline).
+      auth=()
+      if [ -r ${lib.escapeShellArg (toString cfg.ntfy.tokenFile)} ]; then
+        exec {auth_fd}< <(printf 'Authorization: Bearer %s\n' "$(cat ${lib.escapeShellArg (toString cfg.ntfy.tokenFile)})")
+        auth=(-H "@/dev/fd/$auth_fd")
+      fi
+
+      curl -fsS --max-time 15 "''${auth[@]}" \
         -H "Title: $agent $what''${label:+ · $label}" \
         -H "Priority: $prio" -H "Tags: $tags" \
         -d "''${body:-$pane}" \
@@ -250,10 +257,22 @@ in
         default = null;
         description = "File holding the ntfy topic (a secret), readable by the herdr user.";
       };
+      tokenFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "File with an ntfy access token that may write the topic, readable by the herdr user. Needed once the server denies anonymous access.";
+      };
     };
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.ntfy.tokenFile == null || lib.hasPrefix "https://" (toString cfg.ntfy.url);
+        message = "modules.herdr.ntfy.tokenFile is set, but ntfy.url is not https://: the bearer token would go out in clear text.";
+      }
+    ];
+
     home = {
       # Herdr — terminal-based multiplexer for running/attaching to multiple AI
       # coding agent sessions in real PTYs (persistent, SSH-friendly, no Electron).
