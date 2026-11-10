@@ -108,9 +108,11 @@ let
       label=$(herdr workspace get "$ws" 2>/dev/null | jq -r '.result.workspace.label // empty' || true)
       body=$(jq -r '.result.pane.terminal_title_stripped // empty' <<<"$pane_json")
 
+      # The header goes through a file descriptor, not argv (/proc/*/cmdline).
       auth=()
       if [ -r ${lib.escapeShellArg (toString cfg.ntfy.tokenFile)} ]; then
-        auth=(-H "Authorization: Bearer $(cat ${lib.escapeShellArg (toString cfg.ntfy.tokenFile)})")
+        exec {auth_fd}< <(printf 'Authorization: Bearer %s\n' "$(cat ${lib.escapeShellArg (toString cfg.ntfy.tokenFile)})")
+        auth=(-H "@/dev/fd/$auth_fd")
       fi
 
       curl -fsS --max-time 15 "''${auth[@]}" \
@@ -264,6 +266,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.ntfy.tokenFile == null || lib.hasPrefix "https://" (toString cfg.ntfy.url);
+        message = "modules.herdr.ntfy.tokenFile is set, but ntfy.url is not https://: the bearer token would go out in clear text.";
+      }
+    ];
+
     home = {
       # Herdr — terminal-based multiplexer for running/attaching to multiple AI
       # coding agent sessions in real PTYs (persistent, SSH-friendly, no Electron).
