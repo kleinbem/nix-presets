@@ -108,7 +108,12 @@ let
       label=$(herdr workspace get "$ws" 2>/dev/null | jq -r '.result.workspace.label // empty' || true)
       body=$(jq -r '.result.pane.terminal_title_stripped // empty' <<<"$pane_json")
 
-      curl -fsS --max-time 15 \
+      auth=()
+      if [ -r ${lib.escapeShellArg (toString cfg.ntfy.tokenFile)} ]; then
+        auth=(-H "Authorization: Bearer $(cat ${lib.escapeShellArg (toString cfg.ntfy.tokenFile)})")
+      fi
+
+      curl -fsS --max-time 15 "''${auth[@]}" \
         -H "Title: $agent $what''${label:+ · $label}" \
         -H "Priority: $prio" -H "Tags: $tags" \
         -d "''${body:-$pane}" \
@@ -249,6 +254,11 @@ in
         type = lib.types.nullOr lib.types.str;
         default = null;
         description = "File holding the ntfy topic (a secret), readable by the herdr user.";
+      };
+      tokenFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "File with an ntfy access token that may write the topic, readable by the herdr user. Needed once the server denies anonymous access.";
       };
     };
   };
