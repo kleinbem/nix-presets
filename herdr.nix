@@ -118,7 +118,7 @@ let
       curl -fsS --max-time 15 "''${auth[@]}" \
         -H "Title: $agent $what''${label:+ · $label}" \
         -H "Priority: $prio" -H "Tags: $tags" \
-        -d "''${body:-$pane}" \
+        --data-raw "''${body:-$pane}" \
         ${lib.escapeShellArg cfg.ntfy.url}/"$topic" >/dev/null || true
     '';
   };
