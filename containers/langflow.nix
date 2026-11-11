@@ -52,7 +52,7 @@ in
           virtualisation.oci-containers = {
             backend = "podman";
             containers.langflow = {
-              image = "docker.io/langflowai/langflow:1.13.1"; # image-bump: semver
+              image = "docker.io/langflowai/langflow:1.13.2"; # image-bump: semver
               ports = [ "7860:7860" ];
               environment = {
                 LANGFLOW_DATABASE_URL = "sqlite:////var/lib/langflow/langflow.db";
