@@ -46,6 +46,7 @@ pkgs.testers.runNixOSTest {
         pkgs.rclone
         pkgs.gnutar
         pkgs.gzip
+        pkgs.jq
       ];
       # Holds its database the way Music Assistant does: WAL in exclusive
       # locking mode, so no other process can read it while this runs.
@@ -165,6 +166,10 @@ pkgs.testers.runNixOSTest {
     };
 
   testScript = ''
+    snapshots = (
+        "RESTIC_PASSWORD_FILE=/etc/backup-test/restic-pw RCLONE_CONFIG=/etc/backup-test/rclone.conf "
+        "restic -r rclone:dest:/srv/dest-a/restic/machine snapshots --json | jq length"
+    )
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("postgresql.service")
     machine.succeed("setup-fixtures")
@@ -254,10 +259,19 @@ pkgs.testers.runNixOSTest {
             "| grep index-canary"
         )
         machine.fail("test -e /rrestore2/var/lib/backup/staging/bulk-primary/dumps/locked")
+        # No prune on an incomplete run: the complete snapshot from before stays.
+        machine.succeed(f"[ $({snapshots}) -eq 2 ]")
         machine.fail("test -e /var/lib/backup/bulk-primary.last-success")
         machine.fail("test -e /var/lib/backup/staging/bulk-primary")
         # The failed item still started its unit again.
         machine.wait_for_unit("locker.service")
         machine.wait_until_succeeds("grep 'restic-backups-bulk-primary failed' /var/log/backup-notify")
+
+    with subtest("bulk tier: a complete run prunes again"):
+        machine.succeed("rm /run/break-dumps")
+        machine.succeed("systemctl start restic-backups-bulk-primary.service")
+        # --keep-daily keeps one snapshot of today.
+        machine.succeed(f"[ $({snapshots}) -eq 1 ]")
+        machine.succeed("test -f /var/lib/backup/bulk-primary.last-success")
   '';
 }

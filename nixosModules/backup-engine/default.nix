@@ -182,6 +182,10 @@ let
           (
           set -e
           ${lib.optionalString (item.stopUnits != [ ]) ''
+            # Every bulk destination dumps on its own timer: without the lock,
+            # one job's restart retakes the app's lock while another dumps.
+            exec 9>/run/backup-dump.lock
+            ${pkgs.util-linux}/bin/flock 9
             stopped=()
             for u in ${lib.escapeShellArgs item.stopUnits}; do
               ! ${systemctl} is-active -q "$u" || stopped+=("$u")
@@ -469,10 +473,12 @@ in
           initialize = true;
           repository = "rclone:${dest.remote}/restic/${host}";
           inherit (dest) rcloneConfigFile;
-          inherit (cfg.bulk) passwordFile pruneOpts checkOpts;
+          inherit (cfg.bulk) passwordFile;
           extraOptions = dest.resticExtraOptions;
           # Like the secure tier, a failed dump still backs up the rest; the
-          # first ExecStartPost then fails the job (alert, no marker).
+          # first ExecStartPost then fails the job (alert, no marker). Prune
+          # and check come after that check, so an incomplete snapshot never
+          # prunes a complete one.
           backupPrepareCommand = "${mkDumpScript "bulk" bulkItems} ${bulkStage d}/dumps || touch ${bulkStage d}/incomplete";
           backupCleanupCommand = "rm -rf ${bulkStage d}";
           paths = [ "${bulkStage d}/dumps" ] ++ allOf "paths" bulkItems;
@@ -490,7 +496,12 @@ in
 
         services = lib.mkMerge [
           (lib.mapAttrs' (
-            d: _:
+            d: dest:
+            let
+              restic = "${lib.getExe config.services.restic.backups."bulk-${d}".package}${
+                lib.concatMapStrings (o: " -o ${o}") dest.resticExtraOptions
+              }";
+            in
             lib.nameValuePair "restic-backups-bulk-${d}" {
               # upstream's unit only has ssh on PATH; restic execs `rclone`.
               path = [ pkgs.rclone ];
@@ -499,6 +510,15 @@ in
                 "${pkgs.writeShellScript "backup-bulk-complete" ''
                   [ ! -e ${bulkStage d}/incomplete ] || { echo "ERROR: backed up without the failed items above" >&2; exit 1; }
                 ''}"
+              ]
+              ++ lib.optionals (cfg.bulk.pruneOpts != [ ]) [
+                "${restic} unlock"
+                "${restic} forget --prune ${lib.concatStringsSep " " cfg.bulk.pruneOpts}"
+              ]
+              ++ lib.optional (
+                cfg.bulk.checkOpts != [ ]
+              ) "${restic} check ${lib.concatStringsSep " " cfg.bulk.checkOpts}"
+              ++ [
                 (touchMarker "bulk-${d}")
               ]
               ++ lib.optional (hb.pingKeyFile != null) "${heartbeat} bulk-${d}";
