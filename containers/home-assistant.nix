@@ -128,10 +128,18 @@ in
                 "thread"
                 "otbr"
                 "homeassistant_sky_connect"
-                # Discovery finds a QNAP switch and a Google device; without
-                # the libs each logs an import error on every start.
+                # Discovery finds BLE/HomeKit/LAN devices on the home network;
+                # without their libs HA logs an import error on every start.
+                "homekit_controller"
                 "nest"
                 "qnap_qsw"
+                "switchbot"
+                "xiaomi_ble"
+                # Native calendars, to-do lists, workday schedules and ntfy alerts.
+                "local_calendar"
+                "local_todo"
+                "ntfy"
+                "workday"
                 # alarmo imports homeassistant.components.mqtt at load time
                 # although its manifest lists mqtt only as optional, so without
                 # paho-mqtt it fails to set up at all (nielsfaber/alarmo#572).
@@ -144,6 +152,15 @@ in
                 # (my.containers.music-assistant).
                 "music_assistant"
               ];
+
+              # ha_mcp_tools pulls pydantic[email] (email-validator); isal and
+              # zlib-ng satisfy aiohttp_fast_zlib on WebSocket/HTTP payloads.
+              extraPackages =
+                python3Packages: with python3Packages; [
+                  email-validator
+                  isal
+                  zlib-ng
+                ];
 
               # From nixpkgs, not HACS. Lovelace resource path for button-card:
               # /local/nixos-lovelace-modules/button-card.js
@@ -272,9 +289,9 @@ in
                   iframeDashboard "node-red" "Node-RED" "http://${lanHost}:1880"
                 }"
                 "f /var/lib/hass/themes.yaml 0644 hass hass - {}"
-                "f /var/lib/hass/automations.yaml 0644 hass hass - {}"
+                "f /var/lib/hass/automations.yaml 0644 hass hass - []"
                 "f /var/lib/hass/scripts.yaml 0644 hass hass - {}"
-                "f /var/lib/hass/scenes.yaml 0644 hass hass - {}"
+                "f /var/lib/hass/scenes.yaml 0644 hass hass - []"
               ];
 
             systemd.services.home-assistant.preStart = lib.mkAfter ''
