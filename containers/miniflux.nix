@@ -96,7 +96,9 @@ in
               OAUTH2_PROVIDER = "oidc";
               OAUTH2_CLIENT_ID = cfg.oidc.clientId;
               OAUTH2_REDIRECT_URL = "https://${cfg.domain}/oauth2/oidc/callback";
-              OAUTH2_OIDC_DISCOVERY_ENDPOINT = cfg.oidc.issuerUrl;
+              # go-oidc automatically appends /.well-known/openid-configuration
+              OAUTH2_OIDC_DISCOVERY_ENDPOINT = lib.removeSuffix "/.well-known/openid-configuration" cfg.oidc.issuerUrl;
+              OAUTH2_OIDC_PROVIDER_NAME = "Authentik";
               OAUTH2_USER_CREATION = 1;
             }
             // lib.optionalAttrs hasOidcSecret {
