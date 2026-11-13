@@ -16,6 +16,10 @@ let
 
   hasAdminCredentials = cfg.adminCredentialsFile != null;
   adminCredentialsPath = "/run/secrets/miniflux-admin.env";
+
+  hasOidcSecret = cfg.oidc.enable && cfg.oidc.clientSecretFile != null;
+  oidcSecretPath = "/run/secrets/miniflux-oidc-secret";
+  oidcCredentialPath = "/run/credentials/miniflux.service/miniflux-oidc-secret";
 in
 {
   imports = [ ../nixosModules/backup-engine ];
@@ -55,9 +59,15 @@ in
       default = null;
       description = "Host path to environment file containing ADMIN_USERNAME and ADMIN_PASSWORD.";
     };
+    oidc = oidcOpts.oidc // {
+      clientSecretFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Host path to the Authentik client secret file. Required when oidc.enable.";
+      };
+    };
   }
-  // tlsOpts
-  // oidcOpts;
+  // tlsOpts;
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
@@ -88,7 +98,14 @@ in
               OAUTH2_REDIRECT_URL = "https://${cfg.domain}/oauth2/oidc/callback";
               OAUTH2_OIDC_DISCOVERY_ENDPOINT = cfg.oidc.issuerUrl;
               OAUTH2_USER_CREATION = 1;
+            }
+            // lib.optionalAttrs hasOidcSecret {
+              OAUTH2_CLIENT_SECRET_FILE = oidcCredentialPath;
             };
+          };
+
+          systemd.services.miniflux.serviceConfig = lib.mkIf hasOidcSecret {
+            LoadCredential = [ "miniflux-oidc-secret:${oidcSecretPath}" ];
           };
 
           networking.firewall.allowedTCPPorts = [ cfg.port ];
@@ -109,8 +126,22 @@ in
             hostPath = cfg.adminCredentialsFile;
             isReadOnly = true;
           };
+        }
+        // lib.optionalAttrs hasOidcSecret {
+          ${oidcSecretPath} = {
+            hostPath = cfg.oidc.clientSecretFile;
+            isReadOnly = true;
+          };
         };
       })
+      {
+        assertions = [
+          {
+            assertion = !cfg.oidc.enable || cfg.oidc.clientSecretFile != null;
+            message = "my.containers.miniflux.oidc.enable requires oidc.clientSecretFile.";
+          }
+        ];
+      }
       {
         my.backup.items = {
           miniflux-db = {
