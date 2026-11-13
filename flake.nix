@@ -249,7 +249,14 @@
                   imports = [
                     (if builtins.isFunction innerConfig then innerConfig innerArgs else innerConfig)
                   ];
-                  nixpkgs.overlays = inputs.nixpkgs.lib.mkBefore [ inputs.nix-detour-fleet.overlays.default ];
+                  nixpkgs = {
+                    config = {
+                      allowUnfree = true;
+                      allowUnfreePredicate = _: true;
+                      allowInsecurePredicate = pkg: builtins.elem (inputs.nixpkgs.lib.getName pkg) [ "openclaw" ];
+                    };
+                    overlays = inputs.nixpkgs.lib.mkBefore [ inputs.nix-detour-fleet.overlays.default ];
+                  };
                 };
               }
             );
