@@ -144,11 +144,13 @@ in
                   ALLOW_ONLY_EXTERNAL_REGISTRATION = hasOidc;
                   SHOW_REGISTRATION_BUTTON = false;
                 };
-                # A new Authentik login gets its own account; one whose name
+                # A new Authentik login gets its own account (derived from the
+                # email prefix so email-formatted usernames like Google logins
+                # don't fail Forgejo's character validation). One whose name
                 # matches a local account must log in locally once to link.
                 oauth2_client = {
                   ENABLE_AUTO_REGISTRATION = true;
-                  USERNAME = "nickname";
+                  USERNAME = "email";
                   ACCOUNT_LINKING = "login";
                   OPENID_CONNECT_SCOPES = lib.concatStringsSep " " cfg.oidc.scopes;
                 };
