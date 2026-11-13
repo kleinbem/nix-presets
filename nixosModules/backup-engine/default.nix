@@ -71,6 +71,12 @@ let
         default = null;
         description = "Escape hatch: shell command whose stdout is stored as <item>/command.dump.";
       };
+      stopUnits = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        example = [ "container@music-assistant.service" ];
+        description = "Units stopped while this item dumps, for apps that hold their database locked (SQLite `locking_mode=exclusive`). Only the ones that were running are started again.";
+      };
     };
   };
 
@@ -159,6 +165,8 @@ let
   # `<script> <outdir>` → <outdir>/<item>/{<sqlite basename>,postgres-*.sql,command.dump}
   # Each item dumps on its own: a failed one (a stopped container, a missing
   # mount) is left out and the script exits 1 after dumping all the others.
+  systemctl = "${config.systemd.package}/bin/systemctl";
+
   mkDumpScript =
     tier: items:
     pkgs.writeShellScript "backup-dump-${tier}" ''
@@ -173,6 +181,14 @@ let
           set +e
           (
           set -e
+          ${lib.optionalString (item.stopUnits != [ ]) ''
+            stopped=()
+            for u in ${lib.escapeShellArgs item.stopUnits}; do
+              ! ${systemctl} is-active -q "$u" || stopped+=("$u")
+            done
+            trap '[ "''${#stopped[@]}" -eq 0 ] || ${systemctl} start "''${stopped[@]}"' EXIT
+            [ "''${#stopped[@]}" -eq 0 ] || ${systemctl} stop "''${stopped[@]}"
+          ''}
           mkdir -p "$out"/${esc name}
           ${lib.concatMapStrings (p: ''
             ${pkgs.sqlite}/bin/sqlite3 ${esc p} ".backup '$out/${name}/${baseNameOf p}'"
@@ -455,7 +471,9 @@ in
           inherit (dest) rcloneConfigFile;
           inherit (cfg.bulk) passwordFile pruneOpts checkOpts;
           extraOptions = dest.resticExtraOptions;
-          backupPrepareCommand = "${mkDumpScript "bulk" bulkItems} ${bulkStage d}/dumps";
+          # Like the secure tier, a failed dump still backs up the rest; the
+          # first ExecStartPost then fails the job (alert, no marker).
+          backupPrepareCommand = "${mkDumpScript "bulk" bulkItems} ${bulkStage d}/dumps || touch ${bulkStage d}/incomplete";
           backupCleanupCommand = "rm -rf ${bulkStage d}";
           paths = [ "${bulkStage d}/dumps" ] ++ allOf "paths" bulkItems;
           exclude = allOf "exclude" bulkItems;
@@ -478,6 +496,9 @@ in
               path = [ pkgs.rclone ];
               onFailure = [ "backup-notify-failure@restic-backups-bulk-${d}.service" ];
               serviceConfig.ExecStartPost = [
+                "${pkgs.writeShellScript "backup-bulk-complete" ''
+                  [ ! -e ${bulkStage d}/incomplete ] || { echo "ERROR: backed up without the failed items above" >&2; exit 1; }
+                ''}"
                 (touchMarker "bulk-${d}")
               ]
               ++ lib.optional (hb.pingKeyFile != null) "${heartbeat} bulk-${d}";

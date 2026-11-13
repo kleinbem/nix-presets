@@ -98,8 +98,11 @@ in
       {
         # The databases are written while the service runs; copy them with
         # sqlite's `.backup` instead of the live files. The cache is left out.
+        # Music Assistant opens them with locking_mode=exclusive, so nothing
+        # can read them while it runs: the container stops for the dump.
         my.backup.items.music-assistant = {
           tier = "bulk";
+          stopUnits = [ "container@music-assistant.service" ];
           sqlite = [
             "${cfg.hostDataDir}/library.db"
             "${cfg.hostDataDir}/auth.db"

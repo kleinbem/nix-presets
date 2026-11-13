@@ -47,6 +47,26 @@ pkgs.testers.runNixOSTest {
         pkgs.gnutar
         pkgs.gzip
       ];
+      # Holds its database the way Music Assistant does: WAL in exclusive
+      # locking mode, so no other process can read it while this runs.
+      systemd.services.locker = {
+        wantedBy = [ "multi-user.target" ];
+        script = ''
+          mkdir -p /srv/locked
+          ${pkgs.python3}/bin/python3 - <<'PY'
+          import sqlite3, time
+          c = sqlite3.connect("/srv/locked/l.db", isolation_level=None)
+          c.execute("PRAGMA locking_mode=exclusive")
+          c.execute("PRAGMA journal_mode=WAL")
+          c.execute("create table if not exists t(v)")
+          c.execute("delete from t")
+          c.execute("insert into t values('locked-canary')")
+          open("/run/locker-ready", "w").close()
+          time.sleep(1e9)
+          PY
+        '';
+      };
+
       # Fake healthchecks endpoint: logs every request path, answers 200.
       systemd.services.fake-hc = {
         wantedBy = [ "multi-user.target" ];
@@ -103,6 +123,13 @@ pkgs.testers.runNixOSTest {
             ];
             sqlite = [ "/srv/media/index.db" ];
           };
+          locked = {
+            tier = "bulk";
+            sqlite = [ "/srv/locked/l.db" ];
+            stopUnits = [ "locker.service" ];
+            # Fails once /run/break-dumps exists (last subtest).
+            command = "[ ! -e /run/break-dumps ] && echo bulk-command-canary";
+          };
         };
         destinations = {
           primary = {
@@ -142,6 +169,9 @@ pkgs.testers.runNixOSTest {
     machine.wait_for_unit("postgresql.service")
     machine.succeed("setup-fixtures")
     machine.wait_for_open_port(8321)
+    machine.wait_for_file("/run/locker-ready")
+    # The lock is real: a reader is refused while locker runs.
+    machine.fail("sqlite3 /srv/locked/l.db 'select v from t'")
 
     with subtest("secure tier: backup, decrypt, restore"):
         machine.succeed("systemctl start backup-secure.service")
@@ -176,6 +206,14 @@ pkgs.testers.runNixOSTest {
         machine.succeed("test -f /var/lib/backup/bulk-primary.last-success")
         machine.fail("test -e /var/lib/backup/staging/bulk-primary")
 
+    with subtest("bulk tier: a locked database dumps while its unit is stopped"):
+        machine.succeed(
+            "sqlite3 /rrestore/var/lib/backup/staging/bulk-primary/dumps/locked/l.db 'select v from t' "
+            "| grep locked-canary"
+        )
+        machine.succeed("grep bulk-command-canary /rrestore/var/lib/backup/staging/bulk-primary/dumps/locked/command.dump")
+        machine.succeed("systemctl is-active locker.service")
+
     with subtest("failure + staleness notifications"):
         machine.fail("systemctl start restic-backups-bulk-flaky.service")
         machine.wait_until_succeeds("grep 'restic-backups-bulk-flaky failed' /var/log/backup-notify")
@@ -203,5 +241,23 @@ pkgs.testers.runNixOSTest {
         machine.succeed("grep secret-file /restore2/srv/app/keep.pem")
         machine.fail("test -e /var/lib/backup/secure.last-success")
         machine.wait_until_succeeds("grep -x /test-ping-key/machine-backup-secure/fail /var/log/hc-pings")
+
+    with subtest("bulk tier: a failed dump still backs up the rest, then fails the job"):
+        machine.succeed("rm /var/lib/backup/bulk-primary.last-success")
+        machine.fail("systemctl start restic-backups-bulk-primary.service")
+        machine.succeed(
+            "RESTIC_PASSWORD_FILE=/etc/backup-test/restic-pw RCLONE_CONFIG=/etc/backup-test/rclone.conf "
+            "restic -r rclone:dest:/srv/dest-a/restic/machine restore latest --target /rrestore2"
+        )
+        machine.succeed(
+            "sqlite3 /rrestore2/var/lib/backup/staging/bulk-primary/dumps/media/index.db 'select v from i' "
+            "| grep index-canary"
+        )
+        machine.fail("test -e /rrestore2/var/lib/backup/staging/bulk-primary/dumps/locked")
+        machine.fail("test -e /var/lib/backup/bulk-primary.last-success")
+        machine.fail("test -e /var/lib/backup/staging/bulk-primary")
+        # The failed item still started its unit again.
+        machine.wait_for_unit("locker.service")
+        machine.wait_until_succeeds("grep 'restic-backups-bulk-primary failed' /var/log/backup-notify")
   '';
 }
