@@ -168,7 +168,7 @@ pkgs.testers.runNixOSTest {
   testScript = ''
     snapshots = (
         "RESTIC_PASSWORD_FILE=/etc/backup-test/restic-pw RCLONE_CONFIG=/etc/backup-test/rclone.conf "
-        "restic -r rclone:dest:/srv/dest-a/restic/machine snapshots --json | jq length"
+        "restic -r rclone:dest:/srv/dest-a/restic/machine snapshots --json"
     )
     machine.wait_for_unit("multi-user.target")
     machine.wait_for_unit("postgresql.service")
@@ -260,7 +260,8 @@ pkgs.testers.runNixOSTest {
         )
         machine.fail("test -e /rrestore2/var/lib/backup/staging/bulk-primary/dumps/locked")
         # No prune on an incomplete run: the complete snapshot from before stays.
-        machine.succeed(f"[ $({snapshots}) -eq 2 ]")
+        machine.succeed(f"[ $({snapshots} | jq length) -eq 2 ]")
+        incomplete = machine.succeed(f"{snapshots} | jq -r '.[-1].id'").strip()
         machine.fail("test -e /var/lib/backup/bulk-primary.last-success")
         machine.fail("test -e /var/lib/backup/staging/bulk-primary")
         # The failed item still started its unit again.
@@ -270,8 +271,10 @@ pkgs.testers.runNixOSTest {
     with subtest("bulk tier: a complete run prunes again"):
         machine.succeed("rm /run/break-dumps")
         machine.succeed("systemctl start restic-backups-bulk-primary.service")
-        # --keep-daily keeps one snapshot of today.
-        machine.succeed(f"[ $({snapshots}) -eq 1 ]")
+        # The incomplete snapshot goes; restic also keeps the oldest one while
+        # the daily buckets aren't full.
+        machine.succeed(f"[ $({snapshots} | jq length) -eq 2 ]")
+        machine.fail(f"{snapshots} | jq -e --arg id {incomplete} 'any(.[]; .id == $id)'")
         machine.succeed("test -f /var/lib/backup/bulk-primary.last-success")
   '';
 }
