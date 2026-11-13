@@ -14,7 +14,11 @@ in
     enable = lib.mkEnableOption "Netdata NixOS-Native Container";
     ip = lib.mkOption {
       type = lib.types.str;
-      default = myInventory.network.nodes.netdata.ip or "10.85.46.122";
+      default =
+        let
+          addr = myInventory.network.nodes.netdata.ip or "10.85.46.122";
+        in
+        if lib.hasInfix "/" addr then addr else "${addr}/24";
     };
     hostDataDir = lib.mkOption {
       type = lib.types.str;
