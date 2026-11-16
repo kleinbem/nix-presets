@@ -12,7 +12,15 @@ let
   claude-heytcass =
     inputs.claude-for-linux.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop.overrideAttrs
       (oldAttrs: {
-        nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ pkgs.asar ];
+        nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [
+          pkgs.asar
+          pkgs.makeWrapper
+        ];
+        # Electron picks its key store from the desktop name; Hyprland and Sway would get a
+        # plaintext fallback and lose the sign-in that GNOME stored in the login keyring.
+        postFixup = (oldAttrs.postFixup or "") + ''
+          wrapProgram $out/bin/claude-desktop --add-flags "--password-store=gnome-libsecret"
+        '';
         postInstall = (oldAttrs.postInstall or "") + ''
           # Patch Google OAuth deep-link callback handling in app.asar to prevent silent eviction on Linux second-instance handoff
           # Upstream fix tracked in NixOS/nixpkgs#537215
