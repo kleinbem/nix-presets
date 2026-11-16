@@ -35,11 +35,12 @@ in
     # Same-origin, because Gatus sends no CORS headers and the browser would
     # block a direct call. Baked into the closure: set it where it is built.
     gatusUrl = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
+      # Caddy rejects an upstream with a path, a trailing slash included.
+      type = lib.types.nullOr (lib.types.strMatching "https?://[^/]+");
       default = null;
       example = "http://10.85.48.140:8080";
       description = ''
-        Gatus base URL. Its endpoint statuses are proxied at
+        Gatus base URL (scheme, host and port, no path). Its endpoint statuses are proxied at
         `/api/v1/endpoints/statuses`, so `"gatusUrl": "/"` in `config.json`
         gives Foyer live health.
       '';
