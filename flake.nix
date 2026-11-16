@@ -183,6 +183,11 @@
                 module = self.nixosModules.ente;
               };
 
+              dashboard-foyer = import ./checks/dashboard-foyer.nix {
+                inherit pkgs;
+                module = self.nixosModules.dashboard-foyer;
+              };
+
               # Built here so a broken bump fails CI, not only the updater.
               inherit (config.packages) freecad-mcp;
 
