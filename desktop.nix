@@ -77,13 +77,13 @@ in
       obsidian
       mpv
       (google-chrome.override {
-        # No managed policy any more (nix-config modules/nixos/desktop.nix) —
-        # these are just our own launch defaults, not enterprise policy.
+        # Our own launch defaults; Chrome is unmanaged (no enterprise policy).
         commandLineArgs = lib.concatStringsSep " " [
-          # GNOME-drawn title bar under Wayland — replaces the old
-          # UseSystemTitleBar policy, which only existed as a policy (no
-          # normal chrome://settings equivalent on Linux).
+          # GNOME-drawn title bar under Wayland (no settings equivalent on Linux).
           "--enable-features=WaylandWindowDecorations"
+          # Chrome picks its cookie-key store from the desktop it sees, so GNOME and
+          # Hyprland would use different keys and sign you out on every switch.
+          "--password-store=gnome-libsecret"
         ];
       })
       zathura
