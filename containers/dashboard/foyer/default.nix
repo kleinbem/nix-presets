@@ -15,7 +15,9 @@ let
       pkgs.foyer or (pkgs.writeShellScriptBin "foyer" "echo 'foyer package not provided' && exit 1");
 
   hasConfigFile = cfg.configFile != null;
+  hasFeedDir = cfg.feedDir != null;
   configDir = "/run/foyer";
+  feedDir = "/run/foyer-feed";
 in
 {
   imports = [ (import ../options.nix { inherit lib; }) ];
@@ -30,6 +32,18 @@ in
         Path (on the deploying host) to Foyer's `config.json` (hosts, services,
         Gatus URL; see the Foyer README), bind-mounted read-only and served as
         `/config.json`. null serves the package's empty default.
+      '';
+    };
+    feedDir = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      example = "/run/foyer-feed";
+      description = ''
+        Directory (on the deploying host) of JSON files that something on the
+        host regenerates, bind-mounted read-only and served under `/feed/`.
+        With an `attention.json` in it, `"attentionUrl": "/feed/attention.json"`
+        in `config.json` fills Foyer's "Needs attention" panel. The directory
+        must exist before the container starts.
       '';
     };
     # Same-origin, because Gatus sends no CORS headers and the browser would
@@ -64,6 +78,13 @@ in
                   file_server
                 }
               ''
+              + lib.optionalString hasFeedDir ''
+                handle_path /feed/* {
+                  root * ${feedDir}
+                  header Cache-Control no-cache
+                  file_server
+                }
+              ''
               + lib.optionalString (cfg.gatusUrl != null) ''
                 handle /api/v1/endpoints/statuses {
                   reverse_proxy ${cfg.gatusUrl}
@@ -82,12 +103,19 @@ in
         networking.firewall.allowedTCPPorts = [ 8082 ];
       };
 
-      bindMounts = lib.optionalAttrs hasConfigFile {
-        "${configDir}/config.json" = {
-          hostPath = "${cfg.configFile}";
-          isReadOnly = true;
+      bindMounts =
+        lib.optionalAttrs hasConfigFile {
+          "${configDir}/config.json" = {
+            hostPath = "${cfg.configFile}";
+            isReadOnly = true;
+          };
+        }
+        // lib.optionalAttrs hasFeedDir {
+          ${feedDir} = {
+            hostPath = "${cfg.feedDir}";
+            isReadOnly = true;
+          };
         };
-      };
     }
   );
 }
