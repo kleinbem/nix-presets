@@ -11,14 +11,14 @@
 
 buildPythonPackage {
   pname = "freecad-mcp";
-  version = "0.1.30";
+  version = "0.1.32";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "neka-nat";
     repo = "freecad-mcp";
-    rev = "ec8abf21fb9e9ed4bbcbba497515e088423ad251";
-    hash = "sha256-PkRT0avZ9Wh2dEUN5+YAfp0I5eI8cfEpcEjv94YQu7U=";
+    rev = "246f608d5de49089aadc41d2d91cfce2ad8a44cd";
+    hash = "sha256-4BYPLCgQ6As1ceC5MUkfz5O8Lm+TbnSqiFZ8ffqD2uc=";
   };
 
   build-system = [ hatchling ];
