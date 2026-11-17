@@ -1,6 +1,6 @@
 # NixOS VM test for containers/dashboard/foyer: the container boots on a
-# bridge, serves the SPA, answers /config.json from the host's bind mount and
-# proxies the Gatus statuses.
+# bridge, serves the SPA, answers /config.json from the host's bind mount,
+# serves the host's feed directory and proxies the Gatus statuses.
 #   nix build .#checks.x86_64-linux.dashboard-foyer
 { pkgs, module }:
 let
@@ -62,11 +62,18 @@ pkgs.testers.runNixOSTest {
           serviceConfig.ExecStart = "${pkgs.python3}/bin/python3 -m http.server 8000 --bind 10.85.99.1 --directory ${gatusRoot}";
         };
 
+        # What a host timer would regenerate.
+        systemd.tmpfiles.rules = [
+          "d /run/foyer-feed 0755 root root -"
+          "f /run/foyer-feed/attention.json 0644 root root - {\"items\":[{\"title\":\"first\"}]}"
+        ];
+
         my.containers.dashboard = {
           enable = true;
           ip = "10.85.99.10/24";
           hostBridgeIp = "10.85.99.1";
           inherit configFile;
+          feedDir = "/run/foyer-feed";
           gatusUrl = "http://10.85.99.1:8000";
         };
       };
@@ -88,6 +95,16 @@ pkgs.testers.runNixOSTest {
             "curl -sf http://10.85.99.10:8082/api/v1/endpoints/statuses"
             " | ${pkgs.jq}/bin/jq -e '.[0].key == \"public_status\"'"
         )
+
+    with subtest("the host's feed directory is served, also after a file is replaced"):
+        feed = "curl -sf http://10.85.99.10:8082/feed/attention.json | ${pkgs.jq}/bin/jq -e "
+        machine.succeed(feed + "'.items[0].title == \"first\"'")
+        machine.succeed(
+            "echo '{\"items\":[{\"title\":\"second\"}]}' > /run/foyer-feed/new"
+            " && mv /run/foyer-feed/new /run/foyer-feed/attention.json"
+        )
+        machine.succeed(feed + "'.items[0].title == \"second\"'")
+        machine.fail("curl -sf http://10.85.99.10:8082/feed/missing.json")
 
     with subtest("the SPA and its fallback are still served"):
         machine.succeed("curl -sf http://10.85.99.10:8082/ | grep -q sveltekit")
