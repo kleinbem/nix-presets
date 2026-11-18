@@ -84,12 +84,12 @@ in
         "/dev/nvmap"
       ];
       description = ''
-        Tegra /dev nodes exposed to the container when jetson = true. VALIDATE
-        on the real Orin before enabling — the exact set varies by L4T release
-        (JetPack 6 / r36 may expose CUDA via /dev/nvgpu/igpu0/* instead of some
-        of these). Check with `ls -la /dev/nvhost* /dev/nvmap /dev/nvgpu` on the
-        device and trim/extend this list. Binding a node that does not exist on
-        the host fails container start (not the build).
+        Tegra /dev nodes exposed to the container when jetson = true. The set
+        varies by board and L4T release: the Orin Nano (r36 and r39) has no
+        nvhost-ctrl, -nvdec, -vic or -nvjpg and exposes the iGPU under
+        /dev/nvgpu/igpu0/*. Check with `ls -la /dev/nvhost* /dev/nvmap /dev/nvgpu`
+        on the device. Binding a node that does not exist on the host fails
+        container start (not the build).
       '';
     };
     innerConfig = lib.mkOption {

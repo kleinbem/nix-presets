@@ -68,7 +68,7 @@ in
     enableCuda = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Enable CUDA acceleration. Defaults to false on Jetson to avoid PTX toolchain mismatch between CUDA 12.9 and driver 540.5.0.";
+      description = "Enable CUDA acceleration through the host GPU. The CUDA build needs a driver at least as new as nixpkgs' default CUDA (13 on JetPack 7).";
     };
   }
   // tlsOpts;
