@@ -44,25 +44,44 @@ let
     out=${textfileDir}/nix_store.prom
     {
       paths=$(${pkgs.findutils}/bin/find /nix/store -maxdepth 1 -mindepth 1 | ${pkgs.coreutils}/bin/wc -l)
-      roots=$(${config.nix.package}/bin/nix-store --gc --print-roots 2>/dev/null | ${pkgs.gnugrep}/bin/grep -c '^"' || true)
-      gen=$(${pkgs.coreutils}/bin/readlink -f /nix/var/nix/profiles/system | ${pkgs.gnused}/bin/sed -n 's/.*system-\([0-9]*\)-link/\1/p')
-      closure=$(${config.nix.package}/bin/nix --extra-experimental-features nix-command path-info -S /run/current-system 2>/dev/null | ${pkgs.gawk}/bin/awk '{print $2}' || true)
-
       echo "# HELP nix_store_paths_total Total count of paths in /nix/store."
       echo "# TYPE nix_store_paths_total gauge"
       echo "nix_store_paths_total $paths"
 
-      echo "# HELP nix_gc_roots_total Persistent GC roots holding store paths."
-      echo "# TYPE nix_gc_roots_total gauge"
-      echo "nix_gc_roots_total $roots"
+      if roots_out=$(${config.nix.package}/bin/nix-store --gc --print-roots 2>/dev/null); then
+        roots=$(printf '%s\n' "$roots_out" | ${pkgs.gnugrep}/bin/grep -E '^"/' | ${pkgs.gnugrep}/bin/grep -cvE '^"(/proc/|/nix/var/nix/temproots/)' || true)
+        echo "# HELP nix_gc_roots_total Persistent GC roots holding store paths."
+        echo "# TYPE nix_gc_roots_total gauge"
+        echo "nix_gc_roots_total $roots"
+      fi
 
-      echo "# HELP nix_system_generation Current active NixOS system generation."
-      echo "# TYPE nix_system_generation gauge"
-      echo "nix_system_generation ''${gen:-0}"
+      cur=$(${pkgs.coreutils}/bin/readlink -f /run/current-system 2>/dev/null || true)
+      gen=""
+      if [ -n "$cur" ]; then
+        if [ "$(${pkgs.coreutils}/bin/readlink -f /nix/var/nix/profiles/system 2>/dev/null || true)" = "$cur" ]; then
+          gen=$(${pkgs.coreutils}/bin/readlink /nix/var/nix/profiles/system | ${pkgs.gnused}/bin/sed -n 's/.*system-\([0-9]*\)-link/\1/p')
+        else
+          for link in /nix/var/nix/profiles/system-*-link; do
+            if [ "$(${pkgs.coreutils}/bin/readlink -f "$link" 2>/dev/null || true)" = "$cur" ]; then
+              gen=$(printf '%s\n' "$link" | ${pkgs.gnused}/bin/sed -n 's/.*system-\([0-9]*\)-link/\1/p')
+            fi
+          done
+        fi
+      fi
+      if [ -n "$gen" ]; then
+        echo "# HELP nix_system_generation Current active NixOS system generation."
+        echo "# TYPE nix_system_generation gauge"
+        echo "nix_system_generation $gen"
+      fi
 
-      echo "# HELP nix_system_closure_bytes Closure size of /run/current-system in bytes."
-      echo "# TYPE nix_system_closure_bytes gauge"
-      echo "nix_system_closure_bytes ''${closure:-0}"
+      if closure_out=$(${config.nix.package}/bin/nix --extra-experimental-features nix-command path-info -S /run/current-system 2>/dev/null); then
+        closure=$(printf '%s\n' "$closure_out" | ${pkgs.gawk}/bin/awk '{print $2}')
+        if [ -n "$closure" ]; then
+          echo "# HELP nix_system_closure_bytes Closure size of /run/current-system in bytes."
+          echo "# TYPE nix_system_closure_bytes gauge"
+          echo "nix_system_closure_bytes $closure"
+        fi
+      fi
     } > "$out.tmp"
     ${pkgs.coreutils}/bin/mv -f "$out.tmp" "$out"
   '';
