@@ -38,6 +38,34 @@ let
     } > "$out.tmp"
     ${pkgs.coreutils}/bin/mv -f "$out.tmp" "$out"
   '';
+
+  nixStoreMetrics = pkgs.writeShellScript "node-nix-store-metrics" ''
+    set -eu
+    out=${textfileDir}/nix_store.prom
+    {
+      paths=$(${pkgs.findutils}/bin/find /nix/store -maxdepth 1 -mindepth 1 | ${pkgs.coreutils}/bin/wc -l)
+      roots=$(${config.nix.package}/bin/nix-store --gc --print-roots 2>/dev/null | ${pkgs.gnugrep}/bin/grep -c '^"' || true)
+      gen=$(${pkgs.coreutils}/bin/readlink -f /nix/var/nix/profiles/system | ${pkgs.gnused}/bin/sed -n 's/.*system-\([0-9]*\)-link/\1/p')
+      closure=$(${config.nix.package}/bin/nix --extra-experimental-features nix-command path-info -S /run/current-system 2>/dev/null | ${pkgs.gawk}/bin/awk '{print $2}' || true)
+
+      echo "# HELP nix_store_paths_total Total count of paths in /nix/store."
+      echo "# TYPE nix_store_paths_total gauge"
+      echo "nix_store_paths_total $paths"
+
+      echo "# HELP nix_gc_roots_total Persistent GC roots holding store paths."
+      echo "# TYPE nix_gc_roots_total gauge"
+      echo "nix_gc_roots_total $roots"
+
+      echo "# HELP nix_system_generation Current active NixOS system generation."
+      echo "# TYPE nix_system_generation gauge"
+      echo "nix_system_generation ''${gen:-0}"
+
+      echo "# HELP nix_system_closure_bytes Closure size of /run/current-system in bytes."
+      echo "# TYPE nix_system_closure_bytes gauge"
+      echo "nix_system_closure_bytes ''${closure:-0}"
+    } > "$out.tmp"
+    ${pkgs.coreutils}/bin/mv -f "$out.tmp" "$out"
+  '';
 in
 {
   options.my.monitoring.node = {
@@ -79,6 +107,26 @@ in
         timerConfig = {
           OnBootSec = "1min";
           OnUnitActiveSec = "5min";
+        };
+      };
+
+      services.node-nix-store-metrics = {
+        description = "Write Nix store metrics for node_exporter";
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = nixStoreMetrics;
+          ReadWritePaths = [ textfileDir ];
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          PrivateTmp = true;
+          NoNewPrivileges = true;
+        };
+      };
+      timers.node-nix-store-metrics = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnBootSec = "2min";
+          OnUnitActiveSec = "30min";
         };
       };
     };
