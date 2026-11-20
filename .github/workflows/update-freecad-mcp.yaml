@@ -35,7 +35,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: false
 
-      - uses: kleinbem/actions/nix-setup@7ec628296d5194e6e10031706387b992a10a1638 # v1.0.1
+      - uses: kleinbem/actions/nix-setup@b3ffb6b2eeb888969e5f16640c84a55956581542 # v1.9.0
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           nix-path: nixpkgs=channel:nixos-unstable
