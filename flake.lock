@@ -20,6 +20,26 @@
         "type": "github"
       }
     },
+    "coderabbit-steward": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1795397153,
+        "narHash": "sha256-87pgM8jnKXkZVc5fJacgYFvaayoIM2BkzoAxE/KS8Gc=",
+        "owner": "kleinbem-dev",
+        "repo": "coderabbit-steward",
+        "rev": "1d3b08a506af72dc8151402837b3cd0ef8242de3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kleinbem-dev",
+        "repo": "coderabbit-steward",
+        "type": "github"
+      }
+    },
     "colmena": {
       "inputs": {
         "nix-github-actions": "nix-github-actions",
@@ -1829,6 +1849,7 @@
     "root": {
       "inputs": {
         "attic-ui": "attic-ui",
+        "coderabbit-steward": "coderabbit-steward",
         "flake-parts": "flake-parts",
         "foyer": "foyer",
         "git-hooks": "git-hooks",
