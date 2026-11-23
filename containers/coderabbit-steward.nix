@@ -110,20 +110,20 @@ in
             environment = {
               DATABASE_URL = "sqlite:///var/lib/coderabbit-steward/steward.db?mode=rwc";
               CR_STEWARD_MODE = cfg.mode;
-            }
-            // lib.optionalAttrs hasPrivateKey {
-              GITHUB_APP_PRIVATE_KEY_FILE = privateKeyPath;
             };
             serviceConfig = {
               Type = "simple";
               User = "coderabbit-steward";
               Group = "coderabbit-steward";
-              ExecStart = "${stewardPkg}/bin/cr-steward daemon --listen ${listenHost}:${toString cfg.port}";
+              ExecStart =
+                "${stewardPkg}/bin/cr-steward daemon --listen ${listenHost}:${toString cfg.port}"
+                + lib.optionalString hasPrivateKey " --github-private-key-file %d/github-app-private-key";
               Restart = "always";
               RestartSec = "5s";
               StateDirectory = "coderabbit-steward";
               WorkingDirectory = "/var/lib/coderabbit-steward";
               EnvironmentFile = lib.optional hasSecrets secretsPath;
+              LoadCredential = lib.optional hasPrivateKey "github-app-private-key:${privateKeyPath}";
               NoNewPrivileges = true;
               PrivateTmp = true;
             };
