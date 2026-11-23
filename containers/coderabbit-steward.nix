@@ -14,14 +14,13 @@ let
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
   stewardPkg =
-    if inputs ? coderabbit-steward && inputs.coderabbit-steward ? packages then
-      inputs.coderabbit-steward.packages.${pkgs.system}.default
-    else
-      pkgs.coderabbit-steward
-        or (pkgs.writeShellScriptBin "cr-steward" "echo 'coderabbit-steward package not provided' && exit 1");
+    inputs.coderabbit-steward.packages.${pkgs.system}.default or pkgs.coderabbit-steward
+      or (pkgs.writeShellScriptBin "cr-steward" "echo 'coderabbit-steward package not provided' && exit 1");
 
   hasSecrets = cfg.secretsFile != null;
   secretsPath = "/run/secrets/coderabbit-steward.env";
+  inboundTls = cfg.tls.enable && cfg.tls.serverPort > 0;
+  listenHost = if inboundTls then "127.0.0.1" else "0.0.0.0";
 in
 {
   imports = [ ../nixosModules/backup-engine ];
@@ -66,11 +65,6 @@ in
       default = null;
       description = "Host path to sops-backed environment file (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, CR_STEWARD_API_TOKEN).";
     };
-    databaseUrl = lib.mkOption {
-      type = lib.types.str;
-      default = "sqlite:///var/lib/coderabbit-steward/steward.db?mode=rwc";
-      description = "SQLite database URL inside the container.";
-    };
   }
   // tlsOpts;
 
@@ -95,12 +89,12 @@ in
             wantedBy = [ "multi-user.target" ];
             after = [ "network.target" ];
             environment = {
-              DATABASE_URL = cfg.databaseUrl;
+              DATABASE_URL = "sqlite:///var/lib/coderabbit-steward/steward.db?mode=rwc";
               CR_STEWARD_MODE = cfg.mode;
             };
             serviceConfig = {
               Type = "simple";
-              ExecStart = "${stewardPkg}/bin/cr-steward daemon --listen 0.0.0.0:${toString cfg.port}";
+              ExecStart = "${stewardPkg}/bin/cr-steward daemon --listen ${listenHost}:${toString cfg.port}";
               Restart = "always";
               RestartSec = "5s";
               StateDirectory = "coderabbit-steward";
@@ -109,7 +103,7 @@ in
             };
           };
 
-          networking.firewall.allowedTCPPorts = [ cfg.port ];
+          networking.firewall.allowedTCPPorts = lib.optional (!inboundTls) cfg.port;
         };
       })
 
