@@ -14,11 +14,13 @@ let
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
   stewardPkg =
-    inputs.coderabbit-steward.packages.${pkgs.system}.default or pkgs.coderabbit-steward
-      or (pkgs.writeShellScriptBin "cr-steward" "echo 'coderabbit-steward package not provided' && exit 1");
+    inputs.coderabbit-steward.packages.${pkgs.stdenv.hostPlatform.system}.default
+      or pkgs.coderabbit-steward;
 
   hasSecrets = cfg.secretsFile != null;
   secretsPath = "/run/secrets/coderabbit-steward.env";
+  hasPrivateKey = cfg.privateKeyFile != null;
+  privateKeyPath = "/run/secrets/coderabbit-steward.pem";
   inboundTls = cfg.tls.enable && cfg.tls.serverPort > 0;
   listenHost = if inboundTls then "127.0.0.1" else "0.0.0.0";
 in
@@ -63,7 +65,12 @@ in
     secretsFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Host path to sops-backed environment file (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, CR_STEWARD_API_TOKEN).";
+      description = "Host path to sops-backed environment file (GITHUB_APP_ID, CR_STEWARD_API_TOKEN).";
+    };
+    privateKeyFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Host path to sops-backed GitHub App private key PEM file.";
     };
   }
   // tlsOpts;
@@ -82,8 +89,20 @@ in
             hostPath = "${cfg.hostDataDir}/data";
             isReadOnly = false;
           };
+        }
+        // lib.optionalAttrs hasPrivateKey {
+          ${privateKeyPath} = {
+            hostPath = cfg.privateKeyFile;
+            isReadOnly = true;
+          };
         };
         innerConfig = {
+          users.users.coderabbit-steward = {
+            isSystemUser = true;
+            group = "coderabbit-steward";
+          };
+          users.groups.coderabbit-steward = { };
+
           systemd.services.coderabbit-steward = {
             description = "coderabbit-steward CodeRabbit OSS Daemon";
             wantedBy = [ "multi-user.target" ];
@@ -91,15 +110,22 @@ in
             environment = {
               DATABASE_URL = "sqlite:///var/lib/coderabbit-steward/steward.db?mode=rwc";
               CR_STEWARD_MODE = cfg.mode;
+            }
+            // lib.optionalAttrs hasPrivateKey {
+              GITHUB_APP_PRIVATE_KEY_FILE = privateKeyPath;
             };
             serviceConfig = {
               Type = "simple";
+              User = "coderabbit-steward";
+              Group = "coderabbit-steward";
               ExecStart = "${stewardPkg}/bin/cr-steward daemon --listen ${listenHost}:${toString cfg.port}";
               Restart = "always";
               RestartSec = "5s";
               StateDirectory = "coderabbit-steward";
               WorkingDirectory = "/var/lib/coderabbit-steward";
               EnvironmentFile = lib.optional hasSecrets secretsPath;
+              NoNewPrivileges = true;
+              PrivateTmp = true;
             };
           };
 
