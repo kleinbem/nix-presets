@@ -22,7 +22,7 @@ jobs:
           # Read-only Attic over NetBird; skipped when the secrets are
           # absent (fork PRs, Dependabot).
           netbird-setup-key: ${{ secrets.NETBIRD_SETUP_KEY_EPHEMERAL }}
-          attic-token: ${{ secrets.ATTIC_PULL_TOKEN }}
+          attic-token: ${{ github.event_name == 'pull_request' && secrets.ATTIC_PULL_TOKEN || github.event_name != 'pull_request' && secrets.ATTIC_PUSH_TOKEN || '' }}
           # held-open-webui builds open-webui with all optional dependencies.
           free-disk-space: 'true'
       # Build the NixOS VM test on its own first: alone it passes in ~30 s,
@@ -34,13 +34,20 @@ jobs:
       # 16 GiB runner (NixOS/nix#13483). nix-fast-build uses memory-capped
       # eval workers.
       - name: Build all checks
-        run: >-
-          nix run github:Mic92/nix-fast-build --
-          --flake .#checks.x86_64-linux
-          --systems x86_64-linux
-          --eval-workers 2
-          --eval-max-memory-size 4096
-          --no-nom --no-link --skip-cached
+        env:
+          ATTIC_CACHE: ${{ github.event_name != 'pull_request' && secrets.ATTIC_PUSH_TOKEN != '' && 'system' || '' }}
+        run: |
+          args=(
+            --flake .#checks.x86_64-linux
+            --systems x86_64-linux
+            --eval-workers 2
+            --eval-max-memory-size 4096
+            --no-nom --no-link --skip-cached
+          )
+          if [ -n "$ATTIC_CACHE" ]; then
+            args+=(--attic-cache "$ATTIC_CACHE")
+          fi
+          nix run github:Mic92/nix-fast-build -- "${args[@]}"
       # The rest of what `nix flake check` covered: packages and dev shells
       # must evaluate (they are not built here).
       - name: Evaluate packages and dev shells
