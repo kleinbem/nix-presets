@@ -48,6 +48,10 @@
       url = "github:kleinbem-dev/revue";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    coderabbit-steward = {
+      url = "github:kleinbem-dev/coderabbit-steward";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     foyer = {
       url = "github:kleinbem-dev/foyer";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -335,6 +339,7 @@
               miniflux = import ./containers/miniflux.nix { inherit self; };
               forgejo = import ./containers/forgejo.nix { inherit self; };
               revue = import ./containers/revue.nix { inherit self inputs; };
+              coderabbit-steward = import ./containers/coderabbit-steward.nix { inherit self inputs; };
             };
 
             # `all` leaves out dashboard-homer: it declares the same
