@@ -79,7 +79,13 @@
         let
           pkgsUnfree = import inputs.nixpkgs {
             inherit system;
-            config.allowUnfree = true;
+            config = {
+              allowUnfree = true;
+              # firefox-esr-140: Zotero's runtime; drop when Zotero 11 moves to
+              # ESR 153. no-link: upstream Zotero 11 release packaging.
+              allowInsecurePredicate =
+                pkg: builtins.elem (inputs.nixpkgs.lib.getName pkg) [ "firefox-esr-140-bin-unwrapped" ];
+            };
           };
           pkgsWithExts = pkgsUnfree.extend inputs.nix-vscode-extensions.overlays.default;
           bundles = import ./code-common/bundles.nix { pkgs = pkgsWithExts; };
@@ -223,10 +229,20 @@
             antigravity-extensions-bundle = bundles.antigravity;
             cursor-extensions-bundle = bundles.cursor;
             windsurf-extensions-bundle = bundles.windsurf;
-            # Standalone build target for the sandbox desktop.nix installs.
-            element-desktop-sandboxed = sandboxedApps.element-desktop;
-            signal-desktop-sandboxed = sandboxedApps.signal-desktop;
+            # Standalone build targets for the nixpak sandboxes.
+            chromium-sandboxed = sandboxedApps.chromium;
             discord-sandboxed = sandboxedApps.discord;
+            element-desktop-sandboxed = sandboxedApps.element-desktop;
+            github-desktop-sandboxed = sandboxedApps.github-desktop;
+            ladybird-sandboxed = sandboxedApps.ladybird;
+            lmstudio-sandboxed = sandboxedApps.lmstudio;
+            mpv-sandboxed = sandboxedApps.mpv;
+            obs-studio-sandboxed = sandboxedApps.obs-studio;
+            obsidian-sandboxed = sandboxedApps.obsidian;
+            signal-desktop-sandboxed = sandboxedApps.signal-desktop;
+            slack-sandboxed = sandboxedApps.slack;
+            zathura-sandboxed = sandboxedApps.zathura;
+            zotero-sandboxed = sandboxedApps.zotero;
             # The FreeCAD MCP server mcp.nix installs.
             freecad-mcp = pkgs.python3.pkgs.callPackage ./pkgs/freecad-mcp.nix { };
           };

@@ -2,12 +2,27 @@
 
 let
   utils = import ../../nixpak/utils.nix { inherit pkgs nixpak; };
+  # Links and OAuth login: GitHub Desktop execs xdg-open; route via portal.
   sandboxedXdgUtils = pkgs.callPackage ../../nixpak/xdg-utils.nix { };
+
+  # github-desktop doesn't accept commandLineArgs in .override; wrap it so
+  # Chromium safeStorage doesn't need the whole login keyring.
+  githubDesktop = pkgs.symlinkJoin {
+    inherit (pkgs.github-desktop) pname version meta;
+    name = "github-desktop-${pkgs.github-desktop.version}";
+    paths = [ pkgs.github-desktop ];
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+    postBuild = ''
+      wrapProgram $out/bin/github-desktop \
+        --add-flags "--password-store=basic"
+    '';
+  };
 in
 utils.mkSandboxed {
-  package = pkgs.github-desktop;
+  package = githubDesktop;
   name = "github-desktop";
   configDir = "GitHub Desktop";
+  displayName = "GitHub Desktop";
   extraPackages = [
     sandboxedXdgUtils
     pkgs.git
@@ -21,24 +36,28 @@ utils.mkSandboxed {
   extraPerms =
     { sloth, ... }:
     {
+      dbus.policies = {
+        "org.freedesktop.Notifications" = "talk";
+        # File chooser (add local repo) and OpenURI (OAuth login, links)
+        "org.freedesktop.portal.*" = "talk";
+      };
       bubblewrap = {
         bind = {
           rw = [
-            # Code Repositories
+            # Code repositories
             (sloth.concat' sloth.homeDir "/Develop")
+            # SSH agent socket only (not all of $XDG_RUNTIME_DIR)
+            (sloth.env "SSH_AUTH_SOCK")
           ];
           ro = [
-            # Git & SSH Config
+            # Git & SSH config (read-only so the sandbox can't rewrite keys/hooks)
             (sloth.concat' sloth.homeDir "/.gitconfig")
+            (sloth.concat' sloth.homeDir "/.config/git")
             (sloth.concat' sloth.homeDir "/.ssh")
           ];
         };
         env = {
-          # SSH Agent for YubiKey auth
           SSH_AUTH_SOCK = sloth.env "SSH_AUTH_SOCK";
-          # Enable System Integration (Open Links/Apps) via DBus
-          DBUS_SESSION_BUS_ADDRESS = sloth.env "DBUS_SESSION_BUS_ADDRESS";
-          # Force invocation of our xdg-open wrapper
           BROWSER = "xdg-open";
         };
       };
