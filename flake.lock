@@ -27,11 +27,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795476184,
-        "narHash": "sha256-noEipA0QLb0azwxG+a7p/q74AwHlaFFUI1dVtMsYD9k=",
+        "lastModified": 1795493128,
+        "narHash": "sha256-d6bizIYLqDb/RnA4dYMntTGkAMoFXGGrG1WqKkLQVAE=",
         "owner": "kleinbem-dev",
         "repo": "coderabbit-steward",
-        "rev": "d303e73a9f4003fb8cfa6cea1faf3e631c9f638d",
+        "rev": "46be255a090bcb0364b922758a1b0bd25cbe45c3",
         "type": "github"
       },
       "original": {
