@@ -141,16 +141,7 @@
                         config = {
                           boot.isContainer = true;
                           system.stateVersion = "25.11";
-                          nixpkgs.config = {
-                            allowUnfree = true;
-                            # firefox-esr-140: Zotero's runtime (sandboxed-apps).
-                            # no-link: upstream Zotero 11 release packaging.
-                            allowInsecurePredicate =
-                              pkg:
-                              builtins.elem (inputs.nixpkgs.lib.getName pkg) [
-                                "firefox-esr-140-bin-unwrapped"
-                              ];
-                          };
+                          nixpkgs.config.allowUnfree = true;
                           # Mock sops if used
                           sops.templates = lib.mkOptionDefault { };
                           sops.secrets = lib.mkOptionDefault { };

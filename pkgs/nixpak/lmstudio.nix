@@ -1,4 +1,9 @@
-{ pkgs, nixpak, ... }:
+{
+  pkgs,
+  nixpak,
+  extraBindRw ? [ ],
+  ...
+}:
 
 let
   utils = import ../../nixpak/utils.nix { inherit pkgs nixpak; };
@@ -31,8 +36,7 @@ utils.mkSandboxed {
       bubblewrap.bind.rw = [
         # LM Studio runtime, hub metadata, and default model dir
         (sloth.mkdir (sloth.concat' sloth.homeDir "/.lmstudio"))
-        # Dedicated model storage on nixos-nvme (bind-try: skipped if absent)
-        "/var/lib/images/lmstudio"
-      ];
+      ]
+      ++ extraBindRw;
     };
 }

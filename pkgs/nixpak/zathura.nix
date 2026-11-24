@@ -18,9 +18,13 @@ utils.mkSandboxed {
     { sloth, ... }:
     {
       dbus.enable = false;
-      bubblewrap.bind.ro = [
-        (sloth.concat' sloth.homeDir "/Documents")
-        (sloth.concat' sloth.homeDir "/Downloads")
-      ];
+      # Nixpak defaults bubblewrap.network to true; disable it explicitly.
+      bubblewrap = {
+        network = false;
+        bind.ro = [
+          (sloth.concat' sloth.homeDir "/Documents")
+          (sloth.concat' sloth.homeDir "/Downloads")
+        ];
+      };
     };
 }
