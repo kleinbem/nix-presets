@@ -70,12 +70,10 @@ in
       restic-browser # GUI for Restic Backups
       restic # CLI Tool (Required for Restic Browser)
 
-      # Discord, Signal, Element: nixpak sandboxes, installed system-wide
-      # by nixosModules/sandboxed-apps.nix (my.desktop.sandboxedApps).
-
-      # -- Apps (Sandboxed via Firejail on host) --
-      obsidian
-      mpv
+      # Sandboxed desktop apps (chromium, discord, element-desktop, github-desktop,
+      # ladybird, lmstudio, mpv, obs-studio, obsidian, signal-desktop, slack,
+      # zathura, zotero) are installed system-wide by nixosModules/sandboxed-apps.nix
+      # (my.desktop.sandboxedApps).
       (google-chrome.override {
         # Our own launch defaults; Chrome is unmanaged (no enterprise policy).
         commandLineArgs = lib.concatStringsSep " " [
@@ -86,7 +84,6 @@ in
           "--password-store=gnome-libsecret"
         ];
       })
-      zathura
       imv # Image Viewer
       pkgs.rbw
       pkgs.rofi-rbw-wayland

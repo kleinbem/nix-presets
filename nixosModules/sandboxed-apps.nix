@@ -21,12 +21,22 @@ in
     enable = lib.mkEnableOption "nixpak-sandboxed desktop apps";
     apps = lib.mkOption {
       type = lib.types.listOf (lib.types.enum (builtins.attrNames sandboxed));
-      # Only the ones reviewed against firejail/Flathub and tested live; the
-      # other pkgs/nixpak/ drafts join as they're migrated.
+      # bitwarden stays out of the default list: its polkit policy (biometric
+      # unlock) and desktop_proxy bridge must land in the system profile.
       default = [
+        "chromium"
         "discord"
         "element-desktop"
+        "github-desktop"
+        "ladybird"
+        "lmstudio"
+        "mpv"
+        "obs-studio"
+        "obsidian"
         "signal-desktop"
+        "slack"
+        "zathura"
+        "zotero"
       ];
       description = "Which sandboxed apps from pkgs/nixpak/ to install.";
     };
