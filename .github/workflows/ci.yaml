@@ -22,7 +22,7 @@ jobs:
           # Read-only Attic over NetBird; skipped when the secrets are
           # absent (fork PRs, Dependabot).
           netbird-setup-key: ${{ secrets.NETBIRD_SETUP_KEY_EPHEMERAL }}
-          attic-token: ${{ github.event_name == 'pull_request' && secrets.ATTIC_PULL_TOKEN || github.event_name != 'pull_request' && secrets.ATTIC_PUSH_TOKEN || '' }}
+          attic-token: ${{ github.event_name != 'pull_request' && secrets.ATTIC_PUSH_TOKEN || secrets.ATTIC_PULL_TOKEN || '' }}
           # held-open-webui builds open-webui with all optional dependencies.
           free-disk-space: 'true'
       # Build the NixOS VM test on its own first: alone it passes in ~30 s,
@@ -35,7 +35,7 @@ jobs:
       # eval workers.
       - name: Build all checks
         env:
-          ATTIC_CACHE: ${{ github.event_name != 'pull_request' && secrets.ATTIC_PUSH_TOKEN != '' && 'system' || '' }}
+          ATTIC_CACHE: ${{ github.event_name != 'pull_request' && secrets.ATTIC_PUSH_TOKEN != '' && secrets.NETBIRD_SETUP_KEY_EPHEMERAL != '' && 'system' || '' }}
         run: |
           args=(
             --flake .#checks.x86_64-linux
