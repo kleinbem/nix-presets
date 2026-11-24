@@ -156,10 +156,18 @@ rec {
                     # xdg-open) reachable for apps that exec helpers by name.
                     env.PATH = "${envPackage}/bin";
 
-                    # Base binds that everyone needs
+                    # Base binds that everyone needs.
+                    # On NixOS, /etc/ssl/certs/ca-certificates.crt and
+                    # /etc/pki/tls/certs/ca-bundle.crt symlink through /etc/static/*
+                    # into /nix/store; without binding the /etc/static targets, those
+                    # symlinks dangle inside bwrap and break TLS for apps that read
+                    # the host trust store (e.g. Ladybird's RequestServer).
                     bind.ro = [
                       "/etc/fonts"
                       "/etc/ssl/certs"
+                      "/etc/static/ssl/certs"
+                      "/etc/pki/tls/certs"
+                      "/etc/static/pki/tls/certs"
                       "/etc/profiles/per-user"
                       (sloth.concat' sloth.homeDir "/.icons")
                     ];
