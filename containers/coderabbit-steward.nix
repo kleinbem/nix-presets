@@ -72,6 +72,11 @@ in
       default = null;
       description = "Host path to sops-backed GitHub App private key PEM file.";
     };
+    trustAuthentikHeader = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Trust X-Authentik-Username injected by Caddy forward-auth (only enable when host firewall restricts the container port to Caddy).";
+    };
   }
   // tlsOpts;
 
@@ -110,6 +115,9 @@ in
             environment = {
               DATABASE_URL = "sqlite:///var/lib/coderabbit-steward/steward.db?mode=rwc";
               CR_STEWARD_MODE = cfg.mode;
+            }
+            // lib.optionalAttrs cfg.trustAuthentikHeader {
+              CR_STEWARD_TRUST_AUTHENTIK_HEADER = "true";
             };
             serviceConfig = {
               Type = "simple";
