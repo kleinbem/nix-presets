@@ -65,7 +65,7 @@ in
     secretsFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "Host path to sops-backed environment file (GITHUB_APP_ID, CR_STEWARD_API_TOKEN).";
+      description = "Host path to sops-backed environment file (GITHUB_APP_ID, CR_STEWARD_API_TOKEN, GITHUB_WEBHOOK_SECRET, CR_STEWARD_USER_TOKEN, CR_STEWARD_NTFY_URL, CR_STEWARD_NTFY_TOKEN).";
     };
     privateKeyFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
