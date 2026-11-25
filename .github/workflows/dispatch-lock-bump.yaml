@@ -1,0 +1,25 @@
+name: Dispatch nix-config lock bump
+
+# A merge here reaches no host until nix-config's flake.lock moves, which the
+# nightly Maintain Flake run would do at 03:00 UTC. So once main is green, ask
+# nix-config to bump just this input in its lock PR.
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: ["Check Flake"]
+    branches: [main]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  dispatch:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    uses: kleinbem/actions/.github/workflows/dispatch-lock-bump.yaml@b3ffb6b2eeb888969e5f16640c84a55956581542 # v1.9.0
+    with:
+      sha: ${{ github.event.workflow_run.head_sha }}
+    secrets:
+      app-id: ${{ secrets.APP_ID }}
+      app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
