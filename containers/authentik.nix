@@ -13,7 +13,7 @@ let
   inherit (self.lib) mkContainer;
   tlsOpts = import ../lib/tls-options.nix { inherit lib; };
 
-  image = "ghcr.io/goauthentik/server:2026.8.6"; # image-bump: calver
+  image = "ghcr.io/goauthentik/server:2026.8.7"; # image-bump: calver
 
   # In-container paths the *File options are bind-mounted to; the env-setup
   # script reads them into /run/authentik.env.
