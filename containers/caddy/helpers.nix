@@ -101,9 +101,9 @@ in
           else
             "";
       in
-      assert lib.assertMsg
-        ((node.authExcludePaths or [ ]) == [ ] && (node.authBearerPaths or [ ]) == [ ])
-        "caddy: spa node '${node.domain or "unknown"}' cannot set authExcludePaths or authBearerPaths";
+      assert lib.assertMsg (
+        (node.authExcludePaths or [ ]) == [ ] && (node.authBearerPaths or [ ]) == [ ]
+      ) "caddy: spa node '${node.domain or "unknown"}' cannot set authExcludePaths or authBearerPaths";
       ''
         @cors_preflight method OPTIONS
         handle @cors_preflight {
