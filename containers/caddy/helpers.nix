@@ -101,6 +101,9 @@ in
           else
             "";
       in
+      assert lib.assertMsg (
+        (node.authExcludePaths or [ ]) == [ ] && (node.authBearerPaths or [ ]) == [ ]
+      ) "caddy: spa node '${node.domain or "unknown"}' cannot set authExcludePaths or authBearerPaths";
       ''
         @cors_preflight method OPTIONS
         handle @cors_preflight {
@@ -197,17 +200,37 @@ in
                 # (e.g. n8n webhooks). They get no auth here at all, so the app
                 # must authenticate them itself.
                 authExcludePaths = node.authExcludePaths or [ ];
+                # Paths that bypass forward_auth only when an Authorization: Bearer
+                # header is present (CLI/agent callers). Any client-supplied
+                # X-Authentik-* headers are stripped so the app validates only the token.
+                authBearerPaths = node.authBearerPaths or [ ];
+                stripAuthentikHeaders = ''
+                  request_header -X-Authentik-*
+                '';
               in
               helpers.mkExtraRoutes node
               + (
                 if !(node.auth or false) then
                   reverseProxyBlock
-                else if authExcludePaths != [ ] then
-                  ''
+                else if authExcludePaths != [ ] || authBearerPaths != [ ] then
+                  lib.optionalString (authExcludePaths != [ ]) ''
                     @auth_excluded path ${lib.concatStringsSep " " authExcludePaths}
                     handle @auth_excluded {
+                      ${stripAuthentikHeaders}
                       ${reverseProxyBlock}
                     }
+                  ''
+                  + lib.optionalString (authBearerPaths != [ ]) ''
+                    @auth_bearer {
+                      path ${lib.concatStringsSep " " authBearerPaths}
+                      header_regexp Authorization "(?i)^Bearer\s+\S+"
+                    }
+                    handle @auth_bearer {
+                      ${stripAuthentikHeaders}
+                      ${reverseProxyBlock}
+                    }
+                  ''
+                  + ''
                     handle {
                       ${authConfig}
                       ${reverseProxyBlock}

@@ -44,7 +44,8 @@ in
         its own inventory -- this preset has no inventory of its own. See
         helpers.nix's genVHosts for the fields read per entry (ip, port,
         externalPort, domain, extraDomains, mtls, secure, auth,
-        authExcludePaths, maintenance).
+        authExcludePaths, authBearerPaths, maintenance). Note: authExcludePaths
+        and authBearerPaths are not supported on SPA nodes (`spa` set).
       '';
     };
     authUpstream = lib.mkOption {
