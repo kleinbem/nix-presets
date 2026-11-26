@@ -101,6 +101,9 @@ in
           else
             "";
       in
+      assert lib.assertMsg
+        ((node.authExcludePaths or [ ]) == [ ] && (node.authBearerPaths or [ ]) == [ ])
+        "caddy: spa node '${node.domain or "unknown"}' cannot set authExcludePaths or authBearerPaths";
       ''
         @cors_preflight method OPTIONS
         handle @cors_preflight {
@@ -202,12 +205,7 @@ in
                 # X-Authentik-* headers are stripped so the app validates only the token.
                 authBearerPaths = node.authBearerPaths or [ ];
                 stripAuthentikHeaders = ''
-                  request_header -X-Authentik-Username
-                  request_header -X-Authentik-Groups
-                  request_header -X-Authentik-Email
-                  request_header -X-Authentik-Name
-                  request_header -X-Authentik-Uid
-                  request_header -X-Authentik-Jwt
+                  request_header -X-Authentik-*
                 '';
               in
               helpers.mkExtraRoutes node
@@ -225,7 +223,7 @@ in
                   + lib.optionalString (authBearerPaths != [ ]) ''
                     @auth_bearer {
                       path ${lib.concatStringsSep " " authBearerPaths}
-                      header Authorization "Bearer *"
+                      header_regexp Authorization "(?i)^Bearer\s+\S+"
                     }
                     handle @auth_bearer {
                       ${stripAuthentikHeaders}
