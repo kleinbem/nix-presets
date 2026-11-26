@@ -44,7 +44,7 @@ in
         its own inventory -- this preset has no inventory of its own. See
         helpers.nix's genVHosts for the fields read per entry (ip, port,
         externalPort, domain, extraDomains, mtls, secure, auth,
-        authExcludePaths, maintenance).
+        authExcludePaths, authBearerPaths, maintenance).
       '';
     };
     authUpstream = lib.mkOption {
