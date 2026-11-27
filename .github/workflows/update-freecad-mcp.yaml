@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Mint GitHub App installation token
         id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
@@ -35,7 +35,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: false
 
-      - uses: kleinbem/actions/nix-setup@b3ffb6b2eeb888969e5f16640c84a55956581542 # v1.9.0
+      - uses: kleinbem/actions/nix-setup@d5aec5d8fbed30867e0b2c1d781992844240ee1e # v1.10.0
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           nix-path: nixpkgs=channel:nixos-unstable
