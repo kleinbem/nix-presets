@@ -53,7 +53,7 @@ in
         backend = "podman";
         containers.comfyui = {
           # Dated tag: plain :xpu is rebuilt weekly.
-          image = "docker.io/yanwk/comfyui-boot:xpu-20261116"; # image-bump: regex:^xpu-\d{8}$
+          image = "docker.io/yanwk/comfyui-boot:xpu-20261126"; # image-bump: regex:^xpu-\d{8}$
           ports = [ "8188:8188" ];
           environment = {
             CLI_ARGS = "--listen 0.0.0.0";
